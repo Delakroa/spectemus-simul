@@ -8,9 +8,13 @@
     "backend:build": "node scripts/run-gradle.mjs :backend:build --no-daemon",
     "backend:test": "node scripts/run-gradle.mjs :backend:test --no-daemon",
     "build": "pnpm -r --if-present build && pnpm backend:build",
-    "check": "pnpm test && pnpm build",
+    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build",
+    "dev:frontend": "pnpm --filter @watch-together/frontend dev",
     "dev:poc": "pnpm --filter @watch-together/poc-media-capture-livekit dev",
     "dev:poc:down": "pnpm --filter @watch-together/poc-media-capture-livekit dev:down",
-    "test": "pnpm -r --if-present test && pnpm backend:test"
+    "format:check": "pnpm -r --if-present format:check",
+    "lint": "pnpm -r --if-present lint",
+    "test": "pnpm -r --if-present test && pnpm backend:test",
+    "typecheck": "pnpm -r --if-present typecheck"
   }
 }
