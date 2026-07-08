@@ -11,7 +11,7 @@ P0 technical feasibility is complete.
 - WT-003 documented the first quality and latency baseline.
 - WT-004 accepted the media pipeline decision and added a first playback-state data-channel prototype.
 
-The repository is now in P1 foundation. The current task, WT-101, establishes the monorepo layout only. Product backend, React frontend, Redis/PostgreSQL infrastructure, rooms, chat, and voice are intentionally left for later tickets.
+The repository is now in P1 foundation. WT-101 is complete: the monorepo layout is established and the P0 media PoC is preserved as a reference implementation. Product backend, React frontend, Redis/PostgreSQL infrastructure, rooms, chat, and voice are intentionally left for later tickets.
 
 ## Repository Layout
 

@@ -1,5 +1,9 @@
 # WT-101 Monorepo Foundation
 
+## Status
+
+Closed on 2026-07-08.
+
 ## Goal
 
 Create the repository structure for the product MVP while preserving the P0 media PoC as a reference implementation.
@@ -30,7 +34,7 @@ Create the repository structure for the product MVP while preserving the P0 medi
 
 ## Verification
 
-Executed after the monorepo move:
+Executed after the monorepo move and before closing WT-101:
 
 ```bash
 pnpm test
