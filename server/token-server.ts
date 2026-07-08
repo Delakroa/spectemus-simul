@@ -76,7 +76,7 @@ async function createToken(room: string, identity: string, role: Role): Promise<
     roomJoin: true,
     canPublish: role === 'host',
     canSubscribe: true,
-    canPublishData: false
+    canPublishData: role === 'host'
   });
 
   return accessToken.toJwt();

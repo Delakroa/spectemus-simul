@@ -11,6 +11,13 @@ import {
   summarizeStreamTracks
 } from './lib/media';
 import {
+  createHostPlaybackStateMessage,
+  encodeHostPlaybackStateMessage,
+  playbackStateTopic,
+  type HostPlaybackEvent,
+  type HostPlaybackStatus
+} from './lib/playback-state';
+import {
   createIdentity,
   formatSeconds,
   getInitialRoomName,
@@ -42,6 +49,7 @@ type HostElements = {
   videoTrackStatus: HTMLElement;
   audioTrackStatus: HTMLElement;
   publishStatus: HTMLElement;
+  playbackStateStatus: HTMLElement;
   errorStatus: HTMLElement;
 };
 
@@ -101,6 +109,7 @@ export function mountHost(root: HTMLElement): void {
           <div class="status-row"><strong>Video track</strong><span id="video-track-status" class="status-value">Unknown</span></div>
           <div class="status-row"><strong>Audio track</strong><span id="audio-track-status" class="status-value">Unknown</span></div>
           <div class="status-row"><strong>Publication</strong><span id="publish-status" class="status-value">Stopped</span></div>
+          <div class="status-row"><strong>Room state</strong><span id="playback-state-status" class="status-value">Not sent</span></div>
         </div>
         <div>
           <div class="label">Error</div>
@@ -124,6 +133,9 @@ class HostController {
   private wantsPublication = false;
   private publishPromise: Promise<void> | null = null;
   private republishTimer: number | null = null;
+  private playbackStateRevision = 0;
+  private playbackStateTimer: number | null = null;
+  private selectedFileName: string | null = null;
 
   constructor(private readonly elements: HostElements) {}
 
@@ -157,19 +169,26 @@ class HostController {
 
     this.elements.seekInput.addEventListener('change', () => {
       this.isChangingSeek = false;
+      void this.publishPlaybackState('seek');
     });
 
     this.elements.preview.addEventListener('loadedmetadata', () => {
       this.updateTimeControls();
       this.updateSourceResolution();
+      void this.publishPlaybackState('metadata');
     });
     this.elements.preview.addEventListener('timeupdate', () => this.updateTimeControls());
-    this.elements.preview.addEventListener('play', () => setStatus(this.elements.publishStatus, 'Video playing locally', 'ok'));
+    this.elements.preview.addEventListener('play', () => {
+      setStatus(this.elements.publishStatus, 'Video playing locally', 'ok');
+      void this.publishPlaybackState('play');
+    });
     this.elements.preview.addEventListener('pause', () => {
       if (this.publishedTracks.length > 0) {
         setStatus(this.elements.publishStatus, 'Published, source paused', 'warn');
       }
+      void this.publishPlaybackState(this.elements.preview.ended ? 'stop' : 'pause');
     });
+    this.elements.preview.addEventListener('seeked', () => void this.publishPlaybackState('seek'));
     this.elements.preview.addEventListener('error', () => {
       this.showError('The selected file cannot be played by this browser.');
     });
@@ -180,6 +199,7 @@ class HostController {
   private replaceFile(file: File): void {
     this.clearError();
     this.stopPublication({ resetIntent: true });
+    this.selectedFileName = null;
 
     this.objectUrl = cleanupObjectUrl(this.objectUrl);
     this.elements.preview.pause();
@@ -199,6 +219,7 @@ class HostController {
     const type = file.type || 'unknown type';
 
     this.objectUrl = URL.createObjectURL(file);
+    this.selectedFileName = file.name;
     this.elements.preview.src = this.objectUrl;
     this.elements.preview.volume = 1;
     this.elements.preview.muted = false;
@@ -215,6 +236,7 @@ class HostController {
     setStatus(this.elements.videoTrackStatus, 'Not captured yet', 'idle');
     setStatus(this.elements.audioTrackStatus, 'Not captured yet', 'idle');
     setStatus(this.elements.publishStatus, 'Stopped', 'idle');
+    setStatus(this.elements.playbackStateStatus, 'Waiting for metadata', 'idle');
     this.updateButtons();
   }
 
@@ -233,7 +255,9 @@ class HostController {
 
       this.room = connection.room;
       this.bindRoomEvents(connection.room);
+      this.startPlaybackStateHeartbeat();
       setStatus(this.elements.connectionStatus, `Connected as ${connection.tokenResponse.identity}`, 'ok');
+      void this.publishPlaybackState('heartbeat');
     } catch (error) {
       this.showErrorFromUnknown(error, 'Unable to connect host to LiveKit.');
       setStatus(this.elements.connectionStatus, 'Connection failed', 'error');
@@ -255,6 +279,7 @@ class HostController {
       this.room = null;
     }
 
+    this.stopPlaybackStateHeartbeat();
     setStatus(this.elements.connectionStatus, 'Disconnected', 'idle');
     this.updateButtons();
   }
@@ -355,6 +380,7 @@ class HostController {
         }),
         videoOutcome.status === 'pending' || audioPending || (audioTrack && !audioPublished) ? 'warn' : 'ok'
       );
+      void this.publishPlaybackState('publish');
     } catch (error) {
       if (this.publishedTracks.length === 0) {
         this.stopPublication({ resetIntent: false });
@@ -455,6 +481,7 @@ class HostController {
     setStatus(this.elements.videoTrackStatus, 'Not captured', 'idle');
     setStatus(this.elements.audioTrackStatus, 'Not captured', 'idle');
     setStatus(this.elements.publishStatus, 'Stopped', 'idle');
+    void this.publishPlaybackState('stop');
     this.updateButtons();
   }
 
@@ -523,8 +550,11 @@ class HostController {
       .on(RoomEvent.Reconnected, () => {
         setStatus(this.elements.connectionStatus, 'Reconnected', 'ok');
         this.scheduleRepublish('Reconnected');
+        this.startPlaybackStateHeartbeat();
+        void this.publishPlaybackState('reconnect');
       })
       .on(RoomEvent.LocalTrackUnpublished, () => this.scheduleRepublish('Local track unpublished'))
+      .on(RoomEvent.ParticipantConnected, () => void this.publishPlaybackState('participant'))
       .on(RoomEvent.Disconnected, () => setStatus(this.elements.connectionStatus, 'Disconnected', 'warn'));
   }
 
@@ -551,8 +581,72 @@ class HostController {
     setStatus(this.elements.sourceResolutionStatus, 'Metadata loaded, resolution unavailable', 'warn');
   }
 
+  private startPlaybackStateHeartbeat(): void {
+    if (this.playbackStateTimer !== null) {
+      return;
+    }
+
+    this.playbackStateTimer = window.setInterval(() => void this.publishPlaybackState('heartbeat'), 1000);
+  }
+
+  private stopPlaybackStateHeartbeat(): void {
+    if (this.playbackStateTimer !== null) {
+      window.clearInterval(this.playbackStateTimer);
+      this.playbackStateTimer = null;
+    }
+  }
+
+  private async publishPlaybackState(event: HostPlaybackEvent): Promise<void> {
+    if (!this.room) {
+      return;
+    }
+
+    const message = createHostPlaybackStateMessage({
+      revision: ++this.playbackStateRevision,
+      event,
+      status: this.getPlaybackStatus(),
+      currentTime: this.elements.preview.currentTime || 0,
+      duration: Number.isFinite(this.elements.preview.duration) ? this.elements.preview.duration : null,
+      fileName: this.selectedFileName
+    });
+
+    try {
+      await this.room.localParticipant.publishData(encodeHostPlaybackStateMessage(message), {
+        reliable: true,
+        topic: playbackStateTopic
+      });
+      setStatus(
+        this.elements.playbackStateStatus,
+        `Sent ${message.status} @ ${formatSeconds(message.currentTime)}; rev=${message.revision}`,
+        message.status === 'playing' ? 'ok' : 'warn'
+      );
+    } catch (error) {
+      const normalized = normalizeError(error, 'Unable to publish playback state.');
+      setStatus(this.elements.playbackStateStatus, `${normalized.message} (${normalized.code})`, 'warn');
+    }
+  }
+
+  private getPlaybackStatus(): HostPlaybackStatus {
+    const preview = this.elements.preview;
+
+    if (!preview.currentSrc) {
+      return 'idle';
+    }
+
+    if (preview.ended) {
+      return 'ended';
+    }
+
+    if (preview.paused) {
+      return 'paused';
+    }
+
+    return preview.readyState >= 1 ? 'playing' : 'ready';
+  }
+
   private cleanup(): void {
     this.stopPublication({ resetIntent: true });
+    this.stopPlaybackStateHeartbeat();
     this.room?.disconnect();
     this.room = null;
     this.objectUrl = cleanupObjectUrl(this.objectUrl);
@@ -618,6 +712,7 @@ function getHostElements(root: HTMLElement): HostElements {
     videoTrackStatus: getRequiredElement(root, '#video-track-status'),
     audioTrackStatus: getRequiredElement(root, '#audio-track-status'),
     publishStatus: getRequiredElement(root, '#publish-status'),
+    playbackStateStatus: getRequiredElement(root, '#playback-state-status'),
     errorStatus: getRequiredElement(root, '#error-status')
   };
 }

@@ -2,7 +2,13 @@ import { RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent
 import { normalizeError } from './lib/errors';
 import { connectToLiveKit } from './lib/livekit';
 import {
+  decodeHostPlaybackStateMessage,
+  playbackStateTopic,
+  type HostPlaybackStateMessage
+} from './lib/playback-state';
+import {
   createIdentity,
+  formatSeconds,
   getInitialRoomName,
   getRequiredElement,
   getTokenEndpoint,
@@ -23,6 +29,7 @@ type GuestElements = {
   videoTrackStatus: HTMLElement;
   audioTrackStatus: HTMLElement;
   hostStatus: HTMLElement;
+  hostPlaybackStatus: HTMLElement;
   firstFrameStatus: HTMLElement;
   playbackQualityStatus: HTMLElement;
   videoStatsStatus: HTMLElement;
@@ -81,6 +88,7 @@ export function mountGuest(root: HTMLElement): void {
           <div class="status-row"><strong>Video track</strong><span id="video-track-status" class="status-value">Missing</span></div>
           <div class="status-row"><strong>Audio track</strong><span id="audio-track-status" class="status-value">Missing</span></div>
           <div class="status-row"><strong>Host</strong><span id="host-status" class="status-value">Unknown</span></div>
+          <div class="status-row"><strong>Host playback</strong><span id="host-playback-status" class="status-value">Waiting for state</span></div>
           <div class="status-row"><strong>First frame</strong><span id="first-frame-status" class="status-value">Not received</span></div>
           <div class="status-row"><strong>Playback</strong><span id="playback-quality-status" class="status-value">Waiting for video</span></div>
           <div class="status-row"><strong>Video stats</strong><span id="video-stats-status" class="status-value">No video stats</span></div>
@@ -109,6 +117,7 @@ class GuestController {
   private statsTimer: number | null = null;
   private connectStartedAt = 0;
   private firstFrameReceived = false;
+  private lastHostPlaybackState: HostPlaybackStateMessage | null = null;
 
   constructor(private readonly elements: GuestElements) {}
 
@@ -182,6 +191,7 @@ class GuestController {
     setStatus(this.elements.videoTrackStatus, 'Missing', 'idle');
     setStatus(this.elements.audioTrackStatus, 'Missing', 'idle');
     setStatus(this.elements.hostStatus, 'Unknown', 'idle');
+    setStatus(this.elements.hostPlaybackStatus, 'Waiting for state', 'idle');
     setStatus(this.elements.firstFrameStatus, 'Not received', 'idle');
     setStatus(this.elements.playbackQualityStatus, 'Waiting for video', 'idle');
     setStatus(this.elements.videoStatsStatus, 'No video stats', 'idle');
@@ -199,6 +209,9 @@ class GuestController {
       .on(RoomEvent.Disconnected, () => setStatus(this.elements.connectionStatus, 'Disconnected', 'warn'))
       .on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
         this.attachTrack(track, publication, participant);
+      })
+      .on(RoomEvent.DataReceived, (payload, participant, _kind, topic) => {
+        this.handleDataReceived(payload, participant?.identity, topic);
       })
       .on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
         this.detachTrack(track);
@@ -233,6 +246,7 @@ class GuestController {
       track.attach(this.elements.remoteVideo);
       setStatus(this.elements.videoTrackStatus, `${publication.trackName || 'video'} subscribed`, 'ok');
       this.startStatsTimer();
+      this.applyLastHostPlaybackState();
       void this.playRemoteMedia();
       return;
     }
@@ -293,6 +307,49 @@ class GuestController {
     this.elements.remoteVideo.removeAttribute('src');
     this.elements.remoteVideo.srcObject = null;
     this.elements.enableSoundButton.disabled = true;
+    this.lastHostPlaybackState = null;
+  }
+
+  private handleDataReceived(payload: Uint8Array, participantIdentity: string | undefined, topic: string | undefined): void {
+    if (topic !== playbackStateTopic) {
+      return;
+    }
+
+    const message = decodeHostPlaybackStateMessage(payload);
+    if (!message) {
+      setStatus(this.elements.hostPlaybackStatus, 'Invalid host playback state', 'warn');
+      return;
+    }
+
+    if (this.lastHostPlaybackState && message.sentAt < this.lastHostPlaybackState.sentAt) {
+      return;
+    }
+
+    this.lastHostPlaybackState = message;
+    const duration = message.duration === null ? 'live' : formatSeconds(message.duration);
+    const host = participantIdentity ? `${participantIdentity}: ` : '';
+    setStatus(
+      this.elements.hostPlaybackStatus,
+      `${host}${message.status} @ ${formatSeconds(message.currentTime)} / ${duration}; rev=${message.revision}`,
+      message.status === 'playing' ? 'ok' : 'warn'
+    );
+    this.applyLastHostPlaybackState();
+  }
+
+  private applyLastHostPlaybackState(): void {
+    const state = this.lastHostPlaybackState;
+    if (!state || this.subscribedTracks.size === 0) {
+      return;
+    }
+
+    if (state.status === 'playing') {
+      void this.playRemoteMedia();
+      return;
+    }
+
+    if (state.status === 'paused' || state.status === 'ended') {
+      this.elements.remoteVideo.pause();
+    }
   }
 
   private async playRemoteMedia(options: { userGesture?: boolean; markAudioPlaying?: boolean } = {}): Promise<void> {
@@ -458,6 +515,7 @@ function getGuestElements(root: HTMLElement): GuestElements {
     videoTrackStatus: getRequiredElement(root, '#video-track-status'),
     audioTrackStatus: getRequiredElement(root, '#audio-track-status'),
     hostStatus: getRequiredElement(root, '#host-status'),
+    hostPlaybackStatus: getRequiredElement(root, '#host-playback-status'),
     firstFrameStatus: getRequiredElement(root, '#first-frame-status'),
     playbackQualityStatus: getRequiredElement(root, '#playback-quality-status'),
     videoStatsStatus: getRequiredElement(root, '#video-stats-status'),

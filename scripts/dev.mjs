@@ -17,6 +17,7 @@ function runOnce(command, args) {
     const child = spawn(command, args, {
       cwd: rootDir,
       env: process.env,
+      shell: isWindows,
       stdio: 'inherit'
     });
 
@@ -36,6 +37,7 @@ function startLongRunning(name, command, args) {
   const child = spawn(command, args, {
     cwd: rootDir,
     env: process.env,
+    shell: isWindows,
     stdio: 'inherit'
   });
 

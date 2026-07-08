@@ -173,10 +173,11 @@ docker compose exec livekit /livekit-server --version
 5. Не должно быть `POST`, `PUT`, `multipart/form-data`, больших request payload или запроса с именем файла.
 6. В фильтре `WS` будет подключение к LiveKit; это WebRTC signaling/media-plane, не application backend upload.
 
-## WT-002 / WT-003
+## WT-002 / WT-003 / WT-004
 
 - WT-002 матрица совместимости: [docs/WT-002_COMPATIBILITY_MATRIX.md](docs/WT-002_COMPATIBILITY_MATRIX.md)
 - WT-003 качество и задержка: [docs/WT-003_QUALITY_LATENCY.md](docs/WT-003_QUALITY_LATENCY.md)
+- WT-004 product-state sync: [docs/WT-004_PRODUCT_STATE.md](docs/WT-004_PRODUCT_STATE.md)
 
 Текущий вывод: `GO` для продолжения WT-004/product-state прототипа на базе Chrome/Edge + MP4 H.264/AAC. Это еще не production quality/SLO.
 
@@ -198,6 +199,20 @@ docker compose exec livekit /livekit-server --version
 В текущем baseline источник и capture были `1920x1080`, а guest декодировал `1280x720`. Это зафиксированное ограничение PoC; 1:1 resolution tuning вынесен отдельно и не блокирует WT-004.
 
 Перед продуктовым обещанием качества/масштаба нужно снять метрики для 2 guests и 3 guests, а также отдельно проверить controlled network scenarios, если они входят в MVP.
+
+## WT-004
+
+Host теперь отправляет состояние просмотра через LiveKit data channel topic `wt.playback-state.v1`.
+
+Guest получает и показывает `Host playback`, а также применяет host `playing/paused/ended` к своему remote video. Это первый product-state слой: host уже является авторитетным для play/pause, но точная VOD-синхронизация seek по timestamp пока не реализована, потому что guest получает live WebRTC stream, а не локальный файл.
+
+Для ручной проверки:
+
+1. Host выбирает MP4, подключается и публикует tracks.
+2. Guest подключается к той же room.
+3. Host нажимает `Pause` / `Play` / делает seek.
+4. Guest должен обновлять `Host playback`; play/pause должны применяться к remote video.
+5. После guest reload/reconnect новое состояние должно приехать через heartbeat host.
 
 ## Автоматические проверки
 
