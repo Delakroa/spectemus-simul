@@ -36,7 +36,9 @@ type HostElements = {
   preview: HTMLVideoElement;
   connectionStatus: HTMLElement;
   fileStatus: HTMLElement;
+  sourceResolutionStatus: HTMLElement;
   captureStatus: HTMLElement;
+  captureResolutionStatus: HTMLElement;
   videoTrackStatus: HTMLElement;
   audioTrackStatus: HTMLElement;
   publishStatus: HTMLElement;
@@ -93,7 +95,9 @@ export function mountHost(root: HTMLElement): void {
         <div class="status-list">
           <div class="status-row"><strong>LiveKit</strong><span id="connection-status" class="status-value">Disconnected</span></div>
           <div class="status-row"><strong>Selected file</strong><span id="file-status" class="status-value">No file selected</span></div>
+          <div class="status-row"><strong>Source resolution</strong><span id="source-resolution-status" class="status-value">No metadata</span></div>
           <div class="status-row"><strong>captureStream</strong><span id="capture-status" class="status-value">Not captured</span></div>
+          <div class="status-row"><strong>Capture resolution</strong><span id="capture-resolution-status" class="status-value">Not captured</span></div>
           <div class="status-row"><strong>Video track</strong><span id="video-track-status" class="status-value">Unknown</span></div>
           <div class="status-row"><strong>Audio track</strong><span id="audio-track-status" class="status-value">Unknown</span></div>
           <div class="status-row"><strong>Publication</strong><span id="publish-status" class="status-value">Stopped</span></div>
@@ -155,7 +159,10 @@ class HostController {
       this.isChangingSeek = false;
     });
 
-    this.elements.preview.addEventListener('loadedmetadata', () => this.updateTimeControls());
+    this.elements.preview.addEventListener('loadedmetadata', () => {
+      this.updateTimeControls();
+      this.updateSourceResolution();
+    });
     this.elements.preview.addEventListener('timeupdate', () => this.updateTimeControls());
     this.elements.preview.addEventListener('play', () => setStatus(this.elements.publishStatus, 'Video playing locally', 'ok'));
     this.elements.preview.addEventListener('pause', () => {
@@ -182,6 +189,8 @@ class HostController {
     if (file.size === 0) {
       this.showError('Selected file is empty.');
       setStatus(this.elements.fileStatus, 'Empty file', 'error');
+      setStatus(this.elements.sourceResolutionStatus, 'No metadata', 'idle');
+      setStatus(this.elements.captureResolutionStatus, 'Not captured', 'idle');
       return;
     }
 
@@ -200,7 +209,9 @@ class HostController {
       `${file.name} (${type}, ${formatBytes(file.size)})${playableMimeType ? '' : ' - browser did not confirm MP4 support'}`,
       level
     );
+    setStatus(this.elements.sourceResolutionStatus, 'Loading metadata...', 'idle');
     setStatus(this.elements.captureStatus, 'Ready to capture after metadata loads', 'idle');
+    setStatus(this.elements.captureResolutionStatus, 'Not captured', 'idle');
     setStatus(this.elements.videoTrackStatus, 'Not captured yet', 'idle');
     setStatus(this.elements.audioTrackStatus, 'Not captured yet', 'idle');
     setStatus(this.elements.publishStatus, 'Stopped', 'idle');
@@ -282,6 +293,7 @@ class HostController {
       const { videoTrack, audioTrack, summary } = getPrimaryPublishTracks(this.capturedStream);
 
       setStatus(this.elements.captureStatus, `Captured ${summary.videoTracks.length} video / ${summary.audioTracks.length} audio`, 'ok');
+      setStatus(this.elements.captureResolutionStatus, describeCaptureResolution(videoTrack), 'ok');
       setStatus(this.elements.videoTrackStatus, `Publishing ${describeTrack(videoTrack)}`, 'warn');
 
       this.publishedTracks.push(videoTrack);
@@ -439,6 +451,7 @@ class HostController {
     this.capturedStream = null;
 
     setStatus(this.elements.captureStatus, 'Not captured', 'idle');
+    setStatus(this.elements.captureResolutionStatus, 'Not captured', 'idle');
     setStatus(this.elements.videoTrackStatus, 'Not captured', 'idle');
     setStatus(this.elements.audioTrackStatus, 'Not captured', 'idle');
     setStatus(this.elements.publishStatus, 'Stopped', 'idle');
@@ -527,6 +540,17 @@ class HostController {
     timeReadout.textContent = `${formatSeconds(preview.currentTime || 0)} / ${formatSeconds(duration)}`;
   }
 
+  private updateSourceResolution(): void {
+    const { preview } = this.elements;
+
+    if (preview.videoWidth > 0 && preview.videoHeight > 0) {
+      setStatus(this.elements.sourceResolutionStatus, `${preview.videoWidth}x${preview.videoHeight}`, 'ok');
+      return;
+    }
+
+    setStatus(this.elements.sourceResolutionStatus, 'Metadata loaded, resolution unavailable', 'warn');
+  }
+
   private cleanup(): void {
     this.stopPublication({ resetIntent: true });
     this.room?.disconnect();
@@ -588,7 +612,9 @@ function getHostElements(root: HTMLElement): HostElements {
     preview: getRequiredElement(root, '#host-preview'),
     connectionStatus: getRequiredElement(root, '#connection-status'),
     fileStatus: getRequiredElement(root, '#file-status'),
+    sourceResolutionStatus: getRequiredElement(root, '#source-resolution-status'),
     captureStatus: getRequiredElement(root, '#capture-status'),
+    captureResolutionStatus: getRequiredElement(root, '#capture-resolution-status'),
     videoTrackStatus: getRequiredElement(root, '#video-track-status'),
     audioTrackStatus: getRequiredElement(root, '#audio-track-status'),
     publishStatus: getRequiredElement(root, '#publish-status'),
@@ -598,6 +624,13 @@ function getHostElements(root: HTMLElement): HostElements {
 
 function describeTrack(track: MediaStreamTrack): string {
   return `${track.kind} track: ${track.label || 'unlabeled'}, state=${track.readyState}`;
+}
+
+function describeCaptureResolution(track: MediaStreamTrack): string {
+  const settings = track.getSettings();
+  const size = settings.width && settings.height ? `${settings.width}x${settings.height}` : 'resolution=n/a';
+  const frameRate = settings.frameRate ? `, fps=${Math.round(settings.frameRate)}` : '';
+  return `${size}${frameRate}`;
 }
 
 function describePublication(publication: LocalTrackPublication, fallbackTrack: MediaStreamTrack): string {

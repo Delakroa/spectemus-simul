@@ -173,6 +173,19 @@ docker compose exec livekit /livekit-server --version
 5. Не должно быть `POST`, `PUT`, `multipart/form-data`, больших request payload или запроса с именем файла.
 6. В фильтре `WS` будет подключение к LiveKit; это WebRTC signaling/media-plane, не application backend upload.
 
+## WT-002 / WT-003
+
+- WT-002 матрица совместимости: [docs/WT-002_COMPATIBILITY_MATRIX.md](docs/WT-002_COMPATIBILITY_MATRIX.md)
+- WT-003 качество и задержка: [docs/WT-003_QUALITY_LATENCY.md](docs/WT-003_QUALITY_LATENCY.md)
+
+Guest UI после подписки показывает базовые метрики WT-003: time to first frame, dropped frames, video receiver bitrate/loss/jitter и audio receiver bitrate/loss/jitter.
+
+Для проверки сохранения разрешения сравнивай три значения:
+
+1. `Source resolution` у host — фактическое разрешение выбранного файла после загрузки metadata.
+2. `Capture resolution` у host — что отдал `captureStream()` в `MediaStreamTrack`.
+3. `Video stats` у guest — какое разрешение реально декодирует guest после WebRTC.
+
 ## Автоматические проверки
 
 ```powershell

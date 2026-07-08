@@ -24,7 +24,29 @@ type GuestElements = {
   audioTrackStatus: HTMLElement;
   hostStatus: HTMLElement;
   firstFrameStatus: HTMLElement;
+  playbackQualityStatus: HTMLElement;
+  videoStatsStatus: HTMLElement;
+  audioStatsStatus: HTMLElement;
   errorStatus: HTMLElement;
+};
+
+type ReceiverStatsSnapshot = {
+  timestamp: number;
+  bytesReceived?: number;
+  packetsLost?: number;
+  packetsReceived?: number;
+  jitter?: number;
+  framesDecoded?: number;
+  framesDropped?: number;
+  framesReceived?: number;
+  frameWidth?: number;
+  frameHeight?: number;
+  concealedSamples?: number;
+  concealmentEvents?: number;
+};
+
+type ReceiverStatsTrack = RemoteTrack & {
+  getReceiverStats: () => Promise<ReceiverStatsSnapshot | undefined>;
 };
 
 export function mountGuest(root: HTMLElement): void {
@@ -60,6 +82,9 @@ export function mountGuest(root: HTMLElement): void {
           <div class="status-row"><strong>Audio track</strong><span id="audio-track-status" class="status-value">Missing</span></div>
           <div class="status-row"><strong>Host</strong><span id="host-status" class="status-value">Unknown</span></div>
           <div class="status-row"><strong>First frame</strong><span id="first-frame-status" class="status-value">Not received</span></div>
+          <div class="status-row"><strong>Playback</strong><span id="playback-quality-status" class="status-value">Waiting for video</span></div>
+          <div class="status-row"><strong>Video stats</strong><span id="video-stats-status" class="status-value">No video stats</span></div>
+          <div class="status-row"><strong>Audio stats</strong><span id="audio-stats-status" class="status-value">No audio stats</span></div>
         </div>
         <div>
           <div class="label">Error</div>
@@ -77,6 +102,11 @@ export function mountGuest(root: HTMLElement): void {
 class GuestController {
   private room: Room | null = null;
   private subscribedTracks = new Set<RemoteTrack>();
+  private videoStatsTrack: ReceiverStatsTrack | null = null;
+  private audioStatsTrack: ReceiverStatsTrack | null = null;
+  private previousVideoStats: ReceiverStatsSnapshot | null = null;
+  private previousAudioStats: ReceiverStatsSnapshot | null = null;
+  private statsTimer: number | null = null;
   private connectStartedAt = 0;
   private firstFrameReceived = false;
 
@@ -153,6 +183,9 @@ class GuestController {
     setStatus(this.elements.audioTrackStatus, 'Missing', 'idle');
     setStatus(this.elements.hostStatus, 'Unknown', 'idle');
     setStatus(this.elements.firstFrameStatus, 'Not received', 'idle');
+    setStatus(this.elements.playbackQualityStatus, 'Waiting for video', 'idle');
+    setStatus(this.elements.videoStatsStatus, 'No video stats', 'idle');
+    setStatus(this.elements.audioStatsStatus, 'No audio stats', 'idle');
     this.updateButtons();
   }
 
@@ -195,15 +228,21 @@ class GuestController {
     setStatus(this.elements.hostStatus, `Receiving from ${participant.identity}`, 'ok');
 
     if (track.kind === Track.Kind.Video) {
+      this.videoStatsTrack = toReceiverStatsTrack(track);
+      this.previousVideoStats = null;
       track.attach(this.elements.remoteVideo);
       setStatus(this.elements.videoTrackStatus, `${publication.trackName || 'video'} subscribed`, 'ok');
+      this.startStatsTimer();
       void this.playRemoteMedia();
       return;
     }
 
     if (track.kind === Track.Kind.Audio) {
+      this.audioStatsTrack = toReceiverStatsTrack(track);
+      this.previousAudioStats = null;
       track.attach(this.elements.remoteVideo);
       setStatus(this.elements.audioTrackStatus, `${publication.trackName || 'audio'} subscribed`, 'ok');
+      this.startStatsTimer();
       void this.playRemoteMedia({ markAudioPlaying: true });
     }
   }
@@ -213,16 +252,24 @@ class GuestController {
     this.subscribedTracks.delete(track);
 
     if (track.kind === Track.Kind.Video) {
+      this.videoStatsTrack = null;
+      this.previousVideoStats = null;
       setStatus(this.elements.videoTrackStatus, 'Missing', 'warn');
+      setStatus(this.elements.videoStatsStatus, 'No video stats', 'warn');
     }
 
     if (track.kind === Track.Kind.Audio) {
+      this.audioStatsTrack = null;
+      this.previousAudioStats = null;
       setStatus(this.elements.audioTrackStatus, 'Missing', 'warn');
+      setStatus(this.elements.audioStatsStatus, 'No audio stats', 'warn');
     }
 
     if (this.subscribedTracks.size === 0) {
+      this.stopStatsTimer();
       this.elements.remoteVideo.removeAttribute('src');
       this.elements.remoteVideo.srcObject = null;
+      setStatus(this.elements.playbackQualityStatus, 'Waiting for video', 'idle');
     }
 
     setStatus(
@@ -238,6 +285,11 @@ class GuestController {
     }
 
     this.subscribedTracks.clear();
+    this.videoStatsTrack = null;
+    this.audioStatsTrack = null;
+    this.previousVideoStats = null;
+    this.previousAudioStats = null;
+    this.stopStatsTimer();
     this.elements.remoteVideo.removeAttribute('src');
     this.elements.remoteVideo.srcObject = null;
     this.elements.enableSoundButton.disabled = true;
@@ -262,6 +314,96 @@ class GuestController {
       this.elements.enableSoundButton.disabled = false;
       this.showErrorFromUnknown(error, 'Browser blocked remote audio autoplay. Press Enable sound.');
     }
+  }
+
+  private startStatsTimer(): void {
+    if (this.statsTimer !== null) {
+      return;
+    }
+
+    this.statsTimer = window.setInterval(() => void this.updateStats(), 2000);
+    void this.updateStats();
+  }
+
+  private stopStatsTimer(): void {
+    if (this.statsTimer !== null) {
+      window.clearInterval(this.statsTimer);
+      this.statsTimer = null;
+    }
+  }
+
+  private async updateStats(): Promise<void> {
+    this.updatePlaybackQuality();
+    await Promise.all([this.updateVideoReceiverStats(), this.updateAudioReceiverStats()]);
+  }
+
+  private updatePlaybackQuality(): void {
+    const video = this.elements.remoteVideo;
+
+    if (!('getVideoPlaybackQuality' in video)) {
+      setStatus(this.elements.playbackQualityStatus, 'Playback quality API unavailable', 'warn');
+      return;
+    }
+
+    const quality = video.getVideoPlaybackQuality();
+    const total = quality.totalVideoFrames;
+    const dropped = quality.droppedVideoFrames;
+    const droppedPercent = total > 0 ? (dropped / total) * 100 : 0;
+    const level = droppedPercent > 5 ? 'warn' : 'ok';
+    setStatus(
+      this.elements.playbackQualityStatus,
+      `frames=${total}, dropped=${dropped} (${droppedPercent.toFixed(1)}%)`,
+      level
+    );
+  }
+
+  private async updateVideoReceiverStats(): Promise<void> {
+    if (!this.videoStatsTrack) {
+      return;
+    }
+
+    const stats = await this.videoStatsTrack.getReceiverStats();
+    if (!stats) {
+      setStatus(this.elements.videoStatsStatus, 'Video receiver stats unavailable', 'warn');
+      return;
+    }
+
+    const bitrate = calculateBitrateKbps(stats, this.previousVideoStats);
+    this.previousVideoStats = stats;
+
+    const parts = [
+      formatBitrate(bitrate),
+      formatResolution(stats),
+      `loss=${formatOptionalNumber(stats.packetsLost)}`,
+      `jitter=${formatJitter(stats.jitter)}`,
+      `decoded=${formatOptionalNumber(stats.framesDecoded)}`
+    ];
+
+    setStatus(this.elements.videoStatsStatus, parts.join(', '), getStatsLevel(stats.packetsLost, stats.jitter));
+  }
+
+  private async updateAudioReceiverStats(): Promise<void> {
+    if (!this.audioStatsTrack) {
+      return;
+    }
+
+    const stats = await this.audioStatsTrack.getReceiverStats();
+    if (!stats) {
+      setStatus(this.elements.audioStatsStatus, 'Audio receiver stats unavailable', 'warn');
+      return;
+    }
+
+    const bitrate = calculateBitrateKbps(stats, this.previousAudioStats);
+    this.previousAudioStats = stats;
+
+    const parts = [
+      formatBitrate(bitrate),
+      `loss=${formatOptionalNumber(stats.packetsLost)}`,
+      `jitter=${formatJitter(stats.jitter)}`,
+      `conceal=${formatOptionalNumber(stats.concealmentEvents)}`
+    ];
+
+    setStatus(this.elements.audioStatsStatus, parts.join(', '), getStatsLevel(stats.packetsLost, stats.jitter));
   }
 
   private roomName(): string {
@@ -317,6 +459,66 @@ function getGuestElements(root: HTMLElement): GuestElements {
     audioTrackStatus: getRequiredElement(root, '#audio-track-status'),
     hostStatus: getRequiredElement(root, '#host-status'),
     firstFrameStatus: getRequiredElement(root, '#first-frame-status'),
+    playbackQualityStatus: getRequiredElement(root, '#playback-quality-status'),
+    videoStatsStatus: getRequiredElement(root, '#video-stats-status'),
+    audioStatsStatus: getRequiredElement(root, '#audio-stats-status'),
     errorStatus: getRequiredElement(root, '#error-status')
   };
+}
+
+function toReceiverStatsTrack(track: RemoteTrack): ReceiverStatsTrack {
+  return track as ReceiverStatsTrack;
+}
+
+function calculateBitrateKbps(current: ReceiverStatsSnapshot, previous: ReceiverStatsSnapshot | null): number | null {
+  if (!previous || current.bytesReceived === undefined || previous.bytesReceived === undefined) {
+    return null;
+  }
+
+  const elapsedMs = current.timestamp - previous.timestamp;
+  if (elapsedMs <= 0) {
+    return null;
+  }
+
+  return ((current.bytesReceived - previous.bytesReceived) * 8) / elapsedMs;
+}
+
+function formatBitrate(kbps: number | null): string {
+  if (kbps === null || !Number.isFinite(kbps)) {
+    return 'bitrate=warming up';
+  }
+
+  if (kbps >= 1000) {
+    return `bitrate=${(kbps / 1000).toFixed(2)} Mbps`;
+  }
+
+  return `bitrate=${Math.round(kbps)} kbps`;
+}
+
+function formatResolution(stats: ReceiverStatsSnapshot): string {
+  if (stats.frameWidth && stats.frameHeight) {
+    return `${stats.frameWidth}x${stats.frameHeight}`;
+  }
+
+  return 'resolution=n/a';
+}
+
+function formatOptionalNumber(value: number | undefined): string {
+  return value === undefined ? 'n/a' : String(value);
+}
+
+function formatJitter(value: number | undefined): string {
+  if (value === undefined) {
+    return 'n/a';
+  }
+
+  return `${Math.round(value * 1000)} ms`;
+}
+
+function getStatsLevel(packetsLost: number | undefined, jitter: number | undefined): 'ok' | 'warn' {
+  if ((packetsLost ?? 0) > 0 || (jitter ?? 0) > 0.03) {
+    return 'warn';
+  }
+
+  return 'ok';
 }
