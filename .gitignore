@@ -1,9 +1,14 @@
 node_modules/
 **/node_modules/
 
+.gradle/
+**/.gradle/
+
+build/
+**/build/
+
 dist/
 **/dist/
-backend/build/
 frontend/build/
 
 .env

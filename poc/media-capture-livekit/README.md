@@ -1,6 +1,6 @@
 ﻿# WT-001 Media Capture LiveKit PoC
 
-This package is a P0 reference implementation inside the Watch Together monorepo. Product backend, product frontend, room lifecycle, chat, voice, Redis, and PostgreSQL live outside this PoC.
+Этот package — P0 reference implementation внутри Watch Together monorepo. Product backend, product frontend, room lifecycle, chat, voice, Redis и PostgreSQL находятся вне этого PoC.
 
 ## 1. Назначение прототипа
 
@@ -30,7 +30,7 @@ copy .env.example .env
 pnpm install
 ```
 
-From the repository root, `pnpm install` also installs this workspace package.
+Из корня репозитория `pnpm install` также устанавливает этот workspace package.
 
 ## 4. Как запустить всё одной командой
 
@@ -39,7 +39,7 @@ cd watch-together-media-capture-livekit
 pnpm dev:poc
 ```
 
-Or from this package directory:
+Или из директории этого package:
 
 ```powershell
 cd watch-together-media-capture-livekit/poc/media-capture-livekit
@@ -143,7 +143,7 @@ Resolution: 720p или 1080p
 - Без TURN/TLS этот compose предназначен для локального теста на одной машине или в простой LAN.
 - LiveKit image tag закреплен для воспроизводимого PoC, но перед beta версию нужно сверить с production-рекомендациями.
 
-## 12. Troubleshooting
+## 12. Диагностика
 
 - `captureStream is not supported`: открой PoC в desktop Chrome или Edge.
 - `Token endpoint is unavailable`: проверь `pnpm dev:token` и `VITE_TOKEN_ENDPOINT`.
@@ -236,7 +236,7 @@ pnpm test
 pnpm build
 ```
 
-Or from this package directory:
+Или из директории этого package:
 
 ```powershell
 cd watch-together-media-capture-livekit/poc/media-capture-livekit

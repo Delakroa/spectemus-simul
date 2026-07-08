@@ -1,8 +1,8 @@
 # Frontend
 
-Placeholder for WT-103.
+Заглушка для WT-103.
 
-Expected direction:
+Ожидаемое направление:
 
 - React.
 - TypeScript.
@@ -12,4 +12,4 @@ Expected direction:
 - Zustand.
 - LiveKit Client SDK.
 
-Out of scope for WT-101: product UI, room flows, media lifecycle, chat, voice, and tests.
+Вне области WT-101: product UI, room flows, media lifecycle, chat, voice и tests.

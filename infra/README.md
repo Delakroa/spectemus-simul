@@ -1,13 +1,13 @@
 # Infrastructure
 
-Placeholder for WT-104.
+Заглушка для WT-104.
 
-Expected local stack:
+Ожидаемый local stack:
 
 - LiveKit.
 - Redis.
 - PostgreSQL.
 - Reverse proxy.
-- Environment examples and health checks.
+- Environment examples и health checks.
 
-Out of scope for WT-101: runnable product compose stack and beta deployment configuration.
+Вне области WT-101: runnable product compose stack и beta deployment configuration.

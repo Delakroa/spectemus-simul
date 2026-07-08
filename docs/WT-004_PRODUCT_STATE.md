@@ -1,4 +1,4 @@
-# WT-004 Product State Sync
+# WT-004 Синхронизация product-state
 
 Цель: добавить первый product-state слой поверх уже работающего media pipeline. Host становится авторитетным источником состояния просмотра, guest получает это состояние через LiveKit data channel.
 

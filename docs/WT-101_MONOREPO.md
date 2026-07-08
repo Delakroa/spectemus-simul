@@ -1,22 +1,22 @@
 # WT-101 Monorepo Foundation
 
-## Status
+## Статус
 
-Closed on 2026-07-08.
+Закрыт 2026-07-08.
 
-## Goal
+## Цель
 
-Create the repository structure for the product MVP while preserving the P0 media PoC as a reference implementation.
+Создать структуру репозитория для product MVP и сохранить P0 media PoC как reference implementation.
 
-## Scope
+## Область
 
-- Root workspace and root commands.
-- `backend/`, `frontend/`, `infra/`, `docs/`, and `poc/` boundaries.
+- Root workspace и root commands.
+- Границы `backend/`, `frontend/`, `infra/`, `docs/` и `poc/`.
 - Project README.
-- Editor and ignore conventions.
-- Existing PoC moved under `poc/media-capture-livekit`.
+- Editor и ignore conventions.
+- Существующий PoC перенесен в `poc/media-capture-livekit`.
 
-## Out of Scope
+## Вне области
 
 - Spring Boot application code.
 - React application code.
@@ -25,16 +25,16 @@ Create the repository structure for the product MVP while preserving the P0 medi
 - Product room lifecycle.
 - Product LiveKit token flow.
 
-## Acceptance Criteria
+## Критерии приемки
 
-- The repository has explicit product and PoC boundaries.
-- Root `pnpm test`, `pnpm build`, and `pnpm check` are documented.
-- The P0 PoC remains runnable from the root through `pnpm dev:poc`.
-- No real secrets are introduced.
+- В репозитории явно разделены product и PoC boundaries.
+- Root `pnpm test`, `pnpm build` и `pnpm check` задокументированы.
+- P0 PoC остается запускаемым из корня через `pnpm dev:poc`.
+- Реальные секреты не добавлены.
 
-## Verification
+## Проверка
 
-Executed after the monorepo move and before closing WT-101:
+Выполнено после monorepo move и перед закрытием WT-101:
 
 ```bash
 pnpm test
@@ -42,28 +42,28 @@ pnpm build
 pnpm check
 ```
 
-Result:
+Результат:
 
-- 3 test files passed.
-- 13 tests passed.
-- production build passed.
-- Vite reported only the existing large chunk warning for the PoC bundle.
+- 3 test files прошли.
+- 13 tests прошли.
+- Production build прошел.
+- Vite сообщил только существующий large chunk warning для PoC bundle.
 
-## Agent Report
+## Отчет агента
 
-Done:
+Сделано:
 
-- moved the P0 PoC into `poc/media-capture-livekit`;
-- added root workspace scripts;
-- added `backend`, `frontend`, and `infra` ownership placeholders;
-- added editor and repository conventions;
-- updated the root README and PoC README.
+- P0 PoC перенесен в `poc/media-capture-livekit`;
+- добавлены root workspace scripts;
+- добавлены ownership placeholders для `backend`, `frontend` и `infra`;
+- добавлены editor и repository conventions;
+- обновлены root README и PoC README.
 
-Known limitation:
+Известное ограничение:
 
-- WT-101 intentionally does not create runnable backend, frontend, or infrastructure applications. Those are owned by WT-102, WT-103, and WT-104.
+- WT-101 намеренно не создает runnable backend, frontend или infrastructure applications. Это область WT-102, WT-103 и WT-104.
 
-## Next Tickets
+## Следующие тикеты
 
 - WT-102: Spring Boot backend skeleton.
 - WT-103: React frontend skeleton.

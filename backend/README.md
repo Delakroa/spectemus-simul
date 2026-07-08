@@ -1,12 +1,41 @@
 # Backend
 
-Placeholder for WT-102.
+Spring Boot backend skeleton для WT-102.
 
-Expected direction:
+## Стек
 
 - Java 25 LTS.
 - Spring Boot 4.1.x.
-- Gradle Kotlin DSL.
-- Modular monolith packages for rooms, participants, access, realtime, media-session, chat, and observability.
+- Gradle Kotlin DSL через Gradle Wrapper репозитория.
+- Spring Web MVC, Bean Validation, Spring Security и Actuator.
+- Modular monolith packages для rooms, participants, access, realtime, media-session, chat и observability.
 
-Out of scope for WT-101: application code, endpoints, persistence, security configuration, and tests.
+## Команды
+
+Из корня репозитория:
+
+```bash
+pnpm backend:test
+pnpm backend:build
+pnpm backend:bootRun
+```
+
+Прямые Gradle-команды:
+
+```bash
+./gradlew :backend:test
+./gradlew :backend:build
+./gradlew :backend:bootRun
+```
+
+## Эндпоинты
+
+- `GET /api/v1/health`
+- `GET /api/v1/version`
+- `GET /actuator/health`
+
+## Область WT-102
+
+WT-102 создает только backend foundation: воспроизводимую сборку, health/version REST endpoints, validation dependency, stateless security baseline, actuator и тесты.
+
+Вне области: rooms, participants, Redis, PostgreSQL, Flyway migrations, WebSocket state, LiveKit product tokens, chat, voice и persistence.
