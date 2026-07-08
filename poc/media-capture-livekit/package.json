@@ -1,0 +1,28 @@
+{
+  "name": "@watch-together/poc-media-capture-livekit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:down": "docker compose down",
+    "dev:frontend": "vite --host 127.0.0.1",
+    "dev:token": "tsx server/token-server.ts",
+    "logs:livekit": "docker compose logs -f --tail=120 livekit",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "livekit-client": "2.20.0",
+    "livekit-server-sdk": "2.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3",
+    "vitest": "^2.1.8"
+  }
+}

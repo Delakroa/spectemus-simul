@@ -6,7 +6,9 @@ settings:
 
 importers:
 
-  .:
+  .: {}
+
+  poc/media-capture-livekit:
     dependencies:
       livekit-client:
         specifier: 2.20.0

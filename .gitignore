@@ -1,5 +1,14 @@
 node_modules/
+**/node_modules/
+
 dist/
+**/dist/
+backend/build/
+frontend/build/
+
 .env
+.env.*
+!.env.example
+
 *.tsbuildinfo
 .DS_Store
