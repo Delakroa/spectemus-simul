@@ -178,13 +178,26 @@ docker compose exec livekit /livekit-server --version
 - WT-002 матрица совместимости: [docs/WT-002_COMPATIBILITY_MATRIX.md](docs/WT-002_COMPATIBILITY_MATRIX.md)
 - WT-003 качество и задержка: [docs/WT-003_QUALITY_LATENCY.md](docs/WT-003_QUALITY_LATENCY.md)
 
-Guest UI после подписки показывает базовые метрики WT-003: time to first frame, dropped frames, video receiver bitrate/loss/jitter и audio receiver bitrate/loss/jitter.
+Текущий вывод: `GO` для продолжения WT-004/product-state прототипа на базе Chrome/Edge + MP4 H.264/AAC. Это еще не production quality/SLO.
+
+Подтверждено:
+
+- Chrome host -> Chrome guest: 27 минут playback без отвалов.
+- Edge playback smoke: работает.
+- Video + audio через LiveKit: работает.
+- Файл не загружается на application backend.
+- Guest использует native browser video controls, включая volume и fullscreen.
+- Guest UI после подписки показывает метрики WT-003: time to first frame, dropped frames, video receiver bitrate/loss/jitter и audio receiver bitrate/loss/jitter.
 
 Для проверки сохранения разрешения сравнивай три значения:
 
 1. `Source resolution` у host — фактическое разрешение выбранного файла после загрузки metadata.
 2. `Capture resolution` у host — что отдал `captureStream()` в `MediaStreamTrack`.
 3. `Video stats` у guest — какое разрешение реально декодирует guest после WebRTC.
+
+В текущем baseline источник и capture были `1920x1080`, а guest декодировал `1280x720`. Это зафиксированное ограничение PoC; 1:1 resolution tuning вынесен отдельно и не блокирует WT-004.
+
+Перед продуктовым обещанием качества/масштаба нужно снять метрики для 2 guests и 3 guests, а также отдельно проверить controlled network scenarios, если они входят в MVP.
 
 ## Автоматические проверки
 
@@ -195,22 +208,3 @@ pnpm build
 ```
 
 Эти тесты покрывают только логику без реального browser media pipeline: MIME support, error normalization, object URL cleanup, media track cleanup, отсутствие audio track и отсутствие `captureStream()`.
-
-## Ручная матрица WT-001
-
-Заполни после запуска на реальных браузерах:
-
-| Проверка | Результат |
-|---|---|
-| Chrome host -> Chrome guest | not run |
-| Edge host -> Edge guest | not run |
-| Chrome host -> Edge guest | not run |
-| MP4 with audio | not run |
-| MP4 without audio | not run |
-| Re-select file | not run |
-| Pause then Play | not run |
-| Seek forward/back | not run |
-| Close host tab | not run |
-| Guest reconnect | not run |
-| Stop publication | not run |
-| Network: no file upload to backend | not run |
