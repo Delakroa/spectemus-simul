@@ -7,7 +7,7 @@ Spring Boot backend Watch Together.
 - Java 25 LTS.
 - Spring Boot 4.1.x.
 - Gradle Kotlin DSL через Gradle Wrapper репозитория.
-- Spring Web MVC, Bean Validation, Spring Security и Actuator.
+- Spring Web MVC, Spring WebSocket, Bean Validation, Spring Security и Actuator.
 - Modular monolith packages для rooms, participants, access, realtime, media-session, chat и observability.
 
 ## Команды
@@ -35,12 +35,13 @@ pnpm backend:bootRun
 - `GET /actuator/health`
 - `POST /api/v1/rooms`
 - `POST /api/v1/rooms/{roomId}/join`
+- `GET /api/v1/rooms/{roomId}/events` с WebSocket upgrade
 
 ## Область
 
 WT-102 создал backend foundation: воспроизводимую сборку, health/version REST endpoints, validation dependency, stateless security baseline, actuator и тесты.
 
-WT-201 и WT-202 добавили создание комнаты и вход гостя с Redis persistence, TTL, idempotency, session identity и ограничением вместимости.
+WT-201, WT-202 и WT-203 добавили создание комнаты, вход гостя и авторизованный WebSocket snapshot с Redis persistence, TTL, idempotency и session identity.
 
 Вне текущей области: PostgreSQL product state, Flyway migrations, WebSocket state, LiveKit product tokens, chat и voice.
 
@@ -57,4 +58,4 @@ REDIS_PASSWORD=watch_together_redis_dev_only
 ROOM_TTL=4h
 ```
 
-Создание комнаты и вход гостя требуют работающий Redis. Полный локальный stack запускается командами `pnpm infra:up` и `pnpm infra:check`.
+Создание комнаты, вход гостя и WebSocket snapshot требуют работающий Redis. Полный локальный stack запускается командами `pnpm infra:up` и `pnpm infra:check`.

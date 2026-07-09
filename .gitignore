@@ -18,5 +18,8 @@ reports/
 .env.*
 !.env.example
 
+# Local IDE settings
+.vscode/settings.json
+
 *.tsbuildinfo
 .DS_Store
