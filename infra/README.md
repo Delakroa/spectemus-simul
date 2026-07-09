@@ -4,13 +4,13 @@ Docker Compose stack Watch Together, созданный в WT-104.
 
 ## Сервисы
 
-| Сервис | Назначение | Локальный адрес |
-|---|---|---|
-| `gateway` | Nginx, React frontend и reverse proxy для `/api` | `http://127.0.0.1:8088` |
-| `backend` | Spring Boot API | `http://127.0.0.1:8080` |
-| `livekit` | WebSocket/HTTP и WebRTC SFU | `ws://127.0.0.1:7880` |
-| `postgres` | PostgreSQL | `127.0.0.1:5432` |
-| `redis` | Redis | `127.0.0.1:6379` |
+| Сервис     | Назначение                                       | Локальный адрес         |
+| ---------- | ------------------------------------------------ | ----------------------- |
+| `gateway`  | Nginx, React frontend и reverse proxy для `/api` | `http://127.0.0.1:8088` |
+| `backend`  | Spring Boot API                                  | `http://127.0.0.1:8080` |
+| `livekit`  | WebSocket/HTTP и WebRTC SFU                      | `ws://127.0.0.1:7880`   |
+| `postgres` | PostgreSQL                                       | `127.0.0.1:5432`        |
+| `redis`    | Redis                                            | `127.0.0.1:6379`        |
 
 LiveKit TCP fallback доступен на `7881`, UDP media range — `50000-50100`.
 
@@ -30,6 +30,8 @@ pnpm infra:up
 pnpm infra:check
 pnpm infra:ps
 ```
+
+Начиная с WT-201 `infra:check` также создаёт комнату через gateway и подтверждает idempotent replay через Redis.
 
 Открыть приложение:
 
@@ -82,8 +84,8 @@ PostgreSQL и Redis используют named volumes:
 
 Обычный `pnpm infra:down` сохраняет данные. `pnpm infra:reset` удаляет их без возможности восстановления.
 
-## Границы WT-104
+## Границы
 
-Этот stack создаёт воспроизводимую локальную среду. Backend пока не использует PostgreSQL/Redis для room-state: подключение persistence относится к следующим product-задачам.
+Этот stack создаёт воспроизводимую локальную среду. Backend использует Redis для room state и idempotency; PostgreSQL пока не подключен к product state.
 
 TLS, публичный TURN, monitoring stack и beta deployment находятся вне области WT-104.

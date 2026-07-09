@@ -6,6 +6,7 @@ COPY gradlew gradlew
 COPY gradle gradle
 COPY gradle.properties settings.gradle.kts build.gradle.kts ./
 COPY backend/build.gradle.kts backend/build.gradle.kts
+COPY backend/gradle.lockfile backend/gradle.lockfile
 
 RUN ./gradlew :backend:dependencies --no-daemon
 

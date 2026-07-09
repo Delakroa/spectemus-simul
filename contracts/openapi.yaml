@@ -52,7 +52,7 @@ paths:
       tags: [Rooms]
       operationId: createRoom
       summary: Создать приватную комнату
-      x-implementation-status: planned
+      x-implementation-status: implemented
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -72,6 +72,11 @@ paths:
               schema:
                 type: string
                 pattern: ^/api/v1/rooms/
+            Cache-Control:
+              description: Ответ содержит credentials и не должен кэшироваться
+              schema:
+                type: string
+                const: no-store
           content:
             application/json:
               schema:
@@ -197,6 +202,7 @@ components:
         type: string
         minLength: 16
         maxLength: 128
+        pattern: ^[!-~]+$
     HostSecret:
       name: X-Host-Secret
       in: header
