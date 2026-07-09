@@ -1,9 +1,22 @@
 spring:
   application:
     name: watch-together-backend
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:watch_together_redis_dev_only}
 
 server:
   port: 8080
+
+watch-together:
+  rooms:
+    ttl: ${ROOM_TTL:4h}
+    session-cookie-secure: ${SESSION_COOKIE_SECURE:false}
 
 management:
   endpoints:

@@ -16,8 +16,9 @@ P0 технически подтвержден.
 - WT-104 добавил запускаемый Docker Compose stack.
 - WT-105 добавил CI quality gate, test reports и dependency security scan.
 - WT-106 зафиксировал REST, WebSocket и error contracts.
+- WT-201 реализовал создание приватной комнаты с Redis TTL и idempotency.
 
-P1 foundation завершен. Следующий этап: P2 room lifecycle. Persistence integration, chat, voice и product-токены LiveKit намеренно оставлены для следующих тикетов.
+P1 foundation завершен. Проект находится в P2 room lifecycle. Guest join, realtime snapshot, presence, chat, voice и product-токены LiveKit намеренно оставлены для следующих тикетов.
 
 ## Структура репозитория
 
@@ -115,6 +116,7 @@ Media PoC остается референсной реализацией в [poc
 - [WT-104 локальная инфраструктура](docs/WT-104_LOCAL_INFRASTRUCTURE.md)
 - [WT-105 CI quality gate](docs/WT-105_CI_QUALITY_GATE.md)
 - [WT-106 контракты](docs/WT-106_CONTRACTS.md)
+- [WT-201 создание комнаты](docs/WT-201_CREATE_ROOM.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation
