@@ -1,6 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 
+import WebSocket from "ws";
+
 const composeFile = "infra/compose.yaml";
 const appUrl = process.env.WT_APP_URL ?? "http://127.0.0.1:8088";
 const livekitUrl = process.env.WT_LIVEKIT_HTTP_URL ?? "http://127.0.0.1:7880";
@@ -60,6 +62,59 @@ function assertIncludes(value, expected, label) {
       `${label} response does not include ${JSON.stringify(expected)}`,
     );
   }
+}
+
+function connectRoomEvents(url, cookie) {
+  return new Promise((resolve, reject) => {
+    const socket = new WebSocket(url, {
+      headers: {
+        Cookie: cookie,
+        Origin: appUrl,
+      },
+    });
+    const timeout = setTimeout(() => {
+      socket.terminate();
+      reject(new Error("WebSocket snapshot timed out"));
+    }, 5_000);
+
+    socket.once("message", (data, isBinary) => {
+      clearTimeout(timeout);
+      if (isBinary) {
+        socket.terminate();
+        reject(new Error("room WebSocket returned binary snapshot"));
+        return;
+      }
+
+      try {
+        resolve({ socket, event: JSON.parse(data.toString("utf8")) });
+      } catch (error) {
+        socket.terminate();
+        reject(error);
+      }
+    });
+    socket.once("error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+  });
+}
+
+function waitForWebSocketClose(socket) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      socket.terminate();
+      reject(new Error("WebSocket close timed out"));
+    }, 5_000);
+
+    socket.once("close", (code) => {
+      clearTimeout(timeout);
+      resolve(code);
+    });
+    socket.once("error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+  });
 }
 
 const services = ["postgres", "redis", "livekit", "backend", "gateway"];
@@ -242,6 +297,61 @@ console.log("[ok] guest join through proxy: joined");
 console.log("[ok] guest join session replay: restored");
 console.log("[ok] room capacity: enforced");
 console.log("[ok] unavailable room: hidden");
+
+const eventsUrl = new URL(`/api/v1/rooms/${roomId}/events`, appUrl);
+eventsUrl.protocol = eventsUrl.protocol === "https:" ? "wss:" : "ws:";
+
+const firstEventsConnection = await connectRoomEvents(eventsUrl, guestCookie);
+const firstSnapshot = firstEventsConnection.event;
+
+if (
+  firstSnapshot.schemaVersion !== 1 ||
+  !/^[0-9a-f-]{36}$/.test(firstSnapshot.eventId) ||
+  firstSnapshot.type !== "room.snapshot" ||
+  firstSnapshot.roomId !== roomId ||
+  firstSnapshot.participantId !== null ||
+  firstSnapshot.roomVersion !== 3 ||
+  firstSnapshot.payload?.roomId !== roomId ||
+  firstSnapshot.payload?.participants?.length !== 4 ||
+  firstSnapshot.payload?.roomVersion !== 3
+) {
+  firstEventsConnection.socket.terminate();
+  throw new Error("room WebSocket returned invalid initial snapshot");
+}
+firstEventsConnection.socket.close(1000, "smoke reconnect");
+
+const reconnect = await connectRoomEvents(eventsUrl, guestCookie);
+if (
+  reconnect.event.type !== "room.snapshot" ||
+  reconnect.event.eventId === firstSnapshot.eventId ||
+  reconnect.event.roomVersion !== firstSnapshot.roomVersion
+) {
+  reconnect.socket.terminate();
+  throw new Error("room WebSocket reconnect returned invalid snapshot");
+}
+reconnect.socket.close(1000, "smoke complete");
+
+const unknownCommandConnection = await connectRoomEvents(
+  eventsUrl,
+  guestCookie,
+);
+const unknownCommandClose = waitForWebSocketClose(
+  unknownCommandConnection.socket,
+);
+unknownCommandConnection.socket.send(
+  JSON.stringify({
+    schemaVersion: 1,
+    eventId: randomUUID(),
+    type: "participant.future.command",
+  }),
+);
+if ((await unknownCommandClose) !== 1007) {
+  throw new Error("unknown WebSocket client command was not rejected");
+}
+
+console.log("[ok] room WebSocket snapshot: received");
+console.log("[ok] room WebSocket reconnect: refreshed");
+console.log("[ok] unknown WebSocket client command: rejected");
 
 const livekit = await get(livekitUrl);
 assertIncludes(livekit.body.toLowerCase(), "ok", "livekit");

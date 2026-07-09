@@ -28,7 +28,7 @@
 
 ## WebSocket
 
-Планируемый endpoint: `/api/v1/rooms/{roomId}/events`. Upgrade использует same-origin session cookie. Дополнительный credential в query string запрещен.
+Endpoint: `/api/v1/rooms/{roomId}/events`. Upgrade использует same-origin session cookie. Дополнительный credential в query string запрещен.
 
 Транспорт принимает только UTF-8 JSON text messages размером не более 16 KiB. Binary messages и payload, не прошедшие schema validation, закрываются protocol error без применения состояния.
 

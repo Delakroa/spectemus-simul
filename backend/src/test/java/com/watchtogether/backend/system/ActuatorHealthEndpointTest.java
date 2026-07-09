@@ -13,7 +13,11 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@TestPropertySource(properties = "management.health.redis.enabled=false")
+@TestPropertySource(
+        properties = {
+            "management.health.redis.enabled=false",
+            "watch-together.websocket.container-limits-enabled=false"
+        })
 class ActuatorHealthEndpointTest {
 
     @Autowired

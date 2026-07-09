@@ -22,7 +22,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import tools.jackson.databind.ObjectMapper;
 
-@SpringBootTest(properties = "management.health.redis.enabled=false")
+@SpringBootTest(
+        properties = {
+            "management.health.redis.enabled=false",
+            "watch-together.websocket.container-limits-enabled=false"
+        })
 class RedisRoomJoinStoreTest {
 
     private static final UUID GUEST_ID =
