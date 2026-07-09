@@ -13,7 +13,7 @@ record RoomServerEvent(
         UUID participantId,
         long roomVersion,
         Instant occurredAt,
-        RoomSnapshot payload) {
+        Object payload) {
 
     private static final int CURRENT_SCHEMA_VERSION = 1;
 
@@ -28,4 +28,24 @@ record RoomServerEvent(
                 occurredAt,
                 room);
     }
+
+    static RoomServerEvent participantPresence(
+            String roomId,
+            UUID participantId,
+            long roomVersion,
+            boolean online,
+            Instant updatedAt,
+            Instant occurredAt) {
+        return new RoomServerEvent(
+                CURRENT_SCHEMA_VERSION,
+                UUID.randomUUID(),
+                online ? "participant.online" : "participant.offline",
+                roomId,
+                participantId,
+                roomVersion,
+                occurredAt,
+                new ParticipantPresencePayload(participantId, online, updatedAt));
+    }
+
+    record ParticipantPresencePayload(UUID participantId, boolean online, Instant updatedAt) {}
 }

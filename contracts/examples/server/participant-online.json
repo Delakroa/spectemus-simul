@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "eventId": "e3fef1e4-270e-4c41-9fd1-4f23843068b7",
+  "type": "participant.online",
+  "roomId": "AbCdEfGhIjKlMnOpQrStUv",
+  "participantId": "8e7d79a8-a49f-48cc-a409-f07890dd3218",
+  "roomVersion": 43,
+  "occurredAt": "2026-07-09T07:30:05Z",
+  "payload": {
+    "participantId": "8e7d79a8-a49f-48cc-a409-f07890dd3218",
+    "online": true,
+    "updatedAt": "2026-07-09T07:30:05Z"
+  }
+}

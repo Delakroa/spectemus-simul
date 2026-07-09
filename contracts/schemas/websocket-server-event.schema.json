@@ -155,6 +155,37 @@
       "if": {
         "properties": {
           "type": {
+            "enum": ["participant.online", "participant.offline"]
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["participantId", "online", "updatedAt"],
+            "properties": {
+              "participantId": {
+                "$ref": "https://watch-together.local/contracts/schemas/common.schema.json#/$defs/ParticipantId"
+              },
+              "online": {
+                "type": "boolean"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
             "const": "host.disconnected"
           }
         },
