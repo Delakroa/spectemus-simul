@@ -47,8 +47,11 @@ class RedisRoomCreationStoreTest {
         when(redis.execute(any(), anyList(), any(Object[].class)))
                 .thenReturn("CREATED:" + serialized);
 
-        SaveResult result =
-                store.saveOrGet("idempotency-hash", candidate, Duration.ofHours(4));
+        SaveResult result = store.saveOrGet(
+                "idempotency-hash",
+                candidate,
+                Duration.ofHours(4).plusMinutes(5),
+                Duration.ofHours(4));
 
         assertThat(result.outcome()).isEqualTo(SaveOutcome.CREATED);
         assertThat(result.creation()).isEqualTo(candidate);
@@ -61,8 +64,11 @@ class RedisRoomCreationStoreTest {
         when(redis.execute(any(), anyList(), any(Object[].class)))
                 .thenReturn("REPLAYED:" + serialized);
 
-        SaveResult result =
-                store.saveOrGet("idempotency-hash", candidate, Duration.ofHours(4));
+        SaveResult result = store.saveOrGet(
+                "idempotency-hash",
+                candidate,
+                Duration.ofHours(4).plusMinutes(5),
+                Duration.ofHours(4));
 
         assertThat(result.outcome()).isEqualTo(SaveOutcome.REPLAYED);
         assertThat(result.creation()).isEqualTo(candidate);
@@ -74,8 +80,11 @@ class RedisRoomCreationStoreTest {
         when(redis.execute(any(), anyList(), any(Object[].class)))
                 .thenReturn("ROOM_ID_COLLISION");
 
-        SaveResult result =
-                store.saveOrGet("idempotency-hash", candidate, Duration.ofHours(4));
+        SaveResult result = store.saveOrGet(
+                "idempotency-hash",
+                candidate,
+                Duration.ofHours(4).plusMinutes(5),
+                Duration.ofHours(4));
 
         assertThat(result.outcome()).isEqualTo(SaveOutcome.ROOM_ID_COLLISION);
     }

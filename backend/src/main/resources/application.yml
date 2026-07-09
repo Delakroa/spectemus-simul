@@ -17,6 +17,7 @@ watch-together:
   rooms:
     ttl: ${ROOM_TTL:4h}
     session-cookie-secure: ${SESSION_COOKIE_SECURE:false}
+    cleanup-grace: ${ROOM_CLEANUP_GRACE:5m}
   websocket:
     presence-ttl: ${WEBSOCKET_PRESENCE_TTL:30s}
 

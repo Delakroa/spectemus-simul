@@ -35,13 +35,14 @@ pnpm backend:bootRun
 - `GET /actuator/health`
 - `POST /api/v1/rooms`
 - `POST /api/v1/rooms/{roomId}/join`
+- `POST /api/v1/rooms/{roomId}/close`
 - `GET /api/v1/rooms/{roomId}/events` с WebSocket upgrade
 
 ## Область
 
 WT-102 создал backend foundation: воспроизводимую сборку, health/version REST endpoints, validation dependency, stateless security baseline, actuator и тесты.
 
-WT-201, WT-202, WT-203 и WT-204 добавили создание комнаты, вход гостя, авторизованный WebSocket snapshot и backend-owned presence heartbeat с Redis persistence, TTL, idempotency и session identity.
+WT-201, WT-202, WT-203, WT-204 и WT-205 добавили создание комнаты, вход гостя, авторизованный WebSocket snapshot, backend-owned presence heartbeat и закрытие комнаты host-ом с Redis persistence, TTL, idempotency и session identity.
 
 Вне текущей области: PostgreSQL product state, Flyway migrations, LiveKit product tokens, chat и voice.
 
@@ -56,7 +57,8 @@ REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
 REDIS_PASSWORD=watch_together_redis_dev_only
 ROOM_TTL=4h
+ROOM_CLEANUP_GRACE=5m
 WEBSOCKET_PRESENCE_TTL=30s
 ```
 
-Создание комнаты, вход гостя, WebSocket snapshot и presence heartbeat требуют работающий Redis. Полный локальный stack запускается командами `pnpm infra:up` и `pnpm infra:check`.
+Создание комнаты, вход гостя, закрытие комнаты, WebSocket snapshot и presence heartbeat требуют работающий Redis. Полный локальный stack запускается командами `pnpm infra:up` и `pnpm infra:check`.

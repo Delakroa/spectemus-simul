@@ -62,8 +62,14 @@ class RoomWebSocketIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private RoomEventPublisher eventPublisher;
+
     @MockitoBean
     private RoomRealtimeStore store;
+
+    @MockitoBean
+    private RoomLifecycleStore lifecycleStore;
 
     private final AtomicReference<StoredRoom> currentRoom = new AtomicReference<>();
 
@@ -202,6 +208,28 @@ class RoomWebSocketIntegrationTest {
     }
 
     @Test
+    void broadcastsRoomClosedEventAndClosesActiveSessions() throws Exception {
+        Connection host = connect(ROOM_ID, SESSION, null);
+        host.listener().nextText();
+        StoredRoom closedRoom = room(4, RoomStatus.CLOSED, false);
+
+        eventPublisher.publishRoomClosed(
+                closedRoom,
+                RoomClosedReason.HOST_CLOSED,
+                closedRoom.updatedAt());
+        JsonNode event = objectMapper.readTree(host.listener().nextText());
+
+        assertThat(event.get("type").stringValue()).isEqualTo("room.closed");
+        assertThat(event.get("roomId").stringValue()).isEqualTo(ROOM_ID);
+        assertThat(event.get("participantId").isNull()).isTrue();
+        assertThat(event.get("roomVersion").asLong()).isEqualTo(4);
+        assertThat(event.at("/payload/reason").stringValue()).isEqualTo("HOST_CLOSED");
+        assertThat(event.at("/payload/closedAt").stringValue()).isEqualTo(
+                closedRoom.updatedAt().toString());
+        assertThat(host.listener().closeCode()).isEqualTo(1000);
+    }
+
+    @Test
     void closesUnknownClientCommandWithBadDataStatus() throws Exception {
         Connection connection = connect(ROOM_ID, SESSION, null);
         connection.listener().nextText();
@@ -303,12 +331,16 @@ class RoomWebSocketIntegrationTest {
     }
 
     private StoredRoom room(long roomVersion, Boolean guestOnline) {
-        Instant now = Instant.parse("2026-07-09T10:00:00Z");
+        return room(roomVersion, RoomStatus.CREATED, guestOnline);
+    }
+
+    private StoredRoom room(long roomVersion, RoomStatus status, Boolean guestOnline) {
+        Instant now = Instant.parse("2030-07-09T10:00:00Z");
         StoredParticipant host = new StoredParticipant(
                 HOST_ID,
                 "Host",
                 ParticipantRole.HOST,
-                true,
+                status != RoomStatus.CLOSED && status != RoomStatus.EXPIRED,
                 now,
                 SecureHash.sha256(SESSION));
         List<StoredParticipant> participants = guestOnline == null
@@ -324,7 +356,7 @@ class RoomWebSocketIntegrationTest {
                                 SecureHash.sha256(GUEST_SESSION)));
         return new StoredRoom(
                 ROOM_ID,
-                RoomStatus.CREATED,
+                status,
                 HOST_ID,
                 participants,
                 roomVersion,

@@ -32,6 +32,10 @@ class RedisRoomJoinStore implements RoomJoinStore {
             end
 
             local room = cjson.decode(roomJson)
+            if room.expiresAt <= ARGV[3] then
+              return 'ROOM_UNAVAILABLE'
+            end
+
             local joinableStatuses = {
               CREATED = true,
               WAITING_FOR_HOST = true,

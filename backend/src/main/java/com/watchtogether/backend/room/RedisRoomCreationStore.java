@@ -29,7 +29,7 @@ class RedisRoomCreationStore implements RoomCreationStore {
             end
 
             redis.call('SET', KEYS[2], ARGV[1], 'PX', ARGV[3])
-            redis.call('SET', KEYS[1], ARGV[2], 'PX', ARGV[3])
+            redis.call('SET', KEYS[1], ARGV[2], 'PX', ARGV[4])
             return 'CREATED:' .. ARGV[2]
             """,
             String.class);
@@ -44,7 +44,10 @@ class RedisRoomCreationStore implements RoomCreationStore {
 
     @Override
     public SaveResult saveOrGet(
-            String idempotencyKeyHash, StoredRoomCreation candidate, Duration ttl) {
+            String idempotencyKeyHash,
+            StoredRoomCreation candidate,
+            Duration roomStorageTtl,
+            Duration idempotencyTtl) {
         try {
             String roomJson = objectMapper.writeValueAsString(candidate.room());
             String creationJson = objectMapper.writeValueAsString(candidate);
@@ -53,7 +56,8 @@ class RedisRoomCreationStore implements RoomCreationStore {
                     List.of(idempotencyRedisKey(idempotencyKeyHash), roomRedisKey(candidate.room().roomId())),
                     roomJson,
                     creationJson,
-                    Long.toString(ttl.toMillis()));
+                    Long.toString(roomStorageTtl.toMillis()),
+                    Long.toString(idempotencyTtl.toMillis()));
 
             if (result == null) {
                 throw new IllegalStateException("Redis room creation script returned null");

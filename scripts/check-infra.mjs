@@ -56,6 +56,23 @@ async function postJson(url, body, headers = {}) {
   };
 }
 
+async function postEmpty(url, headers = {}) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      ...headers,
+    },
+    signal: AbortSignal.timeout(5_000),
+  });
+
+  return {
+    status: response.status,
+    headers: response.headers,
+    body: await response.text(),
+  };
+}
+
 function assertIncludes(value, expected, label) {
   if (!value.includes(expected)) {
     throw new Error(
@@ -450,11 +467,58 @@ if ((await unknownCommandClose) !== 1007) {
   throw new Error("unknown WebSocket client command was not rejected");
 }
 
+const closeEventsConnection = await connectRoomEvents(eventsUrl, hostCookie);
+if (closeEventsConnection.event.type !== "room.snapshot") {
+  closeEventsConnection.socket.terminate();
+  throw new Error("host close WebSocket returned invalid initial snapshot");
+}
+const closeEventPromise = waitForJsonMessage(
+  closeEventsConnection.socket,
+  "room closed event",
+);
+const closeCodePromise = waitForWebSocketClose(closeEventsConnection.socket);
+const closeRoom = await postEmpty(`${appUrl}/api/v1/rooms/${roomId}/close`, {
+  Cookie: hostCookie,
+  "X-Host-Secret": hostSecret,
+});
+if (closeRoom.status !== 204 || closeRoom.body !== "") {
+  closeEventsConnection.socket.terminate();
+  throw new Error(`close room returned HTTP ${closeRoom.status}`);
+}
+const closedEvent = await closeEventPromise;
+if (
+  closedEvent.type !== "room.closed" ||
+  closedEvent.roomId !== roomId ||
+  closedEvent.participantId !== null ||
+  closedEvent.payload?.reason !== "HOST_CLOSED" ||
+  !closedEvent.payload?.closedAt
+) {
+  closeEventsConnection.socket.terminate();
+  throw new Error("room close event was not broadcast");
+}
+if ((await closeCodePromise) !== 1000) {
+  throw new Error(
+    "room close did not close active WebSocket sessions normally",
+  );
+}
+
+const joinClosedRoom = await postJson(joinUrl, {
+  displayName: "Late Guest",
+});
+if (
+  joinClosedRoom.status !== 404 ||
+  joinClosedRoom.body.code !== "ROOM_UNAVAILABLE"
+) {
+  throw new Error("closed room did not reject join with ROOM_UNAVAILABLE");
+}
+
 console.log("[ok] room WebSocket snapshot: received");
 console.log("[ok] room WebSocket reconnect: refreshed");
 console.log("[ok] room WebSocket heartbeat: accepted");
 console.log("[ok] room WebSocket presence: broadcast");
 console.log("[ok] unknown WebSocket client command: rejected");
+console.log("[ok] close room through proxy: closed");
+console.log("[ok] room WebSocket close event: broadcast");
 
 const livekit = await get(livekitUrl);
 assertIncludes(livekit.body.toLowerCase(), "ok", "livekit");

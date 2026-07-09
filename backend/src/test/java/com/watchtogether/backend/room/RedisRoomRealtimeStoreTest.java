@@ -159,7 +159,7 @@ class RedisRoomRealtimeStoreTest {
     }
 
     private StoredRoom room(RoomStatus status) {
-        Instant now = Instant.parse("2026-07-09T10:00:00Z");
+        Instant now = Instant.parse("2030-07-09T10:00:00Z");
         StoredParticipant host = new StoredParticipant(
                 HOST_ID,
                 "Host",

@@ -24,6 +24,7 @@
 - Production cookie обязана иметь `HttpOnly`, `Secure` и `SameSite=Strict`.
 - Host secret передается отдельно и никогда не включается в invite path.
 - `POST /api/v1/rooms` требует `Idempotency-Key`.
+- `POST /api/v1/rooms/{roomId}/close` требует host session cookie и `X-Host-Secret`.
 - Внешние ответы не содержат локальные пути, movie bytes, stack trace или инфраструктурные секреты.
 
 ## WebSocket
@@ -42,6 +43,7 @@ Endpoint: `/api/v1/rooms/{roomId}/events`. Upgrade использует same-ori
 - после reconnect сервер первым отправляет `room.snapshot`;
 - `participant.heartbeat` продлевает authoritative presence TTL;
 - изменения presence приходят как `participant.online` и `participant.offline`;
+- закрытие комнаты приходит как `room.closed`, после чего WebSocket-сессия закрывается;
 - неизвестный server event с валидным envelope безопасно игнорируется;
 - неизвестный client command отклоняется;
 - `participantId` берется из session и сверяется с payload;

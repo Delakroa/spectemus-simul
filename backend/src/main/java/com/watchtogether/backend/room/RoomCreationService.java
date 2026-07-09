@@ -45,8 +45,11 @@ class RoomCreationService {
 
         for (int attempt = 0; attempt < MAX_ROOM_ID_ATTEMPTS; attempt++) {
             StoredRoomCreation candidate = newCandidate(requestFingerprint, hostDisplayName);
-            SaveResult result =
-                    store.saveOrGet(idempotencyKeyHash, candidate, properties.ttl());
+            SaveResult result = store.saveOrGet(
+                    idempotencyKeyHash,
+                    candidate,
+                    properties.storageTtl(),
+                    properties.ttl());
 
             if (result.outcome() == SaveOutcome.ROOM_ID_COLLISION) {
                 continue;

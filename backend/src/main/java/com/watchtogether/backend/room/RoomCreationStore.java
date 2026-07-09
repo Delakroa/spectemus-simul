@@ -8,7 +8,10 @@ import java.util.UUID;
 interface RoomCreationStore {
 
     SaveResult saveOrGet(
-            String idempotencyKeyHash, StoredRoomCreation candidate, Duration ttl);
+            String idempotencyKeyHash,
+            StoredRoomCreation candidate,
+            Duration roomStorageTtl,
+            Duration idempotencyTtl);
 
     enum SaveOutcome {
         CREATED,

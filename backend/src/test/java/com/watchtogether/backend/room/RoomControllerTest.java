@@ -3,6 +3,7 @@ package com.watchtogether.backend.room;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -15,6 +16,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+
+import jakarta.servlet.http.Cookie;
 
 import com.watchtogether.backend.api.ApiException;
 import com.watchtogether.backend.api.ApiExceptionHandler;
@@ -50,6 +53,9 @@ class RoomControllerTest {
 
     @MockitoBean
     private RoomJoinService roomJoinService;
+
+    @MockitoBean
+    private RoomCloseService roomCloseService;
 
     @MockitoBean
     private RoomProperties roomProperties;
@@ -147,6 +153,18 @@ class RoomControllerTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.code").value("IDEMPOTENCY_CONFLICT"))
                 .andExpect(jsonPath("$.retryable").value(false));
+    }
+
+    @Test
+    void closesRoomAccordingToContract() throws Exception {
+        mockMvc.perform(post("/api/v1/rooms/{roomId}/close", ROOM_ID)
+                        .cookie(new Cookie("wt_session", SESSION))
+                        .header("X-Host-Secret", HOST_SECRET))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(header().exists(CorrelationIdFilter.HEADER));
+
+        verify(roomCloseService).close(ROOM_ID, SESSION, HOST_SECRET);
     }
 
     private CreationResult creationResult() {

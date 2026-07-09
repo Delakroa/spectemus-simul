@@ -9,13 +9,16 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledFuture;
 
 import com.watchtogether.backend.room.RoomRealtimeStore.AuthenticationOutcome;
 import com.watchtogether.backend.room.RoomRealtimeStore.AuthenticationResult;
 import com.watchtogether.backend.room.RoomRealtimeStore.PresenceOutcome;
 import com.watchtogether.backend.room.RoomRealtimeStore.PresenceResult;
+import com.watchtogether.backend.room.RoomCreationStore.StoredRoom;
 
 import org.springframework.stereotype.Component;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -24,7 +27,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
-class RoomWebSocketHandler extends TextWebSocketHandler {
+class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPublisher {
 
     static final int MAX_TEXT_MESSAGE_BYTES = 16 * 1024;
     private static final String CONNECTION_ID_ATTRIBUTE = "watchTogether.connectionId";
@@ -32,21 +35,28 @@ class RoomWebSocketHandler extends TextWebSocketHandler {
     private static final String HEARTBEAT_TYPE = "participant.heartbeat";
 
     private final RoomRealtimeStore store;
+    private final RoomLifecycleStore lifecycleStore;
     private final ObjectMapper objectMapper;
     private final RoomWebSocketProperties properties;
+    private final TaskScheduler taskScheduler;
     private final Clock clock;
     private final Map<ParticipantConnectionKey, ActiveConnection> connectionsByParticipant =
             new ConcurrentHashMap<>();
     private final Map<String, Set<WebSocketSession>> sessionsByRoom = new ConcurrentHashMap<>();
+    private final Map<String, ScheduledFuture<?>> expiryTasksByRoom = new ConcurrentHashMap<>();
 
     RoomWebSocketHandler(
             RoomRealtimeStore store,
+            RoomLifecycleStore lifecycleStore,
             ObjectMapper objectMapper,
             RoomWebSocketProperties properties,
+            TaskScheduler taskScheduler,
             Clock clock) {
         this.store = store;
+        this.lifecycleStore = lifecycleStore;
         this.objectMapper = objectMapper;
         this.properties = properties;
+        this.taskScheduler = taskScheduler;
         this.clock = clock;
     }
 
@@ -80,6 +90,7 @@ class RoomWebSocketHandler extends TextWebSocketHandler {
         var snapshot = RoomResponseMapper.toSnapshot(presence.room());
         var event = RoomServerEvent.snapshot(snapshot, Instant.now(clock));
         session.sendMessage(new TextMessage(objectMapper.writeValueAsString(event)));
+        scheduleExpiry(snapshot.roomId(), snapshot.expiresAt());
         broadcastPresenceChange(roomId, presence, session);
     }
 
@@ -239,6 +250,54 @@ class RoomWebSocketHandler extends TextWebSocketHandler {
                     && roomSession.isOpen()) {
                 roomSession.sendMessage(new TextMessage(payload));
             }
+        }
+    }
+
+    @Override
+    public void publishRoomClosed(StoredRoom room, RoomClosedReason reason, Instant closedAt)
+            throws IOException {
+        ScheduledFuture<?> expiryTask = expiryTasksByRoom.remove(room.roomId());
+        if (expiryTask != null) {
+            expiryTask.cancel(false);
+        }
+
+        var event = RoomServerEvent.roomClosed(
+                room.roomId(),
+                room.roomVersion(),
+                reason,
+                closedAt,
+                Instant.now(clock));
+        String payload = objectMapper.writeValueAsString(event);
+        Set<WebSocketSession> roomSessions = Set.copyOf(
+                sessionsByRoom.getOrDefault(room.roomId(), Set.of()));
+        for (WebSocketSession roomSession : roomSessions) {
+            if (roomSession.isOpen()) {
+                roomSession.sendMessage(new TextMessage(payload));
+                roomSession.close(CloseStatus.NORMAL);
+            }
+        }
+    }
+
+    private void scheduleExpiry(String roomId, Instant expiresAt) {
+        expiryTasksByRoom.compute(roomId, (key, existingTask) -> {
+            if (existingTask != null && !existingTask.isDone()) {
+                return existingTask;
+            }
+            return taskScheduler.schedule(() -> expireRoom(roomId), expiresAt);
+        });
+    }
+
+    private void expireRoom(String roomId) {
+        expiryTasksByRoom.remove(roomId);
+        var result = lifecycleStore.expire(roomId, Instant.now(clock));
+        if (!result.changed()) {
+            return;
+        }
+
+        try {
+            publishRoomClosed(result.room(), RoomClosedReason.EXPIRED, result.room().updatedAt());
+        } catch (IOException exception) {
+            throw new IllegalStateException("Unable to publish room expiry event", exception);
         }
     }
 

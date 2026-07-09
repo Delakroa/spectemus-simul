@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "eventId": "a4394a01-d223-4849-8e87-73017750d0c8",
+  "type": "room.closed",
+  "roomId": "AbCdEfGhIjKlMnOpQrStUv",
+  "participantId": null,
+  "roomVersion": 45,
+  "occurredAt": "2026-07-09T07:31:00Z",
+  "payload": {
+    "reason": "HOST_CLOSED",
+    "closedAt": "2026-07-09T07:31:00Z"
+  }
+}

@@ -2,6 +2,7 @@ package com.watchtogether.backend.room;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.EnumSet;
@@ -46,6 +47,10 @@ class RedisRoomRealtimeStore implements RoomRealtimeStore {
             end
 
             local room = cjson.decode(roomJson)
+            if room.expiresAt <= ARGV[4] then
+              return 'ROOM_UNAVAILABLE'
+            end
+
             local availableStatuses = {
               CREATED = true,
               WAITING_FOR_HOST = true,
@@ -134,10 +139,12 @@ class RedisRoomRealtimeStore implements RoomRealtimeStore {
 
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
-    RedisRoomRealtimeStore(StringRedisTemplate redis, ObjectMapper objectMapper) {
+    RedisRoomRealtimeStore(StringRedisTemplate redis, ObjectMapper objectMapper, Clock clock) {
         this.redis = redis;
         this.objectMapper = objectMapper;
+        this.clock = clock;
     }
 
     @Override
@@ -150,7 +157,8 @@ class RedisRoomRealtimeStore implements RoomRealtimeStore {
 
         try {
             StoredRoom room = objectMapper.readValue(roomJson, StoredRoom.class);
-            if (!AVAILABLE_STATUSES.contains(room.status())) {
+            if (!AVAILABLE_STATUSES.contains(room.status())
+                    || !room.expiresAt().isAfter(Instant.now(clock))) {
                 return AuthenticationResult.roomUnavailable();
             }
 

@@ -20,6 +20,7 @@ P0 технически подтвержден.
 - WT-202 реализовал вход гостя, session identity и ограничение вместимости комнаты.
 - WT-203 реализовал авторизованный room WebSocket и snapshot при connect/reconnect.
 - WT-204 реализовал backend-owned presence heartbeat и online/offline fan-out.
+- WT-205 реализовал host close, `room.closed` и cleanup room lifecycle.
 
 P1 foundation завершен. Проект находится в P2 room lifecycle. Chat, voice и product-токены LiveKit намеренно оставлены для следующих тикетов.
 
@@ -123,6 +124,7 @@ Media PoC остается референсной реализацией в [poc
 - [WT-202 вход гостя](docs/WT-202_GUEST_JOIN.md)
 - [WT-203 WebSocket и snapshot](docs/WT-203_WEBSOCKET_SNAPSHOT.md)
 - [WT-204 presence heartbeat](docs/WT-204_PRESENCE_HEARTBEAT.md)
+- [WT-205 room close и expiry](docs/WT-205_ROOM_CLOSE_EXPIRY.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation

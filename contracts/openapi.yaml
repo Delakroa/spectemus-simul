@@ -165,7 +165,7 @@ paths:
       tags: [Rooms]
       operationId: closeRoom
       summary: Закрыть комнату от имени host
-      x-implementation-status: planned
+      x-implementation-status: implemented
       security:
         - sessionCookie: []
       parameters:

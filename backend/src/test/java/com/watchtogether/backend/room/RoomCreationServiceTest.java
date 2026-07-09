@@ -117,7 +117,7 @@ class RoomCreationServiceTest {
         return new RoomCreationService(
                 store,
                 new StubSecureValueGenerator(),
-                new RoomProperties(TTL, false),
+                new RoomProperties(TTL, false, Duration.ofMinutes(5)),
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
@@ -165,7 +165,10 @@ class RoomCreationServiceTest {
 
         @Override
         public SaveResult saveOrGet(
-                String idempotencyKeyHash, StoredRoomCreation candidate, Duration ttl) {
+                String idempotencyKeyHash,
+                StoredRoomCreation candidate,
+                Duration roomStorageTtl,
+                Duration idempotencyTtl) {
             StoredRoomCreation existing = idempotency.get(idempotencyKeyHash);
             if (existing != null) {
                 return SaveResult.replayed(existing);
