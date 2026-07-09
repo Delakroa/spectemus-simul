@@ -14,12 +14,15 @@ class RoomWebSocketConfiguration implements WebSocketConfigurer {
 
     private final RoomWebSocketHandler handler;
     private final RoomWebSocketAuthenticationInterceptor authenticationInterceptor;
+    private final RoomWebSocketProperties properties;
 
     RoomWebSocketConfiguration(
             RoomWebSocketHandler handler,
-            RoomWebSocketAuthenticationInterceptor authenticationInterceptor) {
+            RoomWebSocketAuthenticationInterceptor authenticationInterceptor,
+            RoomWebSocketProperties properties) {
         this.handler = handler;
         this.authenticationInterceptor = authenticationInterceptor;
+        this.properties = properties;
     }
 
     @Override
@@ -38,6 +41,7 @@ class RoomWebSocketConfiguration implements WebSocketConfigurer {
         var container = new ServletServerContainerFactoryBean();
         container.setMaxTextMessageBufferSize(RoomWebSocketHandler.MAX_TEXT_MESSAGE_BYTES);
         container.setMaxBinaryMessageBufferSize(RoomWebSocketHandler.MAX_TEXT_MESSAGE_BYTES);
+        container.setMaxSessionIdleTimeout(properties.presenceTtl().toMillis());
         return container;
     }
 }

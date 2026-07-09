@@ -40,6 +40,8 @@ Endpoint: `/api/v1/rooms/{roomId}/events`. Upgrade использует same-ori
 - client отправляет `expectedRoomVersion`, но не назначает новую server version;
 - события с меньшим `roomVersion` клиент игнорирует;
 - после reconnect сервер первым отправляет `room.snapshot`;
+- `participant.heartbeat` продлевает authoritative presence TTL;
+- изменения presence приходят как `participant.online` и `participant.offline`;
 - неизвестный server event с валидным envelope безопасно игнорируется;
 - неизвестный client command отклоняется;
 - `participantId` берется из session и сверяется с payload;

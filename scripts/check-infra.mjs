@@ -99,6 +99,35 @@ function connectRoomEvents(url, cookie) {
   });
 }
 
+function waitForJsonMessage(socket, label) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      socket.terminate();
+      reject(new Error(`${label} timed out`));
+    }, 5_000);
+
+    socket.once("message", (data, isBinary) => {
+      clearTimeout(timeout);
+      if (isBinary) {
+        socket.terminate();
+        reject(new Error(`${label} returned binary message`));
+        return;
+      }
+
+      try {
+        resolve(JSON.parse(data.toString("utf8")));
+      } catch (error) {
+        socket.terminate();
+        reject(error);
+      }
+    });
+    socket.once("error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+  });
+}
+
 function waitForWebSocketClose(socket) {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -114,6 +143,12 @@ function waitForWebSocketClose(socket) {
       clearTimeout(timeout);
       reject(error);
     });
+  });
+}
+
+function delay(milliseconds) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
   });
 }
 
@@ -195,6 +230,7 @@ const roomId = createdRoom.body.room?.roomId;
 const hostSecret = createdRoom.body.hostSecret;
 const invitePath = createdRoom.body.invitePath;
 const sessionCookie = createdRoom.headers.get("set-cookie") ?? "";
+const hostCookie = sessionCookie.split(";", 1)[0];
 
 if (!/^[A-Za-z0-9_-]{22}$/.test(roomId)) {
   throw new Error("create room returned invalid roomId");
@@ -207,7 +243,8 @@ if (invitePath !== `/rooms/${roomId}` || invitePath.includes(hostSecret)) {
 }
 if (
   !sessionCookie.includes("HttpOnly") ||
-  !sessionCookie.includes("SameSite=Strict")
+  !sessionCookie.includes("SameSite=Strict") ||
+  !/^wt_session=[A-Za-z0-9_-]{43}$/.test(hostCookie)
 ) {
   throw new Error("create room returned unsafe session cookie");
 }
@@ -301,6 +338,15 @@ console.log("[ok] unavailable room: hidden");
 const eventsUrl = new URL(`/api/v1/rooms/${roomId}/events`, appUrl);
 eventsUrl.protocol = eventsUrl.protocol === "https:" ? "wss:" : "ws:";
 
+const hostEventsConnection = await connectRoomEvents(eventsUrl, hostCookie);
+if (
+  hostEventsConnection.event.type !== "room.snapshot" ||
+  hostEventsConnection.event.payload?.roomId !== roomId
+) {
+  hostEventsConnection.socket.terminate();
+  throw new Error("host room WebSocket returned invalid initial snapshot");
+}
+
 const firstEventsConnection = await connectRoomEvents(eventsUrl, guestCookie);
 const firstSnapshot = firstEventsConnection.event;
 
@@ -315,10 +361,10 @@ if (
   firstSnapshot.payload?.participants?.length !== 4 ||
   firstSnapshot.payload?.roomVersion !== 3
 ) {
+  hostEventsConnection.socket.terminate();
   firstEventsConnection.socket.terminate();
   throw new Error("room WebSocket returned invalid initial snapshot");
 }
-firstEventsConnection.socket.close(1000, "smoke reconnect");
 
 const reconnect = await connectRoomEvents(eventsUrl, guestCookie);
 if (
@@ -326,10 +372,65 @@ if (
   reconnect.event.eventId === firstSnapshot.eventId ||
   reconnect.event.roomVersion !== firstSnapshot.roomVersion
 ) {
+  hostEventsConnection.socket.terminate();
   reconnect.socket.terminate();
   throw new Error("room WebSocket reconnect returned invalid snapshot");
 }
-reconnect.socket.close(1000, "smoke complete");
+reconnect.socket.send(
+  JSON.stringify({
+    schemaVersion: 1,
+    eventId: randomUUID(),
+    type: "participant.heartbeat",
+    roomId,
+    participantId: guestParticipantId,
+    expectedRoomVersion: reconnect.event.roomVersion,
+    occurredAt: new Date().toISOString(),
+    payload: {
+      sentAt: new Date().toISOString(),
+    },
+  }),
+);
+await delay(250);
+if (reconnect.socket.readyState !== WebSocket.OPEN) {
+  hostEventsConnection.socket.terminate();
+  throw new Error("room WebSocket heartbeat was rejected");
+}
+
+reconnect.socket.close(1000, "smoke offline");
+const offlineEvent = await waitForJsonMessage(
+  hostEventsConnection.socket,
+  "participant offline event",
+);
+if (
+  offlineEvent.type !== "participant.offline" ||
+  offlineEvent.participantId !== guestParticipantId ||
+  offlineEvent.payload?.participantId !== guestParticipantId ||
+  offlineEvent.payload?.online !== false
+) {
+  hostEventsConnection.socket.terminate();
+  throw new Error("participant offline event was not broadcast");
+}
+
+const onlineReconnect = await connectRoomEvents(eventsUrl, guestCookie);
+const onlineEvent = await waitForJsonMessage(
+  hostEventsConnection.socket,
+  "participant online event",
+);
+if (
+  onlineReconnect.event.type !== "room.snapshot" ||
+  onlineReconnect.event.roomVersion <= offlineEvent.roomVersion ||
+  onlineEvent.type !== "participant.online" ||
+  onlineEvent.participantId !== guestParticipantId ||
+  onlineEvent.payload?.participantId !== guestParticipantId ||
+  onlineEvent.payload?.online !== true ||
+  onlineEvent.roomVersion !== onlineReconnect.event.roomVersion
+) {
+  hostEventsConnection.socket.terminate();
+  onlineReconnect.socket.terminate();
+  throw new Error("participant online reconnect event was not broadcast");
+}
+onlineReconnect.socket.close(1000, "smoke complete");
+hostEventsConnection.socket.close(1000, "smoke complete");
 
 const unknownCommandConnection = await connectRoomEvents(
   eventsUrl,
@@ -351,6 +452,8 @@ if ((await unknownCommandClose) !== 1007) {
 
 console.log("[ok] room WebSocket snapshot: received");
 console.log("[ok] room WebSocket reconnect: refreshed");
+console.log("[ok] room WebSocket heartbeat: accepted");
+console.log("[ok] room WebSocket presence: broadcast");
 console.log("[ok] unknown WebSocket client command: rejected");
 
 const livekit = await get(livekitUrl);

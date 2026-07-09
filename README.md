@@ -19,8 +19,9 @@ P0 технически подтвержден.
 - WT-201 реализовал создание приватной комнаты с Redis TTL и idempotency.
 - WT-202 реализовал вход гостя, session identity и ограничение вместимости комнаты.
 - WT-203 реализовал авторизованный room WebSocket и snapshot при connect/reconnect.
+- WT-204 реализовал backend-owned presence heartbeat и online/offline fan-out.
 
-P1 foundation завершен. Проект находится в P2 room lifecycle. Presence, chat, voice и product-токены LiveKit намеренно оставлены для следующих тикетов.
+P1 foundation завершен. Проект находится в P2 room lifecycle. Chat, voice и product-токены LiveKit намеренно оставлены для следующих тикетов.
 
 ## Структура репозитория
 
@@ -121,6 +122,7 @@ Media PoC остается референсной реализацией в [poc
 - [WT-201 создание комнаты](docs/WT-201_CREATE_ROOM.md)
 - [WT-202 вход гостя](docs/WT-202_GUEST_JOIN.md)
 - [WT-203 WebSocket и snapshot](docs/WT-203_WEBSOCKET_SNAPSHOT.md)
+- [WT-204 presence heartbeat](docs/WT-204_PRESENCE_HEARTBEAT.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation
