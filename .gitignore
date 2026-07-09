@@ -11,6 +11,8 @@ build/
 dist/
 **/dist/
 frontend/build/
+reports/
+**/reports/
 
 .env
 .env.*

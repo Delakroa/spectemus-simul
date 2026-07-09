@@ -1,0 +1,68 @@
+name: Quality Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-gate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Tests, lint and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Получить исходный код
+        uses: actions/checkout@v6
+
+      - name: Установить pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Установить Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Установить Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - name: Настроить Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Установить зависимости
+        run: pnpm install --frozen-lockfile
+
+      - name: Запустить quality gate
+        run: pnpm check:ci
+
+      - name: Сохранить отчеты тестов
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            frontend/reports/tests/
+            poc/media-capture-livekit/reports/tests/
+            backend/build/reports/tests/test/
+            backend/build/test-results/test/
+          if-no-files-found: warn
+          retention-days: 14

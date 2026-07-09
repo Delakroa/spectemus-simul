@@ -9,6 +9,7 @@
     "backend:test": "node scripts/run-gradle.mjs :backend:test --no-daemon",
     "build": "pnpm -r --if-present build && pnpm backend:build",
     "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build",
+    "check:ci": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test:ci && pnpm build",
     "dev:frontend": "pnpm --filter @watch-together/frontend dev",
     "dev:poc": "pnpm --filter @watch-together/poc-media-capture-livekit dev",
     "dev:poc:down": "pnpm --filter @watch-together/poc-media-capture-livekit dev:down",
@@ -21,7 +22,9 @@
     "infra:reset": "docker compose -f infra/compose.yaml down --volumes",
     "infra:up": "docker compose -f infra/compose.yaml up --build -d --wait --wait-timeout 240",
     "lint": "pnpm -r --if-present lint",
+    "security:audit": "pnpm audit --prod --audit-level high",
     "test": "pnpm -r --if-present test && pnpm backend:test",
+    "test:ci": "pnpm -r --if-present test:ci && pnpm backend:test",
     "typecheck": "pnpm -r --if-present typecheck"
   }
 }
