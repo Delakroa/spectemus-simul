@@ -1,0 +1,12 @@
+.git
+.github
+.gradle
+.pnpm-store
+.vscode
+**/build
+**/coverage
+**/dist
+**/node_modules
+infra/.env
+*.log
+.DS_Store

@@ -62,6 +62,6 @@ pnpm dev:frontend
 
 - Создание и присоединение к комнатам относятся к P2.
 - LiveKit lifecycle относится к P3.
-- Production reverse proxy появится в WT-104.
+- Production-подобный локальный reverse proxy реализован в WT-104.
 - E2E-набор Playwright будет расширен вместе с пользовательскими сценариями; WT-103 покрыт component и integration tests.
 - Автоматическая screenshot-проверка не выполнена: встроенный браузер текущей Codex-сессии недоступен. Страница запущена локально для ручной проверки.

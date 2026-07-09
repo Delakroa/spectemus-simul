@@ -13,15 +13,16 @@ P0 технически подтвержден.
 - WT-101 создал monorepo-структуру.
 - WT-102 добавил Spring Boot backend skeleton.
 - WT-103 добавил React frontend foundation.
+- WT-104 добавил запускаемый Docker Compose stack.
 
-Проект находится в P1 foundation. Жизненный цикл комнат, Redis/PostgreSQL infrastructure, chat, voice и product-токены LiveKit намеренно оставлены для следующих тикетов.
+Проект находится в P1 foundation. Жизненный цикл комнат, persistence integration, chat, voice и product-токены LiveKit намеренно оставлены для следующих тикетов.
 
 ## Структура репозитория
 
 ```text
 backend/                    Spring Boot backend skeleton.
 frontend/                   React frontend foundation.
-infra/                      Будущая локальная/beta infrastructure, начинается в WT-104.
+infra/                      Локальный Docker Compose stack.
 docs/                       Планы, ADR, заметки по совместимости и качеству.
 poc/media-capture-livekit/  P0 proof of concept для media pipeline.
 ```
@@ -61,6 +62,21 @@ pnpm backend:bootRun
 pnpm dev:frontend
 ```
 
+Собрать и запустить весь локальный stack:
+
+```bash
+pnpm infra:up
+pnpm infra:check
+```
+
+Приложение будет доступно на `http://127.0.0.1:8088`.
+
+Остановить локальный stack:
+
+```bash
+pnpm infra:down
+```
+
 Запустить P0 media PoC из корня:
 
 ```bash
@@ -85,6 +101,7 @@ Media PoC остается референсной реализацией в [poc
 - [WT-004 product-state прототип](docs/WT-004_PRODUCT_STATE.md)
 - [WT-102 backend skeleton](docs/WT-102_BACKEND_SKELETON.md)
 - [WT-103 React frontend](docs/WT-103_REACT_FRONTEND.md)
+- [WT-104 локальная инфраструктура](docs/WT-104_LOCAL_INFRASTRUCTURE.md)
 
 ## Правила foundation
 
