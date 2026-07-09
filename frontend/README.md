@@ -8,11 +8,11 @@ React-приложение Watch Together, созданное в WT-103.
 - Vite.
 - React Router.
 - TanStack Query.
-- Zod для runtime-валидации ответов backend.
+- Zod для runtime-валидации ответов бэкенда.
 - Vitest и React Testing Library.
 - ESLint и Prettier.
 
-Zustand и LiveKit Client SDK будут добавлены вместе с реальным product-state и media lifecycle. В foundation-каркасе для них пока нет задачи.
+Zustand и LiveKit Client SDK будут добавлены вместе с реальными сценариями product-state и media lifecycle. В foundation-каркасе для них пока нет задачи.
 
 ## Локальный запуск
 
@@ -22,21 +22,21 @@ Zustand и LiveKit Client SDK будут добавлены вместе с ре
 pnpm install
 ```
 
-В первом терминале запустить backend:
+В первом терминале запустить бэкенд:
 
 ```bash
 pnpm backend:bootRun
 ```
 
-Во втором терминале запустить frontend:
+Во втором терминале запустить фронтенд:
 
 ```bash
 pnpm dev:frontend
 ```
 
-Frontend будет доступен на `http://127.0.0.1:5173`. Vite проксирует запросы `/api` на `http://127.0.0.1:8080`.
+Фронтенд будет доступен на `http://127.0.0.1:5173`. Vite проксирует запросы `/api` на `http://127.0.0.1:8080`.
 
-Другой адрес backend для development можно задать через `VITE_BACKEND_PROXY_TARGET`. Для отдельного production API используется `VITE_API_BASE_URL`. Пример находится в `.env.example`.
+Другой адрес бэкенда для локальной разработки можно задать через `VITE_BACKEND_PROXY_TARGET`. Для отдельного production API используется `VITE_API_BASE_URL`. Пример находится в `.env.example`.
 
 ## Проверки
 
@@ -51,7 +51,7 @@ pnpm build
 pnpm check
 ```
 
-Только frontend:
+Только фронтенд:
 
 ```bash
 pnpm --filter @watch-together/frontend lint
@@ -67,4 +67,4 @@ pnpm --filter @watch-together/frontend build
 
 Комнаты, аутентификация, LiveKit, media lifecycle, чат и голос находятся вне области WT-103.
 
-REST, WebSocket и error contracts находятся в [`../contracts`](../contracts/README.md). Все внешние payload должны проходить runtime validation до попадания в application state.
+REST, WebSocket и error contracts находятся в [`../contracts`](../contracts/README.md). Все внешние payload должны проходить runtime validation до попадания в состояние приложения.

@@ -55,6 +55,7 @@ const [
   snapshotExample,
   participantOnlineExample,
   participantOfflineExample,
+  participantLeftExample,
   roomClosedExample,
   errorExample,
   unknownServerEvent,
@@ -64,6 +65,7 @@ const [
   readJson("examples/server/room-snapshot.json"),
   readJson("examples/server/participant-online.json"),
   readJson("examples/server/participant-offline.json"),
+  readJson("examples/server/participant-left.json"),
   readJson("examples/server/room-closed.json"),
   readJson("examples/server/error.json"),
   readJson("examples/server/unknown-event.json"),
@@ -81,6 +83,11 @@ assertValid(
   validateServerEvent,
   participantOfflineExample,
   "Server participant offline example",
+);
+assertValid(
+  validateServerEvent,
+  participantLeftExample,
+  "Server participant left example",
 );
 assertValid(
   validateServerEvent,

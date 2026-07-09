@@ -1,15 +1,15 @@
 # Watch Together
 
-Watch Together — MVP для приватного синхронного просмотра. Host выбирает локальный видеофайл, создает приватную комнату и приглашает гостей одной ссылкой. Приложение не является видеохостингом: байты фильма остаются на машине host.
+Watch Together — MVP для приватного синхронного просмотра. Host выбирает локальный видеофайл, создаёт приватную комнату и приглашает гостей одной ссылкой. Приложение не является видеохостингом: байты фильма остаются на машине host.
 
 ## Текущий статус
 
-P0 технически подтвержден.
+P0 технически подтверждён.
 
-- WT-001 доказал путь локальный MP4 -> `captureStream()` -> LiveKit -> guest.
+- WT-001 доказал путь: локальный MP4 -> `captureStream()` -> LiveKit -> guest.
 - WT-002 зафиксировал границы браузеров и кодеков.
 - WT-003 зафиксировал первый baseline качества и задержки.
-- WT-004 принял решение по media pipeline и добавил первый data-channel прототип playback-state.
+- WT-004 принял решение по media pipeline и добавил первый data-channel прототип `playback-state`.
 - WT-101 создал monorepo-структуру.
 - WT-102 добавил Spring Boot backend skeleton.
 - WT-103 добавил React frontend foundation.
@@ -21,17 +21,25 @@ P0 технически подтвержден.
 - WT-203 реализовал авторизованный room WebSocket и snapshot при connect/reconnect.
 - WT-204 реализовал backend-owned presence heartbeat и online/offline fan-out.
 - WT-205 реализовал host close, `room.closed` и cleanup room lifecycle.
+- WT-206 реализовал явный выход guest participant, `participant.left` и освобождение места в комнате.
 
-P1 foundation завершен. Проект находится в P2 room lifecycle. Chat, voice и product-токены LiveKit намеренно оставлены для следующих тикетов.
+P1 foundation завершён. Проект находится в P2 room lifecycle. Chat, voice и product-токены LiveKit намеренно оставлены для следующих тикетов.
+
+## Как читать репозиторий
+
+- Если нужно быстро запустить проект, начните с раздела [Корневые команды](#корневые-команды).
+- Если нужно понять архитектуру и принятые решения, начните с [docs/README.md](docs/README.md).
+- Если нужно проверить API-границы, смотрите [contracts/README.md](contracts/README.md).
+- Если нужно поднять локальную среду, смотрите [infra/README.md](infra/README.md).
 
 ## Структура репозитория
 
 ```text
-backend/                    Spring Boot backend skeleton.
-contracts/                  OpenAPI, JSON Schema и contract examples.
-frontend/                   React frontend foundation.
-infra/                      Локальный Docker Compose stack.
-docs/                       Планы, ADR, заметки по совместимости и качеству.
+backend/                    Spring Boot бэкенд.
+contracts/                  OpenAPI, JSON Schema и примеры контрактов.
+frontend/                   React-фронтенд.
+infra/                      Локальная Docker Compose среда.
+docs/                       Карта проекта, ADR, планы и отчёты по тикетам.
 poc/media-capture-livekit/  P0 proof of concept для media pipeline.
 ```
 
@@ -52,7 +60,7 @@ pnpm build
 pnpm check
 ```
 
-Запустить CI-вариант с машинными отчетами тестов и аудит production npm dependencies:
+Запустить CI-вариант с машинными отчётами тестов и аудитом production npm dependencies:
 
 ```bash
 pnpm check:ci
@@ -105,11 +113,11 @@ pnpm dev:poc
 pnpm dev:poc:down
 ```
 
-## P0-референс
+## Документация
 
-Media PoC остается референсной реализацией в [poc/media-capture-livekit](poc/media-capture-livekit/README.md).
+Основная карта документации находится в [docs/README.md](docs/README.md). Она показывает порядок чтения документов и объясняет, какие файлы являются историей PoC, foundation и P2 room lifecycle.
 
-Важные P0-документы:
+Media PoC остаётся референсной реализацией в [poc/media-capture-livekit](poc/media-capture-livekit/README.md).
 
 - [WT-002 матрица совместимости](docs/WT-002_COMPATIBILITY_MATRIX.md)
 - [WT-003 качество и задержка](docs/WT-003_QUALITY_LATENCY.md)
@@ -125,12 +133,13 @@ Media PoC остается референсной реализацией в [poc
 - [WT-203 WebSocket и snapshot](docs/WT-203_WEBSOCKET_SNAPSHOT.md)
 - [WT-204 presence heartbeat](docs/WT-204_PRESENCE_HEARTBEAT.md)
 - [WT-205 room close и expiry](docs/WT-205_ROOM_CLOSE_EXPIRY.md)
+- [WT-206 participant leave](docs/WT-206_PARTICIPANT_LEAVE.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation
 
 - Не загружать байты фильма в backend services.
-- LiveKit остается media plane.
-- Spring Boot в будущем отвечает за rooms, roles, access, state, tokens, presence, TTL, audit и telemetry.
+- LiveKit остаётся media plane.
+- Spring Boot отвечает за rooms, roles, access, state, tokens, presence, TTL, audit и telemetry.
 - Не переносить PoC token или room logic в product code без WT-301 и room lifecycle contracts.
-- Секреты хранить только в локальных `.env` файлах или secret storage. В git коммитить examples, а не реальные значения.
+- Секреты хранить только в локальных `.env` файлах или secret storage. В git попадают только examples, а не реальные значения.

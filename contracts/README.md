@@ -2,7 +2,7 @@
 
 ## Назначение
 
-Каталог содержит source of truth для REST API, WebSocket events и общей модели ошибок. Product-код backend и frontend должен изменяться вместе с контрактами и проходить `pnpm contracts:check`.
+Каталог содержит source of truth для REST API, WebSocket events и общей модели ошибок. Product-код бэкенда и фронтенда должен изменяться вместе с контрактами и проходить `pnpm contracts:check`.
 
 ## Состав
 
@@ -17,21 +17,22 @@
 
 ## REST
 
-- API version находится в path: `/api/v1`.
+- Версия API находится в path: `/api/v1`.
 - JSON является единственным request/response format product API.
 - Ошибки возвращаются как `application/problem+json`.
-- Browser session хранится в opaque `wt_session` cookie.
+- Browser session хранится в opaque cookie `wt_session`.
 - Production cookie обязана иметь `HttpOnly`, `Secure` и `SameSite=Strict`.
-- Host secret передается отдельно и никогда не включается в invite path.
+- Host secret передаётся отдельно и никогда не включается в invite path.
 - `POST /api/v1/rooms` требует `Idempotency-Key`.
+- `POST /api/v1/rooms/{roomId}/leave` удаляет текущего guest participant по session cookie.
 - `POST /api/v1/rooms/{roomId}/close` требует host session cookie и `X-Host-Secret`.
 - Внешние ответы не содержат локальные пути, movie bytes, stack trace или инфраструктурные секреты.
 
 ## WebSocket
 
-Endpoint: `/api/v1/rooms/{roomId}/events`. Upgrade использует same-origin session cookie. Дополнительный credential в query string запрещен.
+Endpoint: `/api/v1/rooms/{roomId}/events`. Upgrade использует same-origin session cookie. Дополнительный credential в query string запрещён.
 
-Транспорт принимает только UTF-8 JSON text messages размером не более 16 KiB. Binary messages и payload, не прошедшие schema validation, закрываются protocol error без применения состояния.
+Транспорт принимает только UTF-8 JSON text messages размером не более 16 KiB. Binary messages и payload, не прошедшие schema validation, закрываются protocol error без изменения состояния.
 
 Общие правила:
 
@@ -43,11 +44,12 @@ Endpoint: `/api/v1/rooms/{roomId}/events`. Upgrade использует same-ori
 - после reconnect сервер первым отправляет `room.snapshot`;
 - `participant.heartbeat` продлевает authoritative presence TTL;
 - изменения presence приходят как `participant.online` и `participant.offline`;
+- явный выход guest приходит как `participant.left`, после чего WebSocket-сессия ушедшего участника закрывается;
 - закрытие комнаты приходит как `room.closed`, после чего WebSocket-сессия закрывается;
 - неизвестный server event с валидным envelope безопасно игнорируется;
 - неизвестный client command отклоняется;
-- `participantId` берется из session и сверяется с payload;
-- `occurredAt` передается в UTC в RFC 3339 формате.
+- `participantId` берётся из session и сверяется с payload;
+- `occurredAt` передаётся в UTC в формате RFC 3339.
 
 ## Ошибки
 
@@ -65,7 +67,7 @@ Endpoint: `/api/v1/rooms/{roomId}/events`. Upgrade использует same-ori
 |  400 | `MALFORMED_REQUEST`       |    нет    | Некорректный JSON или структура запроса           |
 |  401 | `AUTHENTICATION_REQUIRED` |    нет    | Нет действующей session                           |
 |  403 | `ACCESS_DENIED`           |    нет    | Недостаточно прав                                 |
-|  404 | `ROOM_UNAVAILABLE`        |    нет    | Комната недоступна без раскрытия ее существования |
+|  404 | `ROOM_UNAVAILABLE`        |    нет    | Комната недоступна без раскрытия её существования |
 |  409 | `IDEMPOTENCY_CONFLICT`    |    нет    | Key повторен с другим payload                     |
 |  409 | `ROOM_FULL`               |    нет    | Достигнут participant limit                       |
 |  409 | `ROOM_STATE_CONFLICT`     |    да     | Операция основана на устаревшей room version      |

@@ -12,6 +12,8 @@ import java.util.UUID;
 
 import com.watchtogether.backend.room.RoomCreationStore.StoredParticipant;
 import com.watchtogether.backend.room.RoomCreationStore.StoredRoom;
+import com.watchtogether.backend.room.RoomLifecycleStore.LeaveOutcome;
+import com.watchtogether.backend.room.RoomLifecycleStore.LeaveResult;
 import com.watchtogether.backend.room.RoomLifecycleStore.LifecycleOutcome;
 import com.watchtogether.backend.room.RoomLifecycleStore.LifecycleResult;
 
@@ -33,6 +35,8 @@ class RedisRoomLifecycleStoreTest {
     private static final String ROOM_ID = "AbCdEfGhIjKlMnOpQrStUv";
     private static final UUID HOST_ID =
             UUID.fromString("d0f8636f-e21e-4d7b-9fce-6fb0e6fb5678");
+    private static final UUID GUEST_ID =
+            UUID.fromString("8e7d79a8-a49f-48cc-a409-f07890dd3218");
 
     @Autowired
     private RedisRoomLifecycleStore store;
@@ -91,11 +95,54 @@ class RedisRoomLifecycleStoreTest {
         assertThat(notExpired.outcome()).isEqualTo(LifecycleOutcome.NOT_EXPIRED);
     }
 
+    @Test
+    void readsLeaveResultWithParticipantIdAndUpdatedRoom() throws Exception {
+        StoredRoom afterLeave = room(RoomStatus.CREATED);
+        when(redis.execute(any(), anyList(), any(Object[].class)))
+                .thenReturn("LEFT:" + GUEST_ID + ":" + objectMapper.writeValueAsString(afterLeave));
+
+        LeaveResult result = store.leave(
+                ROOM_ID,
+                "guest-session-hash",
+                Instant.parse("2026-07-09T12:00:00Z"));
+
+        assertThat(result.outcome()).isEqualTo(LeaveOutcome.LEFT);
+        assertThat(result.participantId()).isEqualTo(GUEST_ID);
+        assertThat(result.room()).isEqualTo(afterLeave);
+    }
+
+    @Test
+    void readsLeaveRejectionResultsWithoutLeakingRoomState() {
+        when(redis.execute(any(), anyList(), any(Object[].class)))
+                .thenReturn("AUTHENTICATION_REQUIRED")
+                .thenReturn("HOST_CANNOT_LEAVE")
+                .thenReturn("ROOM_UNAVAILABLE");
+
+        LeaveResult authenticationRequired = leave();
+        LeaveResult hostCannotLeave = leave();
+        LeaveResult roomUnavailable = leave();
+
+        assertThat(authenticationRequired.outcome())
+                .isEqualTo(LeaveOutcome.AUTHENTICATION_REQUIRED);
+        assertThat(authenticationRequired.room()).isNull();
+        assertThat(hostCannotLeave.outcome()).isEqualTo(LeaveOutcome.HOST_CANNOT_LEAVE);
+        assertThat(hostCannotLeave.room()).isNull();
+        assertThat(roomUnavailable.outcome()).isEqualTo(LeaveOutcome.ROOM_UNAVAILABLE);
+        assertThat(roomUnavailable.room()).isNull();
+    }
+
     private LifecycleResult close() {
         return store.closeByHost(
                 ROOM_ID,
                 "session-hash",
                 "host-secret-hash",
+                Instant.parse("2026-07-09T12:00:00Z"));
+    }
+
+    private LeaveResult leave() {
+        return store.leave(
+                ROOM_ID,
+                "guest-session-hash",
                 Instant.parse("2026-07-09T12:00:00Z"));
     }
 

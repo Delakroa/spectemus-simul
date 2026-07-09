@@ -6,11 +6,11 @@
 
 ## Цель
 
-Завершить базовый room lifecycle: host может закрыть комнату, backend рассылает `room.closed`, активные WebSocket-сессии закрываются, а истекшие комнаты становятся недоступны после логического `expiresAt`.
+Завершить базовый room lifecycle: host может закрыть комнату, backend рассылает `room.closed`, активные WebSocket-сессии закрываются, а истёкшие комнаты становятся недоступны после логического `expiresAt`.
 
-## REST close
+## REST endpoint
 
-Endpoint:
+Команда закрытия:
 
 ```text
 POST /api/v1/rooms/{roomId}/close
@@ -18,16 +18,16 @@ POST /api/v1/rooms/{roomId}/close
 
 Требования:
 
-- browser session передается только через HttpOnly cookie `wt_session`;
-- host secret передается в header `X-Host-Secret`;
+- browser session передаётся только через HttpOnly cookie `wt_session`;
+- host secret передаётся в header `X-Host-Secret`;
 - закрыть комнату может только host participant с валидным session credential и host secret;
 - успешный ответ: `204 No Content`, `Cache-Control: no-store`;
 - повторное закрытие уже закрытой комнаты с валидными host credentials идемпотентно возвращает `204`;
-- отсутствующая, истекшая или недоступная комната возвращает `404 ROOM_UNAVAILABLE`;
+- отсутствующая, истёкшая или недоступная комната возвращает `404 ROOM_UNAVAILABLE`;
 - не-host session или неверный host secret возвращает `403 ACCESS_DENIED`;
 - отсутствующая или невалидная session возвращает `401 AUTHENTICATION_REQUIRED`.
 
-## Room state
+## Состояние комнаты
 
 При закрытии комнаты backend атомарно в Redis:
 
@@ -40,9 +40,9 @@ POST /api/v1/rooms/{roomId}/close
 
 Логическая expiry отделена от физического удаления ключа:
 
-- `expiresAt` остается product boundary;
+- `expiresAt` остаётся product boundary;
 - после `expiresAt` join и WebSocket connect недоступны;
-- Redis room key живет еще `watch-together.rooms.cleanup-grace`, чтобы backend успел выполнить cleanup и отправить `room.closed` reason `EXPIRED` активным WebSocket-сессиям.
+- Redis room key живёт ещё `watch-together.rooms.cleanup-grace`, чтобы backend успел выполнить cleanup и отправить `room.closed` reason `EXPIRED` активным WebSocket-сессиям.
 
 ## WebSocket
 
@@ -88,5 +88,5 @@ pnpm check
 ## Известные ограничения
 
 - Полноценный distributed sweeper для комнат без активных WebSocket-сессий не входит в WT-205: такие комнаты очищаются Redis TTL после cleanup grace.
-- `participant.left` как явная пользовательская команда выхода относится к следующему lifecycle тикету.
+- Явный выход guest participant реализован отдельно в WT-206.
 - Media controls, chat, voice и LiveKit product token lifecycle пока не реализуются.

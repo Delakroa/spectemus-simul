@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "eventId": "4e0fa361-4f7c-4d48-b61a-4a11f3277d93",
+  "type": "participant.left",
+  "roomId": "AbCdEfGhIjKlMnOpQrStUv",
+  "participantId": "8e7d79a8-a49f-48cc-a409-f07890dd3218",
+  "roomVersion": 46,
+  "occurredAt": "2026-07-09T07:31:30Z",
+  "payload": {
+    "participantId": "8e7d79a8-a49f-48cc-a409-f07890dd3218",
+    "reason": "LEFT"
+  }
+}

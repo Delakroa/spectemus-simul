@@ -10,10 +10,10 @@
 
 ## Поведение
 
-- При WebSocket connect backend повторно проверяет room/session и создает новый `connectionId`.
+- При WebSocket connect backend повторно проверяет room/session и создаёт новый `connectionId`.
 - Последнее соединение одного participant считается актуальным; предыдущее соединение закрывается.
 - Redis presence key хранит актуальный `connectionId` с TTL `watch-together.websocket.presence-ttl`.
-- `participant.heartbeat` продлевает Redis presence TTL и подтверждает, что соединение остается актуальным.
+- `participant.heartbeat` продлевает Redis presence TTL и подтверждает, что соединение остаётся актуальным.
 - При закрытии актуального соединения participant переводится в `online=false`.
 - Если закрывается старое соединение, уже замененное reconnect, room state не меняется.
 - Изменение `online` увеличивает `roomVersion` и обновляет `updatedAt`.
@@ -84,6 +84,6 @@ pnpm check
 ## Известные ограничения
 
 - Proactive cleanup после backend crash ограничен Redis TTL и последующей state reconciliation; отдельный room sweeper не входит в WT-204.
-- `participant.joined`, `participant.left`, close/expiry events относятся к следующим room lifecycle тикетам.
+- `participant.left` реализован в WT-206, close/expiry events реализованы в WT-205; отдельный `participant.joined` event пока не реализуется.
 - Media controls, chat и voice client-команды пока не реализуются.
 - Browser reconnect policy и UI-индикация presence относятся к frontend-тикетам.
