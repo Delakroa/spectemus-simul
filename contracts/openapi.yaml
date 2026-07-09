@@ -123,7 +123,7 @@ paths:
       tags: [Rooms]
       operationId: joinRoom
       summary: Присоединить гостя к комнате
-      x-implementation-status: planned
+      x-implementation-status: implemented
       requestBody:
         required: true
         content:
@@ -132,10 +132,15 @@ paths:
               $ref: "#/components/schemas/JoinRoomRequest"
       responses:
         "200":
-          description: Гость присоединён, session credential установлена в HttpOnly cookie
+          description: Гость присоединён или его session identity восстановлена
           headers:
             Set-Cookie:
               $ref: "#/components/headers/SessionCookie"
+            Cache-Control:
+              description: Ответ содержит session credential и не должен кэшироваться
+              schema:
+                type: string
+                const: no-store
           content:
             application/json:
               schema:

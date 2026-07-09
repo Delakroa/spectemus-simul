@@ -31,7 +31,7 @@ pnpm infra:check
 pnpm infra:ps
 ```
 
-Начиная с WT-201 `infra:check` также создаёт комнату через gateway и подтверждает idempotent replay через Redis.
+Начиная с WT-202 `infra:check` создаёт комнату через gateway, подтверждает idempotent create, проверяет guest join и session replay, а также ограничения вместимости и недоступной комнаты.
 
 Открыть приложение:
 

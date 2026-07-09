@@ -1,6 +1,6 @@
 # Backend
 
-Spring Boot backend skeleton для WT-102.
+Spring Boot backend Watch Together.
 
 ## Стек
 
@@ -34,18 +34,21 @@ pnpm backend:bootRun
 - `GET /api/v1/version`
 - `GET /actuator/health`
 - `POST /api/v1/rooms`
+- `POST /api/v1/rooms/{roomId}/join`
 
-## Область WT-102
+## Область
 
-WT-102 создает только backend foundation: воспроизводимую сборку, health/version REST endpoints, validation dependency, stateless security baseline, actuator и тесты.
+WT-102 создал backend foundation: воспроизводимую сборку, health/version REST endpoints, validation dependency, stateless security baseline, actuator и тесты.
 
-Вне области: rooms, participants, Redis, PostgreSQL, Flyway migrations, WebSocket state, LiveKit product tokens, chat, voice и persistence.
+WT-201 и WT-202 добавили создание комнаты и вход гостя с Redis persistence, TTL, idempotency, session identity и ограничением вместимости.
+
+Вне текущей области: PostgreSQL product state, Flyway migrations, WebSocket state, LiveKit product tokens, chat и voice.
 
 REST, WebSocket и error contracts находятся в [`../contracts`](../contracts/README.md). Новые product endpoints реализуются contract-first и не должны расходиться с OpenAPI/JSON Schema.
 
 ## Redis
 
-Room state и idempotency records хранятся в Redis. Локальные defaults:
+Room state, participant sessions и idempotency records хранятся в Redis. Локальные defaults:
 
 ```text
 REDIS_HOST=127.0.0.1
@@ -54,4 +57,4 @@ REDIS_PASSWORD=watch_together_redis_dev_only
 ROOM_TTL=4h
 ```
 
-Создание комнаты требует работающий Redis. Полный локальный stack запускается командами `pnpm infra:up` и `pnpm infra:check`.
+Создание комнаты и вход гостя требуют работающий Redis. Полный локальный stack запускается командами `pnpm infra:up` и `pnpm infra:check`.
