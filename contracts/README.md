@@ -43,6 +43,7 @@ Endpoint: `/api/v1/rooms/{roomId}/events`. Upgrade использует same-ori
 - события с меньшим `roomVersion` клиент игнорирует;
 - после reconnect сервер первым отправляет `room.snapshot`;
 - `participant.heartbeat` продлевает authoritative presence TTL;
+- вход нового guest participant приходит как `participant.joined`;
 - изменения presence приходят как `participant.online` и `participant.offline`;
 - явный выход guest приходит как `participant.left`, после чего WebSocket-сессия ушедшего участника закрывается;
 - закрытие комнаты приходит как `room.closed`, после чего WebSocket-сессия закрывается;

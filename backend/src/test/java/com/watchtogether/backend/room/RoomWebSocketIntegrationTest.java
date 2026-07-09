@@ -230,6 +230,37 @@ class RoomWebSocketIntegrationTest {
     }
 
     @Test
+    void broadcastsParticipantJoinedEventToActiveRoomSessions() throws Exception {
+        Connection host = connect(ROOM_ID, SESSION, null);
+        host.listener().nextText();
+        StoredRoom afterJoin = room(3, true);
+        currentRoom.set(afterJoin);
+
+        eventPublisher.publishParticipantJoined(afterJoin, GUEST_ID, afterJoin.updatedAt());
+        JsonNode event = objectMapper.readTree(host.listener().nextText());
+
+        assertThat(event.get("type").stringValue()).isEqualTo("participant.joined");
+        assertThat(event.get("roomId").stringValue()).isEqualTo(ROOM_ID);
+        assertThat(event.get("participantId").stringValue()).isEqualTo(GUEST_ID.toString());
+        assertThat(event.get("roomVersion").asLong()).isEqualTo(3);
+        assertThat(event.at("/payload/participantId").stringValue())
+                .isEqualTo(GUEST_ID.toString());
+        assertThat(event.at("/payload/displayName").stringValue()).isEqualTo("Guest");
+        assertThat(event.at("/payload/role").stringValue()).isEqualTo("GUEST");
+        assertThat(event.at("/payload/online").booleanValue()).isTrue();
+        Instant guestJoinedAt = afterJoin.participants().stream()
+                .filter(participant -> participant.participantId().equals(GUEST_ID))
+                .findFirst()
+                .orElseThrow()
+                .joinedAt();
+        assertThat(event.at("/payload/joinedAt").stringValue()).isEqualTo(
+                guestJoinedAt.toString());
+        assertThat(host.listener().isClosed()).isFalse();
+
+        close(host, "test complete");
+    }
+
+    @Test
     void broadcastsParticipantLeftEventAndClosesLeavingParticipantSession() throws Exception {
         currentRoom.set(room(3, true));
         Connection host = connect(ROOM_ID, SESSION, null);

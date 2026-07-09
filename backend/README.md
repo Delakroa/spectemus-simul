@@ -43,7 +43,7 @@ pnpm backend:bootRun
 
 WT-102 создал backend foundation: воспроизводимую сборку, REST endpoints `health/version`, validation dependency, stateless security baseline, actuator и тесты.
 
-WT-201, WT-202, WT-203, WT-204, WT-205 и WT-206 добавили создание комнаты, вход гостя, авторизованный WebSocket snapshot, backend-owned presence heartbeat, закрытие комнаты host-ом и явный выход guest participant. Эти сценарии используют Redis persistence, TTL, idempotency и session identity.
+WT-201, WT-202, WT-203, WT-204, WT-205, WT-206 и WT-207 добавили создание комнаты, вход гостя, авторизованный WebSocket snapshot, backend-owned presence heartbeat, `participant.joined`, закрытие комнаты host-ом и явный выход guest participant. Эти сценарии используют Redis persistence, TTL, idempotency и session identity.
 
 Вне текущей области: PostgreSQL product state, Flyway migrations, LiveKit product tokens, chat и voice.
 

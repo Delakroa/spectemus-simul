@@ -53,6 +53,7 @@ const [
   problemExample,
   heartbeatExample,
   snapshotExample,
+  participantJoinedExample,
   participantOnlineExample,
   participantOfflineExample,
   participantLeftExample,
@@ -63,6 +64,7 @@ const [
   readJson("examples/problem-details.json"),
   readJson("examples/client/participant-heartbeat.json"),
   readJson("examples/server/room-snapshot.json"),
+  readJson("examples/server/participant-joined.json"),
   readJson("examples/server/participant-online.json"),
   readJson("examples/server/participant-offline.json"),
   readJson("examples/server/participant-left.json"),
@@ -74,6 +76,11 @@ const [
 assertValid(validateProblem, problemExample, "Problem Details example");
 assertValid(validateClientEvent, heartbeatExample, "Client event example");
 assertValid(validateServerEvent, snapshotExample, "Server snapshot example");
+assertValid(
+  validateServerEvent,
+  participantJoinedExample,
+  "Server participant joined example",
+);
 assertValid(
   validateServerEvent,
   participantOnlineExample,

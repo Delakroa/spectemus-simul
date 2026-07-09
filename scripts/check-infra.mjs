@@ -365,13 +365,58 @@ if (
   throw new Error("repeated join created a duplicate participant");
 }
 
-for (const displayName of ["Infra Smoke Guest 2", "Infra Smoke Guest 3"]) {
+const eventsUrl = new URL(`/api/v1/rooms/${roomId}/events`, appUrl);
+eventsUrl.protocol = eventsUrl.protocol === "https:" ? "wss:" : "ws:";
+
+const joinEventsConnection = await connectRoomEvents(eventsUrl, hostCookie);
+if (joinEventsConnection.event.type !== "room.snapshot") {
+  joinEventsConnection.socket.terminate();
+  throw new Error("host join WebSocket returned invalid initial snapshot");
+}
+const joinedEventPromise = waitForJsonMessageMatching(
+  joinEventsConnection.socket,
+  (event) => event.type === "participant.joined",
+  "participant joined event",
+);
+const joinedSecondGuest = await postJson(joinUrl, {
+  displayName: "Infra Smoke Guest 2",
+});
+if (joinedSecondGuest.status !== 200) {
+  joinEventsConnection.socket.terminate();
+  throw new Error(
+    `join room while checking participant.joined returned HTTP ${joinedSecondGuest.status}`,
+  );
+}
+const joinedSecondGuestId = joinedSecondGuest.body.participant?.participantId;
+const joinedEvent = await joinedEventPromise;
+if (
+  joinedEvent.type !== "participant.joined" ||
+  joinedEvent.roomId !== roomId ||
+  joinedEvent.participantId !== joinedSecondGuestId ||
+  joinedEvent.payload?.participantId !== joinedSecondGuestId ||
+  joinedEvent.payload?.displayName !== "Infra Smoke Guest 2" ||
+  joinedEvent.payload?.role !== "GUEST" ||
+  joinedEvent.payload?.online !== true ||
+  joinedEvent.roomVersion !== joinedSecondGuest.body.room?.roomVersion
+) {
+  joinEventsConnection.socket.terminate();
+  throw new Error("participant joined event was not broadcast");
+}
+
+for (const displayName of ["Infra Smoke Guest 3"]) {
+  const capacityJoinEventPromise = waitForJsonMessageMatching(
+    joinEventsConnection.socket,
+    (event) => event.type === "participant.joined",
+    "participant joined capacity event",
+  );
   const response = await postJson(joinUrl, { displayName });
   if (response.status !== 200) {
+    joinEventsConnection.socket.terminate();
     throw new Error(
       `join room while filling capacity returned HTTP ${response.status}`,
     );
   }
+  await capacityJoinEventPromise;
 }
 
 const fullRoomResponse = await postJson(joinUrl, {
@@ -397,20 +442,11 @@ if (
 
 console.log("[ok] guest join through proxy: joined");
 console.log("[ok] guest join session replay: restored");
+console.log("[ok] room WebSocket participant joined: broadcast");
 console.log("[ok] room capacity: enforced");
 console.log("[ok] unavailable room: hidden");
 
-const eventsUrl = new URL(`/api/v1/rooms/${roomId}/events`, appUrl);
-eventsUrl.protocol = eventsUrl.protocol === "https:" ? "wss:" : "ws:";
-
-const hostEventsConnection = await connectRoomEvents(eventsUrl, hostCookie);
-if (
-  hostEventsConnection.event.type !== "room.snapshot" ||
-  hostEventsConnection.event.payload?.roomId !== roomId
-) {
-  hostEventsConnection.socket.terminate();
-  throw new Error("host room WebSocket returned invalid initial snapshot");
-}
+const hostEventsConnection = joinEventsConnection;
 
 const firstEventsConnection = await connectRoomEvents(eventsUrl, guestCookie);
 const firstSnapshot = firstEventsConnection.event;

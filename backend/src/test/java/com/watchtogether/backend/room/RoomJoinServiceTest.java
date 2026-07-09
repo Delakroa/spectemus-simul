@@ -3,6 +3,7 @@ package com.watchtogether.backend.room;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -35,7 +36,8 @@ class RoomJoinServiceTest {
     @Test
     void joinsGuestWithNewIdentityAndSessionCredential() {
         FakeRoomJoinStore store = new FakeRoomJoinStore(roomWithHost());
-        RoomJoinService service = service(store);
+        RecordingPublisher publisher = new RecordingPublisher();
+        RoomJoinService service = service(store, publisher);
 
         JoinResponse result = service.join(ROOM_ID, " Guest ", null);
 
@@ -50,13 +52,18 @@ class RoomJoinServiceTest {
         assertThat(store.room().participants().getLast().sessionCredentialHash())
                 .isEqualTo(SecureHash.sha256(SESSION_1))
                 .isNotEqualTo(SESSION_1);
+        assertThat(publisher.joinedRoom()).isEqualTo(store.room());
+        assertThat(publisher.joinedParticipantId()).isEqualTo(GUEST_ID_1);
+        assertThat(publisher.joinedAt()).isEqualTo(NOW);
     }
 
     @Test
     void replaysExistingParticipantWithoutCreatingDuplicate() {
         FakeRoomJoinStore store = new FakeRoomJoinStore(roomWithHost());
-        RoomJoinService service = service(store);
+        RecordingPublisher publisher = new RecordingPublisher();
+        RoomJoinService service = service(store, publisher);
         JoinResponse first = service.join(ROOM_ID, "Guest", null);
+        publisher.clear();
 
         JoinResponse replay = service.join(ROOM_ID, "Changed name", SESSION_1);
 
@@ -66,6 +73,7 @@ class RoomJoinServiceTest {
         assertThat(replay.response().room().participants()).hasSize(2);
         assertThat(replay.response().room().roomVersion()).isEqualTo(1);
         assertThat(replay.sessionCredential()).isEqualTo(SESSION_1);
+        assertThat(publisher.joinedRoom()).isNull();
     }
 
     @Test
@@ -107,8 +115,13 @@ class RoomJoinServiceTest {
     }
 
     private RoomJoinService service(FakeRoomJoinStore store) {
+        return service(store, new RecordingPublisher());
+    }
+
+    private RoomJoinService service(FakeRoomJoinStore store, RecordingPublisher publisher) {
         return new RoomJoinService(
                 store,
+                publisher,
                 new StubSecureValueGenerator(),
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
@@ -209,6 +222,52 @@ class RoomJoinServiceTest {
         @Override
         public UUID participantId() {
             return callIndex == 1 ? GUEST_ID_1 : GUEST_ID_2;
+        }
+    }
+
+    private static final class RecordingPublisher implements RoomEventPublisher {
+
+        private StoredRoom joinedRoom;
+        private UUID joinedParticipantId;
+        private Instant joinedAt;
+
+        @Override
+        public void publishParticipantJoined(StoredRoom room, UUID participantId, Instant joinedAt)
+                throws IOException {
+            this.joinedRoom = room;
+            this.joinedParticipantId = participantId;
+            this.joinedAt = joinedAt;
+        }
+
+        @Override
+        public void publishRoomClosed(StoredRoom room, RoomClosedReason reason, Instant closedAt)
+                throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void publishParticipantLeft(
+                StoredRoom room, UUID participantId, ParticipantLeftReason reason, Instant leftAt)
+                throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        void clear() {
+            joinedRoom = null;
+            joinedParticipantId = null;
+            joinedAt = null;
+        }
+
+        StoredRoom joinedRoom() {
+            return joinedRoom;
+        }
+
+        UUID joinedParticipantId() {
+            return joinedParticipantId;
+        }
+
+        Instant joinedAt() {
+            return joinedAt;
         }
     }
 }
