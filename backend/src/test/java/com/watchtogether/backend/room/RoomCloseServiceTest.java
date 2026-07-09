@@ -173,6 +173,12 @@ class RoomCloseServiceTest {
         private Instant closedAt;
 
         @Override
+        public void publishParticipantJoined(StoredRoom room, UUID participantId, Instant joinedAt)
+                throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public void publishRoomClosed(StoredRoom room, RoomClosedReason reason, Instant closedAt)
                 throws IOException {
             this.room = room;

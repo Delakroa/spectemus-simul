@@ -171,6 +171,12 @@ class RoomLeaveServiceTest {
         private Instant leftAt;
 
         @Override
+        public void publishParticipantJoined(StoredRoom room, UUID participantId, Instant joinedAt)
+                throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public void publishRoomClosed(StoredRoom room, RoomClosedReason reason, Instant closedAt)
                 throws IOException {
             throw new UnsupportedOperationException();

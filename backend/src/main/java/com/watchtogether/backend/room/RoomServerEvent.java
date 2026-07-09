@@ -3,6 +3,7 @@ package com.watchtogether.backend.room;
 import java.time.Instant;
 import java.util.UUID;
 
+import com.watchtogether.backend.room.CreateRoomResponse.Participant;
 import com.watchtogether.backend.room.CreateRoomResponse.RoomSnapshot;
 
 record RoomServerEvent(
@@ -45,6 +46,22 @@ record RoomServerEvent(
                 roomVersion,
                 occurredAt,
                 new ParticipantPresencePayload(participantId, online, updatedAt));
+    }
+
+    static RoomServerEvent participantJoined(
+            String roomId,
+            Participant participant,
+            long roomVersion,
+            Instant occurredAt) {
+        return new RoomServerEvent(
+                CURRENT_SCHEMA_VERSION,
+                UUID.randomUUID(),
+                "participant.joined",
+                roomId,
+                participant.participantId(),
+                roomVersion,
+                occurredAt,
+                participant);
     }
 
     static RoomServerEvent roomClosed(

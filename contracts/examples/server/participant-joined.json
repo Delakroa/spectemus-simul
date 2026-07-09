@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "eventId": "37adbb9e-2ee2-4590-864d-84f8a9b23b3d",
+  "type": "participant.joined",
+  "roomId": "AbCdEfGhIjKlMnOpQrStUv",
+  "participantId": "8e7d79a8-a49f-48cc-a409-f07890dd3218",
+  "roomVersion": 43,
+  "occurredAt": "2026-07-09T07:30:05Z",
+  "payload": {
+    "participantId": "8e7d79a8-a49f-48cc-a409-f07890dd3218",
+    "displayName": "Guest",
+    "role": "GUEST",
+    "online": true,
+    "joinedAt": "2026-07-09T07:30:05Z"
+  }
+}

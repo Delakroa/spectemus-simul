@@ -1,5 +1,6 @@
 package com.watchtogether.backend.room;
 
+import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -24,11 +25,17 @@ class RoomJoinService {
             Pattern.compile("^[A-Za-z0-9_-]{43}$");
 
     private final RoomJoinStore store;
+    private final RoomEventPublisher events;
     private final SecureValueGenerator values;
     private final Clock clock;
 
-    RoomJoinService(RoomJoinStore store, SecureValueGenerator values, Clock clock) {
+    RoomJoinService(
+            RoomJoinStore store,
+            RoomEventPublisher events,
+            SecureValueGenerator values,
+            Clock clock) {
         this.store = store;
+        this.events = events;
         this.values = values;
         this.clock = clock;
     }
@@ -76,8 +83,20 @@ class RoomJoinService {
                 result.outcome() == JoinOutcome.REPLAYED ? sessionCredential : newSessionCredential;
         Duration remainingTtl = Duration.between(now, result.room().expiresAt());
         Duration cookieMaxAge = remainingTtl.isNegative() ? Duration.ZERO : remainingTtl;
+        if (result.outcome() == JoinOutcome.JOINED) {
+            publishParticipantJoined(result, participant);
+        }
 
         return new JoinResponse(response, responseSessionCredential, cookieMaxAge);
+    }
+
+    private void publishParticipantJoined(JoinResult result, StoredParticipant participant) {
+        try {
+            events.publishParticipantJoined(
+                    result.room(), participant.participantId(), participant.joinedAt());
+        } catch (IOException exception) {
+            throw new IllegalStateException("Unable to publish participant joined event", exception);
+        }
     }
 
     private boolean validSessionCredential(String sessionCredential) {

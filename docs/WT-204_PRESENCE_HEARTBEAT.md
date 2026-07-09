@@ -84,6 +84,6 @@ pnpm check
 ## Известные ограничения
 
 - Proactive cleanup после backend crash ограничен Redis TTL и последующей state reconciliation; отдельный room sweeper не входит в WT-204.
-- `participant.left` реализован в WT-206, close/expiry events реализованы в WT-205; отдельный `participant.joined` event пока не реализуется.
+- `participant.left` реализован в WT-206, `participant.joined` реализован в WT-207, close/expiry events реализованы в WT-205.
 - Media controls, chat и voice client-команды пока не реализуются.
 - Browser reconnect policy и UI-индикация presence относятся к frontend-тикетам.
