@@ -163,6 +163,86 @@ if (JSON.stringify(createdRoom.body) !== JSON.stringify(replayedRoom.body)) {
 console.log("[ok] create room through proxy: created");
 console.log("[ok] create room idempotency: replayed");
 
+const joinUrl = `${appUrl}/api/v1/rooms/${roomId}/join`;
+const joinedGuest = await postJson(joinUrl, {
+  displayName: "Infra Smoke Guest",
+});
+
+if (joinedGuest.status !== 200) {
+  throw new Error(`join room returned HTTP ${joinedGuest.status}`);
+}
+
+const guestSessionCookie = joinedGuest.headers.get("set-cookie") ?? "";
+const guestCookie = guestSessionCookie.split(";", 1)[0];
+const guestParticipantId = joinedGuest.body.participant?.participantId;
+
+if (
+  !guestSessionCookie.includes("HttpOnly") ||
+  !guestSessionCookie.includes("SameSite=Strict") ||
+  !/^wt_session=[A-Za-z0-9_-]{43}$/.test(guestCookie)
+) {
+  throw new Error("join room returned unsafe session cookie");
+}
+if (
+  joinedGuest.body.participant?.role !== "GUEST" ||
+  joinedGuest.body.room?.participants?.length !== 2 ||
+  joinedGuest.body.room?.roomVersion !== 1
+) {
+  throw new Error("join room returned invalid participant or room state");
+}
+
+const replayedGuest = await postJson(
+  joinUrl,
+  { displayName: "Infra Smoke Guest" },
+  { Cookie: guestCookie },
+);
+
+if (replayedGuest.status !== 200) {
+  throw new Error(`repeated join returned HTTP ${replayedGuest.status}`);
+}
+if (
+  replayedGuest.body.participant?.participantId !== guestParticipantId ||
+  replayedGuest.body.room?.participants?.length !== 2 ||
+  replayedGuest.body.room?.roomVersion !== 1
+) {
+  throw new Error("repeated join created a duplicate participant");
+}
+
+for (const displayName of ["Infra Smoke Guest 2", "Infra Smoke Guest 3"]) {
+  const response = await postJson(joinUrl, { displayName });
+  if (response.status !== 200) {
+    throw new Error(
+      `join room while filling capacity returned HTTP ${response.status}`,
+    );
+  }
+}
+
+const fullRoomResponse = await postJson(joinUrl, {
+  displayName: "Infra Smoke Guest 4",
+});
+if (
+  fullRoomResponse.status !== 409 ||
+  fullRoomResponse.body.code !== "ROOM_FULL"
+) {
+  throw new Error("full room did not return 409 ROOM_FULL");
+}
+
+const unavailableRoomResponse = await postJson(
+  `${appUrl}/api/v1/rooms/0000000000000000000000/join`,
+  { displayName: "Infra Smoke Guest" },
+);
+if (
+  unavailableRoomResponse.status !== 404 ||
+  unavailableRoomResponse.body.code !== "ROOM_UNAVAILABLE"
+) {
+  throw new Error("missing room did not return 404 ROOM_UNAVAILABLE");
+}
+
+console.log("[ok] guest join through proxy: joined");
+console.log("[ok] guest join session replay: restored");
+console.log("[ok] room capacity: enforced");
+console.log("[ok] unavailable room: hidden");
+
 const livekit = await get(livekitUrl);
 assertIncludes(livekit.body.toLowerCase(), "ok", "livekit");
 console.log(`[ok] LiveKit HTTP/WebSocket endpoint: ${livekitUrl}`);

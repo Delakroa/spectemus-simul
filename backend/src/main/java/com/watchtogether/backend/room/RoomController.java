@@ -1,15 +1,19 @@
 package com.watchtogether.backend.room;
 
 import java.net.URI;
+import java.time.Duration;
 
 import jakarta.validation.Valid;
 
 import com.watchtogether.backend.room.RoomCreationService.CreationResult;
+import com.watchtogether.backend.room.RoomJoinService.JoinResponse;
 
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -23,10 +27,15 @@ public class RoomController {
     private static final String SESSION_COOKIE = "wt_session";
 
     private final RoomCreationService roomCreationService;
+    private final RoomJoinService roomJoinService;
     private final RoomProperties properties;
 
-    RoomController(RoomCreationService roomCreationService, RoomProperties properties) {
+    RoomController(
+            RoomCreationService roomCreationService,
+            RoomJoinService roomJoinService,
+            RoomProperties properties) {
         this.roomCreationService = roomCreationService;
+        this.roomJoinService = roomJoinService;
         this.properties = properties;
     }
 
@@ -37,17 +46,38 @@ public class RoomController {
         CreationResult result =
                 roomCreationService.create(idempotencyKey, request.hostDisplayName());
         String roomId = result.response().room().roomId();
-        ResponseCookie sessionCookie = ResponseCookie.from(SESSION_COOKIE, result.sessionCredential())
-                .httpOnly(true)
-                .secure(properties.sessionCookieSecure())
-                .sameSite("Strict")
-                .path("/api/v1/rooms")
-                .maxAge(result.cookieMaxAge())
-                .build();
+        ResponseCookie sessionCookie =
+                sessionCookie(result.sessionCredential(), result.cookieMaxAge());
 
         return ResponseEntity.created(URI.create("/api/v1/rooms/" + roomId))
                 .cacheControl(CacheControl.noStore())
                 .header(HttpHeaders.SET_COOKIE, sessionCookie.toString())
                 .body(result.response());
+    }
+
+    @PostMapping("/{roomId}/join")
+    ResponseEntity<JoinRoomResponse> joinRoom(
+            @PathVariable String roomId,
+            @CookieValue(name = SESSION_COOKIE, required = false) String sessionCredential,
+            @Valid @RequestBody JoinRoomRequest request) {
+        JoinResponse result =
+                roomJoinService.join(roomId, request.displayName(), sessionCredential);
+        ResponseCookie sessionCookie =
+                sessionCookie(result.sessionCredential(), result.cookieMaxAge());
+
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.SET_COOKIE, sessionCookie.toString())
+                .body(result.response());
+    }
+
+    private ResponseCookie sessionCookie(String value, Duration maxAge) {
+        return ResponseCookie.from(SESSION_COOKIE, value)
+                .httpOnly(true)
+                .secure(properties.sessionCookieSecure())
+                .sameSite("Strict")
+                .path("/api/v1/rooms")
+                .maxAge(maxAge)
+                .build();
     }
 }

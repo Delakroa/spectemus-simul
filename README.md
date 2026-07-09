@@ -17,8 +17,9 @@ P0 технически подтвержден.
 - WT-105 добавил CI quality gate, test reports и dependency security scan.
 - WT-106 зафиксировал REST, WebSocket и error contracts.
 - WT-201 реализовал создание приватной комнаты с Redis TTL и idempotency.
+- WT-202 реализовал вход гостя, session identity и ограничение вместимости комнаты.
 
-P1 foundation завершен. Проект находится в P2 room lifecycle. Guest join, realtime snapshot, presence, chat, voice и product-токены LiveKit намеренно оставлены для следующих тикетов.
+P1 foundation завершен. Проект находится в P2 room lifecycle. Realtime snapshot, presence, chat, voice и product-токены LiveKit намеренно оставлены для следующих тикетов.
 
 ## Структура репозитория
 
@@ -117,6 +118,7 @@ Media PoC остается референсной реализацией в [poc
 - [WT-105 CI quality gate](docs/WT-105_CI_QUALITY_GATE.md)
 - [WT-106 контракты](docs/WT-106_CONTRACTS.md)
 - [WT-201 создание комнаты](docs/WT-201_CREATE_ROOM.md)
+- [WT-202 вход гостя](docs/WT-202_GUEST_JOIN.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation

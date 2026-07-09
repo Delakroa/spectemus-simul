@@ -49,6 +49,9 @@ class RoomControllerTest {
     private RoomCreationService roomCreationService;
 
     @MockitoBean
+    private RoomJoinService roomJoinService;
+
+    @MockitoBean
     private RoomProperties roomProperties;
 
     @BeforeEach
