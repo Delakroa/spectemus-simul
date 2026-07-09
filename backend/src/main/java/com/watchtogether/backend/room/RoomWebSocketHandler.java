@@ -278,6 +278,32 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
         }
     }
 
+    @Override
+    public void publishParticipantLeft(
+            StoredRoom room, UUID participantId, ParticipantLeftReason reason, Instant leftAt)
+            throws IOException {
+        var event = RoomServerEvent.participantLeft(
+                room.roomId(),
+                participantId,
+                room.roomVersion(),
+                reason,
+                leftAt);
+        String payload = objectMapper.writeValueAsString(event);
+        Set<WebSocketSession> roomSessions = Set.copyOf(
+                sessionsByRoom.getOrDefault(room.roomId(), Set.of()));
+        for (WebSocketSession roomSession : roomSessions) {
+            if (!roomSession.isOpen()) {
+                continue;
+            }
+            roomSession.sendMessage(new TextMessage(payload));
+            if (participantId.equals(optionalUuid(
+                    roomSession.getAttributes(),
+                    RoomWebSocketAuthenticationInterceptor.PARTICIPANT_ID_ATTRIBUTE))) {
+                roomSession.close(CloseStatus.NORMAL);
+            }
+        }
+    }
+
     private void scheduleExpiry(String roomId, Instant expiresAt) {
         expiryTasksByRoom.compute(roomId, (key, existingTask) -> {
             if (existingTask != null && !existingTask.isDone()) {

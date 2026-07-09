@@ -158,6 +158,34 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/v1/rooms/{roomId}/leave:
+    parameters:
+      - $ref: "#/components/parameters/RoomId"
+    post:
+      tags: [Rooms]
+      operationId: leaveRoom
+      summary: Покинуть комнату от имени guest
+      x-implementation-status: implemented
+      security:
+        - sessionCookie: []
+      responses:
+        "204":
+          description: Guest participant покинул комнату
+          headers:
+            Cache-Control:
+              description: Ответ не должен кэшироваться
+              schema:
+                type: string
+                const: no-store
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/RoomUnavailable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /api/v1/rooms/{roomId}/close:
     parameters:
       - $ref: "#/components/parameters/RoomId"

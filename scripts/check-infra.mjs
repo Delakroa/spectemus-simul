@@ -145,6 +145,54 @@ function waitForJsonMessage(socket, label) {
   });
 }
 
+function waitForJsonMessageMatching(socket, predicate, label) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      socket.terminate();
+      reject(new Error(`${label} timed out`));
+    }, 5_000);
+
+    function cleanup() {
+      clearTimeout(timeout);
+      socket.off("message", onMessage);
+      socket.off("error", onError);
+    }
+
+    function onMessage(data, isBinary) {
+      if (isBinary) {
+        cleanup();
+        socket.terminate();
+        reject(new Error(`${label} returned binary message`));
+        return;
+      }
+
+      let event;
+      try {
+        event = JSON.parse(data.toString("utf8"));
+      } catch (error) {
+        cleanup();
+        socket.terminate();
+        reject(error);
+        return;
+      }
+
+      if (predicate(event)) {
+        cleanup();
+        resolve(event);
+      }
+    }
+
+    function onError(error) {
+      cleanup();
+      reject(error);
+    }
+
+    socket.on("message", onMessage);
+    socket.once("error", onError);
+  });
+}
+
 function waitForWebSocketClose(socket) {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -467,6 +515,74 @@ if ((await unknownCommandClose) !== 1007) {
   throw new Error("unknown WebSocket client command was not rejected");
 }
 
+const leavingGuestConnection = await connectRoomEvents(eventsUrl, guestCookie);
+if (leavingGuestConnection.event.type !== "room.snapshot") {
+  leavingGuestConnection.socket.terminate();
+  throw new Error("guest leave WebSocket returned invalid initial snapshot");
+}
+const leftHostEventsConnection = await connectRoomEvents(eventsUrl, hostCookie);
+if (leftHostEventsConnection.event.type !== "room.snapshot") {
+  leftHostEventsConnection.socket.terminate();
+  leavingGuestConnection.socket.terminate();
+  throw new Error("host leave WebSocket returned invalid initial snapshot");
+}
+const leftEventPromise = waitForJsonMessageMatching(
+  leftHostEventsConnection.socket,
+  (event) => event.type === "participant.left",
+  "participant left event",
+);
+const leavingGuestLeftEventPromise = waitForJsonMessageMatching(
+  leavingGuestConnection.socket,
+  (event) => event.type === "participant.left",
+  "participant left self event",
+);
+const leavingGuestClosePromise = waitForWebSocketClose(
+  leavingGuestConnection.socket,
+);
+const leaveRoom = await postEmpty(`${appUrl}/api/v1/rooms/${roomId}/leave`, {
+  Cookie: guestCookie,
+});
+if (leaveRoom.status !== 204 || leaveRoom.body !== "") {
+  leftHostEventsConnection.socket.terminate();
+  leavingGuestConnection.socket.terminate();
+  throw new Error(`leave room returned HTTP ${leaveRoom.status}`);
+}
+const leftEvent = await leftEventPromise;
+const leavingGuestLeftEvent = await leavingGuestLeftEventPromise;
+if (
+  leftEvent.type !== "participant.left" ||
+  leftEvent.roomId !== roomId ||
+  leftEvent.participantId !== guestParticipantId ||
+  leftEvent.payload?.participantId !== guestParticipantId ||
+  leftEvent.payload?.reason !== "LEFT" ||
+  leavingGuestLeftEvent.type !== "participant.left" ||
+  leavingGuestLeftEvent.participantId !== guestParticipantId ||
+  leavingGuestLeftEvent.payload?.reason !== "LEFT"
+) {
+  leftHostEventsConnection.socket.terminate();
+  leavingGuestConnection.socket.terminate();
+  throw new Error("participant left event was not broadcast");
+}
+if ((await leavingGuestClosePromise) !== 1000) {
+  leftHostEventsConnection.socket.terminate();
+  throw new Error("participant leave did not close leaving WebSocket normally");
+}
+if (leftHostEventsConnection.socket.readyState !== WebSocket.OPEN) {
+  throw new Error("participant leave closed non-leaving host WebSocket");
+}
+leftHostEventsConnection.socket.close(1000, "smoke complete");
+
+const replacementGuest = await postJson(joinUrl, {
+  displayName: "Infra Smoke Replacement Guest",
+});
+if (
+  replacementGuest.status !== 200 ||
+  replacementGuest.body.participant?.role !== "GUEST" ||
+  replacementGuest.body.room?.participants?.length !== 4
+) {
+  throw new Error("explicit leave did not free room capacity");
+}
+
 const closeEventsConnection = await connectRoomEvents(eventsUrl, hostCookie);
 if (closeEventsConnection.event.type !== "room.snapshot") {
   closeEventsConnection.socket.terminate();
@@ -517,6 +633,9 @@ console.log("[ok] room WebSocket reconnect: refreshed");
 console.log("[ok] room WebSocket heartbeat: accepted");
 console.log("[ok] room WebSocket presence: broadcast");
 console.log("[ok] unknown WebSocket client command: rejected");
+console.log("[ok] leave room through proxy: left");
+console.log("[ok] room WebSocket participant left: broadcast");
+console.log("[ok] room capacity after leave: freed");
 console.log("[ok] close room through proxy: closed");
 console.log("[ok] room WebSocket close event: broadcast");
 

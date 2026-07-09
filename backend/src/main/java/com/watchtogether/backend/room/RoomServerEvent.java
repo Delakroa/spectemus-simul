@@ -64,7 +64,26 @@ record RoomServerEvent(
                 new RoomClosedPayload(reason, closedAt));
     }
 
+    static RoomServerEvent participantLeft(
+            String roomId,
+            UUID participantId,
+            long roomVersion,
+            ParticipantLeftReason reason,
+            Instant occurredAt) {
+        return new RoomServerEvent(
+                CURRENT_SCHEMA_VERSION,
+                UUID.randomUUID(),
+                "participant.left",
+                roomId,
+                participantId,
+                roomVersion,
+                occurredAt,
+                new ParticipantLeftPayload(participantId, reason));
+    }
+
     record ParticipantPresencePayload(UUID participantId, boolean online, Instant updatedAt) {}
 
     record RoomClosedPayload(RoomClosedReason reason, Instant closedAt) {}
+
+    record ParticipantLeftPayload(UUID participantId, ParticipantLeftReason reason) {}
 }

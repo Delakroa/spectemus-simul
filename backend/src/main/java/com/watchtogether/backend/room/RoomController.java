@@ -29,16 +29,19 @@ public class RoomController {
     private final RoomCreationService roomCreationService;
     private final RoomJoinService roomJoinService;
     private final RoomCloseService roomCloseService;
+    private final RoomLeaveService roomLeaveService;
     private final RoomProperties properties;
 
     RoomController(
             RoomCreationService roomCreationService,
             RoomJoinService roomJoinService,
             RoomCloseService roomCloseService,
+            RoomLeaveService roomLeaveService,
             RoomProperties properties) {
         this.roomCreationService = roomCreationService;
         this.roomJoinService = roomJoinService;
         this.roomCloseService = roomCloseService;
+        this.roomLeaveService = roomLeaveService;
         this.properties = properties;
     }
 
@@ -72,6 +75,16 @@ public class RoomController {
                 .cacheControl(CacheControl.noStore())
                 .header(HttpHeaders.SET_COOKIE, sessionCookie.toString())
                 .body(result.response());
+    }
+
+    @PostMapping("/{roomId}/leave")
+    ResponseEntity<Void> leaveRoom(
+            @PathVariable String roomId,
+            @CookieValue(name = SESSION_COOKIE, required = false) String sessionCredential) {
+        roomLeaveService.leave(roomId, sessionCredential);
+        return ResponseEntity.noContent()
+                .cacheControl(CacheControl.noStore())
+                .build();
     }
 
     @PostMapping("/{roomId}/close")

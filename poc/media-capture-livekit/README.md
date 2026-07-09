@@ -1,4 +1,4 @@
-﻿# WT-001 Media Capture LiveKit PoC
+# WT-001 Media Capture LiveKit PoC
 
 Этот package — P0 reference implementation внутри Watch Together monorepo. Product backend, product frontend, room lifecycle, chat, voice, Redis и PostgreSQL находятся вне этого PoC.
 
@@ -11,7 +11,7 @@
 -> публикация audio/video tracks в LiveKit -> guest browser
 ```
 
-Прототип не создает продуктовые комнаты, аккаунты, чат, Spring Boot backend, Redis, PostgreSQL, transcoding или хранение видео. Локальный файл остается в браузере host и используется через `URL.createObjectURL()`.
+Прототип не создаёт продуктовые комнаты, аккаунты, чат, Spring Boot backend, Redis, PostgreSQL, transcoding или хранение видео. Локальный файл остаётся в браузере host и используется через `URL.createObjectURL()`.
 
 ## 2. Требования
 
@@ -107,7 +107,7 @@ http://127.0.0.1:5173/?mode=host&room=wt-poc-room
 3. Убедись, что local preview играет со звуком.
 4. Нажми `Publish captured tracks`.
 5. Используй `Play`, `Pause` и seek slider или controls видео.
-6. Для смены файла выбери новый MP4; старый object URL будет освобожден, а старая публикация остановлена.
+6. Для смены файла выбери новый MP4; старый object URL будет освобождён, а старая публикация остановлена.
 
 ## 9. Как открыть guest
 
@@ -119,7 +119,7 @@ http://127.0.0.1:5173/?mode=guest&room=wt-poc-room
 
 Нажми `Connect`. Guest должен увидеть connection state, subscription state, remote video и audio state. Если браузер заблокирует autoplay audio, нажми `Enable sound`.
 
-Guest использует нативные video controls браузера, как host: volume, mute и fullscreen работают штатно. Product-state комнаты все равно принадлежит host; локальные pause/seek на guest не отправляют команды host.
+Guest использует нативные video controls браузера, как host: volume, mute и fullscreen работают штатно. Product-state комнаты всё равно принадлежит host; локальные pause/seek на guest не отправляют команды host.
 
 ## 10. Какой тестовый файл использовать
 
@@ -138,10 +138,10 @@ Resolution: 720p или 1080p
 
 - `HTMLMediaElement.captureStream()` поддерживается не во всех браузерах; WT-001 ориентирован на desktop Chrome/Edge.
 - Guest audio может требовать пользовательского действия из-за autoplay policy.
-- Pause у host теперь дополнительно передается как WT-004 playback-state событие, но backend-owned room state еще не реализован.
+- Pause у host теперь дополнительно передаётся как WT-004 playback-state событие, но backend-owned room state ещё не реализован.
 - Seek у host виден guest как скачок кадров в live stream; WT-004 обновляет host playback state, но точная VOD-синхронизация по timestamp пока не реализована.
 - Без TURN/TLS этот compose предназначен для локального теста на одной машине или в простой LAN.
-- LiveKit image tag закреплен для воспроизводимого PoC, но перед beta версию нужно сверить с production-рекомендациями.
+- LiveKit image tag закреплён для воспроизводимого PoC, но перед beta версию нужно сверить с production-рекомендациями.
 
 ## 12. Диагностика
 
@@ -149,7 +149,7 @@ Resolution: 720p или 1080p
 - `Token endpoint is unavailable`: проверь `pnpm dev:token` и `VITE_TOKEN_ENDPOINT`.
 - `LiveKit connection failed`: проверь `docker compose up -d livekit`, `docker compose ps`, порт `17880` и совпадение key/secret в `.env` и `livekit.yaml`.
 - `v1 RTC path not found` в browser console: LiveKit server слишком старый для установленного `livekit-client`; пересоздай контейнер через `docker compose pull livekit` и `docker compose up -d --force-recreate livekit`.
-- Guest видит video, но не слышит audio: нажми `Enable sound`, проверь что исходный файл содержит AAC audio track и что host preview не muted.
+- Guest видит video, но не слышит audio: нажми `Enable sound`, проверь, что исходный файл содержит AAC audio track и что host preview не muted.
 - Повторный выбор файла не обновляет stream: нажми `Stop publication`, затем выбери файл снова; если проблема повторяется, перезагрузи host страницу и зафиксируй browser/version.
 
 ## 13. Где смотреть логи
@@ -191,7 +191,7 @@ docker compose exec livekit /livekit-server --version
 - WT-004 media pipeline ADR: [../../docs/WT-004_MEDIA_PIPELINE_ADR.md](../../docs/WT-004_MEDIA_PIPELINE_ADR.md)
 - WT-004 product-state sync: [../../docs/WT-004_PRODUCT_STATE.md](../../docs/WT-004_PRODUCT_STATE.md)
 
-Текущий вывод P0: `GO` для перехода к P1 foundation на базе Chrome/Edge + MP4 H.264/AAC + LiveKit. Это еще не production quality/SLO.
+Текущий вывод P0: `GO` для перехода к P1 foundation на базе Chrome/Edge + MP4 H.264/AAC + LiveKit. Это ещё не production quality/SLO.
 
 Подтверждено:
 

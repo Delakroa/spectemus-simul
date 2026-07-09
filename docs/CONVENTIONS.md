@@ -2,21 +2,21 @@
 
 ## Контроль области
 
-Одна branch — один backlog ticket. Не смешивать room lifecycle, media lifecycle, chat, voice и infrastructure work в одном изменении.
+Одна ветка — один backlog ticket. Не смешивать room lifecycle, media lifecycle, chat, voice и infrastructure work в одном изменении.
 
 ## Границы репозитория
 
-- `backend/` отвечает за server-side product state и APIs.
+- `backend/` отвечает за server-side product state и API.
 - `frontend/` отвечает за product UI и browser media lifecycle.
-- `infra/` отвечает за local и deployment infrastructure.
+- `infra/` отвечает за локальную и deployment-инфраструктуру.
 - `poc/` содержит только reference prototypes.
-- `docs/` содержит ADR, compatibility notes, quality notes, contracts и handoff reports.
+- `docs/` содержит ADR, заметки по совместимости и качеству, контракты и отчёты по тикетам.
 
 ## Приватность
 
 - Не загружать локальные movie files в application backend.
 - Не логировать полные local file paths.
-- Не коммитить реальные секреты.
+- Не добавлять реальные секреты в git.
 - Не помещать LiveKit API secrets во frontend code.
 
 ## Документация
@@ -53,7 +53,7 @@
 - Java package names lowercase, classes `PascalCase`, методы и поля `camelCase`.
 - Constructor injection предпочтительнее field injection.
 - DTO задаются records, когда им не нужна identity или mutable lifecycle.
-- Время передается как `Instant` в UTC; duration хранится в миллисекундах.
+- Время передаётся как `Instant` в UTC; duration хранится в миллисекундах.
 - Нельзя использовать untyped `Map<String, Object>` вместо известного contract DTO.
 - Permission и validation checks выполняются до изменения authoritative state.
 
@@ -74,7 +74,7 @@
 
 ## Команды
 
-Root commands должны оставаться стабильными:
+Корневые команды должны оставаться стабильными:
 
 ```bash
 pnpm contracts:check

@@ -230,6 +230,38 @@ class RoomWebSocketIntegrationTest {
     }
 
     @Test
+    void broadcastsParticipantLeftEventAndClosesLeavingParticipantSession() throws Exception {
+        currentRoom.set(room(3, true));
+        Connection host = connect(ROOM_ID, SESSION, null);
+        host.listener().nextText();
+        Connection guest = connect(ROOM_ID, GUEST_SESSION, null);
+        guest.listener().nextText();
+        StoredRoom afterLeave = room(4);
+        currentRoom.set(afterLeave);
+
+        eventPublisher.publishParticipantLeft(
+                afterLeave,
+                GUEST_ID,
+                ParticipantLeftReason.LEFT,
+                afterLeave.updatedAt());
+        JsonNode hostEvent = objectMapper.readTree(host.listener().nextText());
+        JsonNode guestEvent = objectMapper.readTree(guest.listener().nextText());
+
+        assertThat(hostEvent.get("type").stringValue()).isEqualTo("participant.left");
+        assertThat(hostEvent.get("roomId").stringValue()).isEqualTo(ROOM_ID);
+        assertThat(hostEvent.get("participantId").stringValue()).isEqualTo(GUEST_ID.toString());
+        assertThat(hostEvent.get("roomVersion").asLong()).isEqualTo(4);
+        assertThat(hostEvent.at("/payload/participantId").stringValue())
+                .isEqualTo(GUEST_ID.toString());
+        assertThat(hostEvent.at("/payload/reason").stringValue()).isEqualTo("LEFT");
+        assertThat(guestEvent).isEqualTo(hostEvent);
+        assertThat(guest.listener().closeCode()).isEqualTo(1000);
+        assertThat(host.listener().isClosed()).isFalse();
+
+        close(host, "test complete");
+    }
+
+    @Test
     void closesUnknownClientCommandWithBadDataStatus() throws Exception {
         Connection connection = connect(ROOM_ID, SESSION, null);
         connection.listener().nextText();

@@ -14,6 +14,7 @@ import java.util.UUID;
 import com.watchtogether.backend.api.ApiException;
 import com.watchtogether.backend.room.RoomCreationStore.StoredParticipant;
 import com.watchtogether.backend.room.RoomCreationStore.StoredRoom;
+import com.watchtogether.backend.room.RoomLifecycleStore.LeaveResult;
 import com.watchtogether.backend.room.RoomLifecycleStore.LifecycleResult;
 
 import org.junit.jupiter.api.Test;
@@ -151,6 +152,11 @@ class RoomCloseServiceTest {
             throw new UnsupportedOperationException();
         }
 
+        @Override
+        public LeaveResult leave(String roomId, String sessionCredentialHash, Instant leftAt) {
+            throw new UnsupportedOperationException();
+        }
+
         String sessionCredentialHash() {
             return sessionCredentialHash;
         }
@@ -172,6 +178,13 @@ class RoomCloseServiceTest {
             this.room = room;
             this.reason = reason;
             this.closedAt = closedAt;
+        }
+
+        @Override
+        public void publishParticipantLeft(
+                StoredRoom room, UUID participantId, ParticipantLeftReason reason, Instant leftAt)
+                throws IOException {
+            throw new UnsupportedOperationException();
         }
 
         StoredRoom room() {

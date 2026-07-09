@@ -8,7 +8,7 @@
 
 Реализовать безопасный вход гостя в существующую комнату с устойчивой participant identity, ограничением вместимости и восстановлением session без создания дублей.
 
-## Endpoint
+## REST endpoint
 
 ```http
 POST /api/v1/rooms/{roomId}/join
@@ -83,6 +83,6 @@ pnpm infra:check
 - Получение snapshot и WebSocket channel относятся к WT-203.
 - Presence timeout и перевод participant в offline относятся к WT-204.
 - Close и expiry events относятся к WT-205.
-- Create/join UI относится к WT-206.
+- Create/join UI относится к будущим frontend-тикетам.
 - Rate limiting и защита от автоматизированного перебора относятся к WT-505.
 - Повторный join без прежней cookie считается новой participant identity.

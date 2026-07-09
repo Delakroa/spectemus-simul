@@ -1,8 +1,8 @@
-# WT-102 Backend Skeleton
+# WT-102 Backend skeleton
 
 ## Статус
 
-Закрыт 2026-07-08.
+Завершено 2026-07-08.
 
 ## Цель
 
@@ -39,7 +39,7 @@
 - Health endpoint существует.
 - Version endpoint существует.
 - Spring context test существует.
-- Сборка воспроизводится через Gradle Wrapper репозитория и root `pnpm` commands.
+- Сборка воспроизводится через Gradle Wrapper репозитория и корневые `pnpm` commands.
 
 ## Проверка
 
@@ -54,10 +54,10 @@ npm exec --yes pnpm -- check
 Результат:
 
 - backend context, endpoint, actuator и security tests прошли;
-- backend boot jar build прошел;
-- PoC Vitest suite прошел: 3 test files, 13 tests;
-- PoC production build прошел;
-- root `pnpm check` прошел;
+- backend boot jar build прошёл;
+- PoC Vitest suite прошёл: 3 test files, 13 tests;
+- PoC production build прошёл;
+- root `pnpm check` прошёл;
 - Vite сообщил только существующий large chunk warning для PoC bundle.
 
 ## Отчет агента
@@ -65,15 +65,15 @@ npm exec --yes pnpm -- check
 Сделано:
 
 - добавлен Gradle Wrapper 9.6.1 и Gradle Kotlin DSL backend project;
-- backend закреплен на Spring Boot 4.1.0 и Java 25 toolchain;
+- backend закреплён на Spring Boot 4.1.0 и Java 25 toolchain;
 - добавлены Spring Web MVC, Bean Validation, Spring Security и Actuator foundation;
 - добавлены `GET /api/v1/health`, `GET /api/v1/version` и открыт `GET /actuator/health`;
-- добавлен stateless security baseline: явно разрешены только public system endpoints, все остальное закрыто deny-by-default;
+- добавлен stateless security baseline: явно разрешены только public system endpoints, всё остальное закрыто deny-by-default;
 - backend checks подключены к root `pnpm test`, `pnpm build` и `pnpm check`.
 
 Известное ограничение:
 
-- WT-102 намеренно не создает room lifecycle, persistence, WebSocket events или LiveKit product token generation. Это область следующих тикетов.
+- WT-102 намеренно не создаёт room lifecycle, persistence, WebSocket events или LiveKit product token generation. Это область следующих тикетов.
 
 ## Следующие тикеты
 

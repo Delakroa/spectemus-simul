@@ -1,6 +1,7 @@
 package com.watchtogether.backend.room;
 
 import java.time.Instant;
+import java.util.UUID;
 
 import com.watchtogether.backend.room.RoomCreationStore.StoredRoom;
 
@@ -10,6 +11,8 @@ interface RoomLifecycleStore {
             String roomId, String sessionCredentialHash, String hostSecretHash, Instant closedAt);
 
     LifecycleResult expire(String roomId, Instant expiredAt);
+
+    LeaveResult leave(String roomId, String sessionCredentialHash, Instant leftAt);
 
     enum LifecycleOutcome {
         CLOSED,
@@ -53,6 +56,32 @@ interface RoomLifecycleStore {
 
         boolean changed() {
             return outcome == LifecycleOutcome.CLOSED || outcome == LifecycleOutcome.EXPIRED;
+        }
+    }
+
+    enum LeaveOutcome {
+        LEFT,
+        HOST_CANNOT_LEAVE,
+        AUTHENTICATION_REQUIRED,
+        ROOM_UNAVAILABLE
+    }
+
+    record LeaveResult(LeaveOutcome outcome, StoredRoom room, UUID participantId) {
+
+        static LeaveResult left(StoredRoom room, UUID participantId) {
+            return new LeaveResult(LeaveOutcome.LEFT, room, participantId);
+        }
+
+        static LeaveResult hostCannotLeave() {
+            return new LeaveResult(LeaveOutcome.HOST_CANNOT_LEAVE, null, null);
+        }
+
+        static LeaveResult authenticationRequired() {
+            return new LeaveResult(LeaveOutcome.AUTHENTICATION_REQUIRED, null, null);
+        }
+
+        static LeaveResult roomUnavailable() {
+            return new LeaveResult(LeaveOutcome.ROOM_UNAVAILABLE, null, null);
         }
     }
 }

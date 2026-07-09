@@ -1,8 +1,8 @@
-# WT-101 Monorepo Foundation
+# WT-101 Monorepo foundation
 
 ## Статус
 
-Закрыт 2026-07-08.
+Завершено 2026-07-08.
 
 ## Цель
 
@@ -28,8 +28,8 @@
 ## Критерии приемки
 
 - В репозитории явно разделены product и PoC boundaries.
-- Root `pnpm test`, `pnpm build` и `pnpm check` задокументированы.
-- P0 PoC остается запускаемым из корня через `pnpm dev:poc`.
+- Корневые `pnpm test`, `pnpm build` и `pnpm check` задокументированы.
+- P0 PoC остаётся запускаемым из корня через `pnpm dev:poc`.
 - Реальные секреты не добавлены.
 
 ## Проверка
@@ -46,7 +46,7 @@ pnpm check
 
 - 3 test files прошли.
 - 13 tests прошли.
-- Production build прошел.
+- Production build прошёл.
 - Vite сообщил только существующий large chunk warning для PoC bundle.
 
 ## Отчет агента
@@ -61,7 +61,7 @@ pnpm check
 
 Известное ограничение:
 
-- WT-101 намеренно не создает runnable backend, frontend или infrastructure applications. Это область WT-102, WT-103 и WT-104.
+- WT-101 намеренно не создаёт runnable backend, frontend или infrastructure applications. Это область WT-102, WT-103 и WT-104.
 
 ## Следующие тикеты
 

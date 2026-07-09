@@ -8,7 +8,7 @@
 
 Реализовать создание приватной комнаты с криптографически случайными идентификаторами, отдельными credentials, TTL и атомарной idempotency.
 
-## Endpoint
+## REST endpoint
 
 ```http
 POST /api/v1/rooms
@@ -67,11 +67,11 @@ pnpm infra:up
 pnpm infra:check
 ```
 
-`infra:check` создает комнату через reverse proxy и повторяет запрос с тем же `Idempotency-Key`.
+`infra:check` создаёт комнату через reverse proxy и повторяет запрос с тем же `Idempotency-Key`.
 
 Финальная проверка:
 
-- `pnpm check` прошел полностью;
+- `pnpm check` прошёл полностью;
 - backend: 19 тестов;
 - frontend: 7 тестов;
 - PoC: 13 тестов;

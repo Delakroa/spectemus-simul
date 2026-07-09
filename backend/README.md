@@ -1,6 +1,6 @@
 # Backend
 
-Spring Boot backend Watch Together.
+Spring Boot бэкенд Watch Together.
 
 ## Стек
 
@@ -35,14 +35,15 @@ pnpm backend:bootRun
 - `GET /actuator/health`
 - `POST /api/v1/rooms`
 - `POST /api/v1/rooms/{roomId}/join`
+- `POST /api/v1/rooms/{roomId}/leave`
 - `POST /api/v1/rooms/{roomId}/close`
 - `GET /api/v1/rooms/{roomId}/events` с WebSocket upgrade
 
 ## Область
 
-WT-102 создал backend foundation: воспроизводимую сборку, health/version REST endpoints, validation dependency, stateless security baseline, actuator и тесты.
+WT-102 создал backend foundation: воспроизводимую сборку, REST endpoints `health/version`, validation dependency, stateless security baseline, actuator и тесты.
 
-WT-201, WT-202, WT-203, WT-204 и WT-205 добавили создание комнаты, вход гостя, авторизованный WebSocket snapshot, backend-owned presence heartbeat и закрытие комнаты host-ом с Redis persistence, TTL, idempotency и session identity.
+WT-201, WT-202, WT-203, WT-204, WT-205 и WT-206 добавили создание комнаты, вход гостя, авторизованный WebSocket snapshot, backend-owned presence heartbeat, закрытие комнаты host-ом и явный выход guest participant. Эти сценарии используют Redis persistence, TTL, idempotency и session identity.
 
 Вне текущей области: PostgreSQL product state, Flyway migrations, LiveKit product tokens, chat и voice.
 
@@ -50,7 +51,7 @@ REST, WebSocket и error contracts находятся в [`../contracts`](../con
 
 ## Redis
 
-Room state, participant sessions и idempotency records хранятся в Redis. Локальные defaults:
+Room state, participant sessions и idempotency records хранятся в Redis. Локальные значения по умолчанию:
 
 ```text
 REDIS_HOST=127.0.0.1
@@ -61,4 +62,4 @@ ROOM_CLEANUP_GRACE=5m
 WEBSOCKET_PRESENCE_TTL=30s
 ```
 
-Создание комнаты, вход гостя, закрытие комнаты, WebSocket snapshot и presence heartbeat требуют работающий Redis. Полный локальный stack запускается командами `pnpm infra:up` и `pnpm infra:check`.
+Создание комнаты, вход гостя, выход guest participant, закрытие комнаты, WebSocket snapshot и presence heartbeat требуют работающий Redis. Полная локальная среда запускается командами `pnpm infra:up` и `pnpm infra:check`.

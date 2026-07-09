@@ -1,6 +1,6 @@
 # Локальная инфраструктура
 
-Docker Compose stack Watch Together, созданный в WT-104.
+Локальная Docker Compose среда Watch Together, созданная в WT-104.
 
 ## Сервисы
 
@@ -31,7 +31,7 @@ pnpm infra:check
 pnpm infra:ps
 ```
 
-Начиная с WT-203 `infra:check` создаёт комнату через gateway, проверяет guest join и session replay, а затем подключается к room WebSocket, получает snapshot и повторяет подключение.
+Начиная с WT-203 `infra:check` создаёт комнату через gateway, проверяет guest join и session replay, подключается к room WebSocket, получает snapshot и повторяет подключение.
 
 Открыть приложение:
 
@@ -59,7 +59,7 @@ pnpm infra:reset
 
 ## Настройка
 
-Compose работает с development defaults без обязательного `.env`.
+Compose работает с локальными значениями по умолчанию, поэтому `.env` не обязателен.
 
 Чтобы переопределить порты или credentials:
 
@@ -67,7 +67,7 @@ Compose работает с development defaults без обязательног
 cp infra/.env.example infra/.env
 ```
 
-Docker Compose автоматически читает `infra/.env`, если команда запускается с `--env-file infra/.env`. Root-команды используют defaults; собственный файл можно передать напрямую:
+Docker Compose автоматически читает `infra/.env`, если команда запускается с `--env-file infra/.env`. Корневые команды используют значения по умолчанию; собственный файл можно передать напрямую:
 
 ```bash
 docker compose --env-file infra/.env -f infra/compose.yaml up --build -d --wait
@@ -86,6 +86,6 @@ PostgreSQL и Redis используют named volumes:
 
 ## Границы
 
-Этот stack создаёт воспроизводимую локальную среду. Backend использует Redis для room state и idempotency; PostgreSQL пока не подключен к product state.
+Эта среда нужна для воспроизводимой локальной проверки. Бэкенд использует Redis для room state и idempotency; PostgreSQL пока не подключён к product state.
 
 TLS, публичный TURN, monitoring stack и beta deployment находятся вне области WT-104.

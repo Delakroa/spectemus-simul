@@ -58,6 +58,9 @@ class RoomControllerTest {
     private RoomCloseService roomCloseService;
 
     @MockitoBean
+    private RoomLeaveService roomLeaveService;
+
+    @MockitoBean
     private RoomProperties roomProperties;
 
     @BeforeEach
@@ -165,6 +168,17 @@ class RoomControllerTest {
                 .andExpect(header().exists(CorrelationIdFilter.HEADER));
 
         verify(roomCloseService).close(ROOM_ID, SESSION, HOST_SECRET);
+    }
+
+    @Test
+    void leavesRoomAccordingToContract() throws Exception {
+        mockMvc.perform(post("/api/v1/rooms/{roomId}/leave", ROOM_ID)
+                        .cookie(new Cookie("wt_session", SESSION)))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(header().exists(CorrelationIdFilter.HEADER));
+
+        verify(roomLeaveService).leave(ROOM_ID, SESSION);
     }
 
     private CreationResult creationResult() {

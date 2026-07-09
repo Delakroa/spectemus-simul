@@ -12,15 +12,15 @@ Host отправляет reliable data messages в LiveKit topic `wt.playback-s
 
 Сообщение содержит:
 
-| Поле | Значение |
-|---|---|
-| `revision` | Монотонный номер состояния host страницы. |
-| `event` | Причина отправки: `metadata`, `play`, `pause`, `seek`, `heartbeat`, `publish`, `stop`, `participant`, `reconnect`. |
-| `status` | `idle`, `ready`, `playing`, `paused`, `ended`. |
-| `currentTime` | Текущая позиция host video element. |
-| `duration` | Длительность файла, если известна. |
-| `sentAt` | Время отправки сообщения. |
-| `fileName` | Имя выбранного локального файла, без загрузки файла на backend. |
+| Поле          | Значение                                                                                                           |
+| ------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `revision`    | Монотонный номер состояния host страницы.                                                                          |
+| `event`       | Причина отправки: `metadata`, `play`, `pause`, `seek`, `heartbeat`, `publish`, `stop`, `participant`, `reconnect`. |
+| `status`      | `idle`, `ready`, `playing`, `paused`, `ended`.                                                                     |
+| `currentTime` | Текущая позиция host video element.                                                                                |
+| `duration`    | Длительность файла, если известна.                                                                                 |
+| `sentAt`      | Время отправки сообщения.                                                                                          |
+| `fileName`    | Имя выбранного локального файла, без загрузки файла на backend.                                                    |
 
 Host отправляет состояние:
 
@@ -43,7 +43,7 @@ Guest:
 
 ## Важное ограничение
 
-Текущий media stream остается live WebRTC stream. Guest не может честно `seek`-нуться в remote media stream по `host.currentTime`, потому что у него нет файла и нет VOD timeline. Поэтому WT-004 v1 синхронизирует состояние и намерение host, а не делает точную VOD-синхронизацию по timestamp.
+Текущий media stream остаётся live WebRTC stream. Guest не может честно `seek`-нуться в remote media stream по `host.currentTime`, потому что у него нет файла и нет VOD timeline. Поэтому WT-004 v1 синхронизирует состояние и намерение host, а не делает точную VOD-синхронизацию по timestamp.
 
 Это PoC-слой, а не финальный backend-owned room state. В MVP авторитетное состояние комнаты должно жить в Spring Boot WebSocket snapshot/events с versioning, permissions и stale-event handling.
 
@@ -66,13 +66,13 @@ Guest:
 
 ## Ручная проверка
 
-| Сценарий | Результат | Заметки |
-|---|---|---|
-| Host отправляет state, guest получает state | PASS | `Host playback` на guest показывает `host-...: playing/paused @ ...; rev=...`. |
-| Host pause -> guest | PASS | Guest получает `paused`; remote video становится на паузу. |
-| Host play -> guest | PASS | Guest получает `playing`; remote video продолжает playback. |
-| Host seek -> guest | PASS | После seek guest показывает актуальный live stream, `Host playback` обновляет время и revision. |
-| Guest reload/reconnect | PASS | После reload/reconnect guest снова получает текущее состояние host через heartbeat. |
+| Сценарий                                    | Результат | Заметки                                                                                         |
+| ------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------- |
+| Host отправляет state, guest получает state | PASS      | `Host playback` на guest показывает `host-...: playing/paused @ ...; rev=...`.                  |
+| Host pause -> guest                         | PASS      | Guest получает `paused`; remote video становится на паузу.                                      |
+| Host play -> guest                          | PASS      | Guest получает `playing`; remote video продолжает playback.                                     |
+| Host seek -> guest                          | PASS      | После seek guest показывает актуальный live stream, `Host playback` обновляет время и revision. |
+| Guest reload/reconnect                      | PASS      | После reload/reconnect guest снова получает текущее состояние host через heartbeat.             |
 
 ## Критерий выхода WT-004 v1
 
