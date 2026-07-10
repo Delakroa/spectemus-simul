@@ -336,6 +336,22 @@ export function HomePage() {
           </div>
         )}
 
+        {room?.status === "HOST_DISCONNECTED" && (
+          <div className="system-message system-message--warning" role="status">
+            <WifiOff size={22} aria-hidden="true" />
+            <div>
+              <strong>Host отключился</strong>
+              <span>
+                Ждём переподключения
+                {roomSession.hostReconnectDeadline
+                  ? ` до ${formatCheckedAt(roomSession.hostReconnectDeadline)}`
+                  : ""}
+                …
+              </span>
+            </div>
+          </div>
+        )}
+
         {room && (
           <div className="room-dashboard">
             {isHost && !roomClosed && (

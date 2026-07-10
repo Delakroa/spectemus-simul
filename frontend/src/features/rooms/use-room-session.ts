@@ -97,6 +97,7 @@ export type RoomSessionState = {
   hostPlaybackDuration: number | null;
   hostPlaybackError: string | null;
   hostPlaybackStatus: HostPlaybackStatus;
+  hostReconnectDeadline: string | null;
   hostSecret: string | null;
   invitePath: string | null;
   liveKitError: string | null;
@@ -138,6 +139,7 @@ const initialState: RoomSessionState = {
   hostPlaybackDuration: null,
   hostPlaybackError: null,
   hostPlaybackStatus: "idle",
+  hostReconnectDeadline: null,
   hostSecret: null,
   invitePath: null,
   liveKitError: null,
@@ -1147,12 +1149,20 @@ function applyEventToState(current: RoomSessionState, event: RoomServerEvent): R
       })
     : current.chatMessages;
 
+  let nextHostReconnectDeadline = current.hostReconnectDeadline;
+  if (event.type === "host.disconnected") {
+    nextHostReconnectDeadline = event.payload.reconnectDeadline;
+  } else if (nextRoom?.status !== "HOST_DISCONNECTED") {
+    nextHostReconnectDeadline = null;
+  }
+
   return {
     ...current,
     chatMessages: nextChatMessages,
     connectionStatus: event.type === "room.closed" ? "closed" : current.connectionStatus,
     error: null,
     events: addServerEvent(current.events, event),
+    hostReconnectDeadline: nextHostReconnectDeadline,
     participant: nextParticipant,
     pendingAction: event.type === "room.closed" ? null : current.pendingAction,
     room: nextRoom,
@@ -1170,7 +1180,18 @@ function systemChatText(event: KnownRoomServerEvent, room: RoomSnapshot | null):
       return `${name ?? "Участник"} покинул комнату`;
     }
     case "room.closed":
-      return event.payload.reason === "EXPIRED" ? "Комната истекла" : "Комната закрыта";
+      switch (event.payload.reason) {
+        case "EXPIRED":
+          return "Комната истекла";
+        case "HOST_TIMEOUT":
+          return "Host не вернулся, комната закрыта";
+        default:
+          return "Комната закрыта";
+      }
+    case "host.disconnected":
+      return "Host отключился, ждём переподключения";
+    case "host.reconnected":
+      return "Host снова в сети";
     default:
       return null;
   }

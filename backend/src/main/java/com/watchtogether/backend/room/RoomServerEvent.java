@@ -134,6 +134,41 @@ record RoomServerEvent(
                 problem);
     }
 
+    static RoomServerEvent hostDisconnected(
+            String roomId,
+            UUID hostParticipantId,
+            long roomVersion,
+            Instant reconnectDeadline,
+            Instant occurredAt) {
+        return new RoomServerEvent(
+                CURRENT_SCHEMA_VERSION,
+                UUID.randomUUID(),
+                "host.disconnected",
+                roomId,
+                hostParticipantId,
+                roomVersion,
+                occurredAt,
+                new HostDisconnectedPayload(reconnectDeadline));
+    }
+
+    static RoomServerEvent hostReconnected(
+            String roomId,
+            UUID hostParticipantId,
+            long roomVersion,
+            RoomStatus status,
+            Instant updatedAt,
+            Instant occurredAt) {
+        return new RoomServerEvent(
+                CURRENT_SCHEMA_VERSION,
+                UUID.randomUUID(),
+                "host.reconnected",
+                roomId,
+                hostParticipantId,
+                roomVersion,
+                occurredAt,
+                new HostReconnectedPayload(hostParticipantId, status, updatedAt));
+    }
+
     record ParticipantPresencePayload(UUID participantId, boolean online, Instant updatedAt) {}
 
     record RoomClosedPayload(RoomClosedReason reason, Instant closedAt) {}
@@ -142,6 +177,10 @@ record RoomServerEvent(
 
     record ChatMessagePayload(
             UUID messageId, UUID participantId, String displayName, String text, Instant sentAt) {}
+
+    record HostDisconnectedPayload(Instant reconnectDeadline) {}
+
+    record HostReconnectedPayload(UUID participantId, RoomStatus status, Instant updatedAt) {}
 
     record ProblemDetails(
             String type,

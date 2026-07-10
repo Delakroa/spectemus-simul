@@ -6,7 +6,7 @@ const displayNameSchema = z.string().min(1).max(64);
 const dateTimeSchema = z.iso.datetime();
 
 const participantRoleSchema = z.enum(["HOST", "GUEST"]);
-const roomStatusSchema = z.enum([
+export const roomStatusSchema = z.enum([
   "CREATED",
   "WAITING_FOR_HOST",
   "READY",

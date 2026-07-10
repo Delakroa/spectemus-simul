@@ -60,6 +60,8 @@ const [
   participantLeftExample,
   roomClosedExample,
   chatMessageServerExample,
+  hostDisconnectedExample,
+  hostReconnectedExample,
   errorExample,
   unknownServerEvent,
 ] = await Promise.all([
@@ -73,6 +75,8 @@ const [
   readJson("examples/server/participant-left.json"),
   readJson("examples/server/room-closed.json"),
   readJson("examples/server/chat-message.json"),
+  readJson("examples/server/host-disconnected.json"),
+  readJson("examples/server/host-reconnected.json"),
   readJson("examples/server/error.json"),
   readJson("examples/server/unknown-event.json"),
 ]);
@@ -114,6 +118,16 @@ assertValid(
   validateServerEvent,
   chatMessageServerExample,
   "Server chat message example",
+);
+assertValid(
+  validateServerEvent,
+  hostDisconnectedExample,
+  "Server host disconnected example",
+);
+assertValid(
+  validateServerEvent,
+  hostReconnectedExample,
+  "Server host reconnected example",
 );
 assertValid(validateServerEvent, errorExample, "Server error example");
 assertValid(

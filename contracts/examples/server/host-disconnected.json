@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "eventId": "a7f1c2d3-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "type": "host.disconnected",
+  "roomId": "AbCdEfGhIjKlMnOpQrStUv",
+  "participantId": "d0f8636f-e21e-4d7b-9fce-6fb0e6fb5678",
+  "roomVersion": 47,
+  "occurredAt": "2026-07-09T07:33:00Z",
+  "payload": {
+    "reconnectDeadline": "2026-07-09T07:34:00Z"
+  }
+}

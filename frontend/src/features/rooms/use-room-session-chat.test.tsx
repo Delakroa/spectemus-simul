@@ -260,6 +260,28 @@ describe("useRoomSession text chat", () => {
     );
   });
 
+  it("создаёт системное сообщение из host.disconnected", async () => {
+    const user = userEvent.setup();
+    const socket = await openSession(user);
+
+    deliver(socket, {
+      schemaVersion: 1,
+      eventId: "66666666-6666-4666-8666-666666666666",
+      type: "host.disconnected",
+      roomId: ROOM_ID,
+      participantId: HOST_ID,
+      roomVersion: 2,
+      occurredAt: "2026-07-10T10:04:00Z",
+      payload: { reconnectDeadline: "2026-07-10T10:05:00Z" },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("chat-system")).toHaveTextContent(
+        "Host отключился, ждём переподключения",
+      ),
+    );
+  });
+
   it("показывает chatError при получении error с кодом RATE_LIMITED", async () => {
     const user = userEvent.setup();
     const socket = await openSession(user);

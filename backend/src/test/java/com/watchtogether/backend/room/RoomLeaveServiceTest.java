@@ -150,6 +150,21 @@ class RoomLeaveServiceTest {
             return result;
         }
 
+        @Override
+        public HostPresenceResult markHostDisconnected(String roomId, Instant occurredAt) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public HostPresenceResult recoverHost(String roomId, Instant occurredAt) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public HostPresenceResult closeAbandonedRoom(String roomId, Instant closedAt) {
+            throw new UnsupportedOperationException();
+        }
+
         String roomId() {
             return roomId;
         }

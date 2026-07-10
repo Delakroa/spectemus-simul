@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.watchtogether.backend.room.RoomCreationStore.StoredParticipant;
 import com.watchtogether.backend.room.RoomCreationStore.StoredRoom;
+import com.watchtogether.backend.room.RoomLifecycleStore.HostPresenceResult;
 import com.watchtogether.backend.room.RoomRealtimeStore.AuthenticationResult;
 import com.watchtogether.backend.room.RoomRealtimeStore.PresenceResult;
 
@@ -44,7 +45,8 @@ import tools.jackson.databind.ObjectMapper;
         properties = {
             "management.health.redis.enabled=false",
             "watch-together.websocket.container-limits-enabled=true",
-            "watch-together.websocket.chat-rate-limit=2"
+            "watch-together.websocket.chat-rate-limit=2",
+            "watch-together.websocket.host-reconnect-grace=500ms"
         })
 class RoomWebSocketIntegrationTest {
 
@@ -102,6 +104,12 @@ class RoomWebSocketIntegrationTest {
             UUID participantId = invocation.getArgument(2);
             return unchangedPresence(roomId, sessionHash, participantId);
         });
+        when(lifecycleStore.markHostDisconnected(anyString(), any()))
+                .thenReturn(HostPresenceResult.unchanged());
+        when(lifecycleStore.recoverHost(anyString(), any()))
+                .thenReturn(HostPresenceResult.unchanged());
+        when(lifecycleStore.closeAbandonedRoom(anyString(), any()))
+                .thenReturn(HostPresenceResult.unchanged());
     }
 
     @Test
@@ -408,6 +416,93 @@ class RoomWebSocketIntegrationTest {
         connection.webSocket().sendText(json, true).join();
 
         assertThat(connection.listener().closeCode()).isEqualTo(1007);
+    }
+
+    @Test
+    void marksHostDisconnectedAndBroadcastsHostDisconnectedEvent() throws Exception {
+        currentRoom.set(room(3, true));
+        when(store.disconnect(eq(ROOM_ID), eq(SecureHash.sha256(SESSION)), eq(HOST_ID), any(), any()))
+                .thenReturn(PresenceResult.offline(room(4, true), HOST_ID));
+        when(lifecycleStore.markHostDisconnected(eq(ROOM_ID), any()))
+                .thenReturn(HostPresenceResult.changed(room(5, RoomStatus.HOST_DISCONNECTED, true)));
+
+        Connection host = connect(ROOM_ID, SESSION, null);
+        host.listener().nextText();
+        Connection guest = connect(ROOM_ID, GUEST_SESSION, null);
+        guest.listener().nextText();
+
+        close(host, "drop");
+
+        JsonNode offline = objectMapper.readTree(guest.listener().nextText());
+        assertThat(offline.get("type").stringValue()).isEqualTo("participant.offline");
+        JsonNode disconnected = objectMapper.readTree(guest.listener().nextText());
+        assertThat(disconnected.get("type").stringValue()).isEqualTo("host.disconnected");
+        assertThat(disconnected.get("participantId").stringValue()).isEqualTo(HOST_ID.toString());
+        assertThat(disconnected.get("roomVersion").asLong()).isEqualTo(5);
+        assertThat(disconnected.at("/payload/reconnectDeadline").stringValue()).isNotBlank();
+        assertThat(guest.listener().isClosed()).isFalse();
+
+        close(guest, "test complete");
+    }
+
+    @Test
+    void recoversHostAndBroadcastsHostReconnectedOnReconnect() throws Exception {
+        currentRoom.set(room(5, RoomStatus.HOST_DISCONNECTED, true));
+        when(lifecycleStore.recoverHost(eq(ROOM_ID), any()))
+                .thenReturn(HostPresenceResult.changed(room(6, RoomStatus.PLAYING, true)));
+
+        Connection guest = connect(ROOM_ID, GUEST_SESSION, null);
+        guest.listener().nextText();
+
+        Connection host = connect(ROOM_ID, SESSION, null);
+        JsonNode hostSnapshot = objectMapper.readTree(host.listener().nextText());
+        assertThat(hostSnapshot.get("type").stringValue()).isEqualTo("room.snapshot");
+        assertThat(hostSnapshot.at("/payload/status").stringValue()).isEqualTo("PLAYING");
+        assertThat(hostSnapshot.get("roomVersion").asLong()).isEqualTo(6);
+
+        JsonNode reconnected = objectMapper.readTree(guest.listener().nextText());
+        assertThat(reconnected.get("type").stringValue()).isEqualTo("host.reconnected");
+        assertThat(reconnected.get("participantId").stringValue()).isEqualTo(HOST_ID.toString());
+        assertThat(reconnected.get("roomVersion").asLong()).isEqualTo(6);
+        assertThat(reconnected.at("/payload/participantId").stringValue())
+                .isEqualTo(HOST_ID.toString());
+        assertThat(reconnected.at("/payload/status").stringValue()).isEqualTo("PLAYING");
+        assertThat(reconnected.at("/payload/updatedAt").stringValue()).isNotBlank();
+
+        verify(lifecycleStore, timeout(1000)).recoverHost(eq(ROOM_ID), any());
+        close(host, "test complete");
+        close(guest, "test complete");
+    }
+
+    @Test
+    void closesRoomWithHostTimeoutWhenGraceElapses() throws Exception {
+        currentRoom.set(room(3, true));
+        when(store.disconnect(eq(ROOM_ID), eq(SecureHash.sha256(SESSION)), eq(HOST_ID), any(), any()))
+                .thenReturn(PresenceResult.offline(room(4, true), HOST_ID));
+        when(lifecycleStore.markHostDisconnected(eq(ROOM_ID), any()))
+                .thenReturn(HostPresenceResult.changed(room(5, RoomStatus.HOST_DISCONNECTED, true)));
+        when(lifecycleStore.closeAbandonedRoom(eq(ROOM_ID), any()))
+                .thenReturn(HostPresenceResult.changed(room(6, RoomStatus.CLOSED, false)));
+
+        Connection host = connect(ROOM_ID, SESSION, null);
+        host.listener().nextText();
+        Connection guest = connect(ROOM_ID, GUEST_SESSION, null);
+        guest.listener().nextText();
+
+        close(host, "abandon");
+
+        assertThat(objectMapper.readTree(guest.listener().nextText()).get("type").stringValue())
+                .isEqualTo("participant.offline");
+        assertThat(objectMapper.readTree(guest.listener().nextText()).get("type").stringValue())
+                .isEqualTo("host.disconnected");
+
+        JsonNode closed = objectMapper.readTree(guest.listener().nextText());
+        assertThat(closed.get("type").stringValue()).isEqualTo("room.closed");
+        assertThat(closed.at("/payload/reason").stringValue()).isEqualTo("HOST_TIMEOUT");
+        assertThat(closed.get("roomVersion").asLong()).isEqualTo(6);
+        assertThat(guest.listener().closeCode()).isEqualTo(1000);
+
+        verify(lifecycleStore, timeout(2000)).closeAbandonedRoom(eq(ROOM_ID), any());
     }
 
     private void assertHandshakeStatus(

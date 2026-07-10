@@ -14,6 +14,37 @@ interface RoomLifecycleStore {
 
     LeaveResult leave(String roomId, String sessionCredentialHash, Instant leftAt);
 
+    HostPresenceResult markHostDisconnected(String roomId, Instant occurredAt);
+
+    HostPresenceResult recoverHost(String roomId, Instant occurredAt);
+
+    HostPresenceResult closeAbandonedRoom(String roomId, Instant closedAt);
+
+    enum HostPresenceOutcome {
+        CHANGED,
+        UNCHANGED,
+        ROOM_UNAVAILABLE
+    }
+
+    record HostPresenceResult(HostPresenceOutcome outcome, StoredRoom room) {
+
+        static HostPresenceResult changed(StoredRoom room) {
+            return new HostPresenceResult(HostPresenceOutcome.CHANGED, room);
+        }
+
+        static HostPresenceResult unchanged() {
+            return new HostPresenceResult(HostPresenceOutcome.UNCHANGED, null);
+        }
+
+        static HostPresenceResult roomUnavailable() {
+            return new HostPresenceResult(HostPresenceOutcome.ROOM_UNAVAILABLE, null);
+        }
+
+        boolean changed() {
+            return outcome == HostPresenceOutcome.CHANGED;
+        }
+    }
+
     enum LifecycleOutcome {
         CLOSED,
         EXPIRED,
