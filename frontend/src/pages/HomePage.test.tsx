@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
@@ -323,6 +323,401 @@ describe("HomePage", () => {
     MockWebSocket.instances[0]?.open();
     expect(await screen.findByText("live")).toBeInTheDocument();
     expect(await screen.findByText("LiveKit: подключён")).toBeInTheDocument();
+  });
+
+  it("host видит file picker после создания комнаты, guest — нет", async () => {
+    vi.stubGlobal("WebSocket", MockWebSocket);
+    const user = userEvent.setup();
+
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const url = String(input);
+
+      if (url.endsWith("/health")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ status: "UP", checkedAt: "2026-07-10T10:00:00Z" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url.endsWith("/version")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              name: "watch-together-backend",
+              version: "0.1.0",
+              buildTime: "2026-07-10T10:00:00Z",
+              apiVersion: "v1",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      if (url.endsWith("/api/v1/rooms") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              room: createRoomSnapshot(),
+              hostSecret: "a".repeat(43),
+              invitePath: `/rooms/${roomId}`,
+            }),
+            { status: 201 },
+          ),
+        );
+      }
+
+      if (url.endsWith(`/api/v1/rooms/${roomId}/livekit-token`) && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              token: "header.payload.signature",
+              liveKitUrl: "ws://127.0.0.1:7880",
+              roomName: roomId,
+              participantId: hostId,
+              participantIdentity: hostId,
+              role: "HOST",
+              canPublish: true,
+              canPublishData: true,
+              expiresAt: "2026-07-10T11:00:00Z",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response(null, { status: 404 }));
+    });
+
+    renderPage();
+
+    await screen.findByText("Сервис готов");
+    await user.clear(screen.getByLabelText("Имя host"));
+    await user.type(screen.getByLabelText("Имя host"), "Dima");
+    await user.click(screen.getByRole("button", { name: "Создать" }));
+
+    expect(await screen.findByText("Видеофайл")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Выбрать файл" })).toBeInTheDocument();
+  });
+
+  it("guest не видит file picker после входа в комнату", async () => {
+    vi.stubGlobal("WebSocket", MockWebSocket);
+    const user = userEvent.setup();
+
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const url = String(input);
+
+      if (url.endsWith("/health")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ status: "UP", checkedAt: "2026-07-10T10:00:00Z" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url.endsWith("/version")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              name: "watch-together-backend",
+              version: "0.1.0",
+              buildTime: "2026-07-10T10:00:00Z",
+              apiVersion: "v1",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      if (url.endsWith(`/api/v1/rooms/${roomId}/join`) && init?.method === "POST") {
+        const guestSnapshot = {
+          ...createRoomSnapshot(),
+          participants: [
+            createRoomSnapshot().participants[0],
+            {
+              participantId: guestId,
+              displayName: "Guest",
+              role: "GUEST",
+              online: true,
+              joinedAt: "2026-07-10T10:01:00Z",
+            },
+          ],
+        };
+
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              room: guestSnapshot,
+              participant: {
+                participantId: guestId,
+                displayName: "Guest",
+                role: "GUEST",
+                online: true,
+                joinedAt: "2026-07-10T10:01:00Z",
+              },
+            }),
+            { status: 201 },
+          ),
+        );
+      }
+
+      if (url.endsWith(`/api/v1/rooms/${roomId}/livekit-token`) && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              token: "header.payload.signature",
+              liveKitUrl: "ws://127.0.0.1:7880",
+              roomName: roomId,
+              participantId: guestId,
+              participantIdentity: guestId,
+              role: "GUEST",
+              canPublish: false,
+              canPublishData: true,
+              expiresAt: "2026-07-10T11:00:00Z",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response(null, { status: 404 }));
+    });
+
+    renderPage();
+
+    await screen.findByText("Сервис готов");
+    await user.type(screen.getByLabelText("Invite-ссылка или ID комнаты"), roomId);
+    await user.type(screen.getByLabelText("Имя гостя"), "GuestUser");
+    await user.click(screen.getByRole("button", { name: "Войти" }));
+
+    expect(await screen.findByText("Состояние комнаты")).toBeInTheDocument();
+    expect(screen.queryByText("Видеофайл")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Выбрать файл" })).not.toBeInTheDocument();
+  });
+
+  it("успешный выбор файла показывает имя файла и длительность", async () => {
+    vi.stubGlobal("WebSocket", MockWebSocket);
+    const user = userEvent.setup();
+
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const url = String(input);
+
+      if (url.endsWith("/health")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ status: "UP", checkedAt: "2026-07-10T10:00:00Z" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url.endsWith("/version")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              name: "watch-together-backend",
+              version: "0.1.0",
+              buildTime: "2026-07-10T10:00:00Z",
+              apiVersion: "v1",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      if (url.endsWith("/api/v1/rooms") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              room: createRoomSnapshot(),
+              hostSecret: "a".repeat(43),
+              invitePath: `/rooms/${roomId}`,
+            }),
+            { status: 201 },
+          ),
+        );
+      }
+
+      if (url.endsWith(`/api/v1/rooms/${roomId}/livekit-token`) && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              token: "header.payload.signature",
+              liveKitUrl: "ws://127.0.0.1:7880",
+              roomName: roomId,
+              participantId: hostId,
+              participantIdentity: hostId,
+              role: "HOST",
+              canPublish: true,
+              canPublishData: true,
+              expiresAt: "2026-07-10T11:00:00Z",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response(null, { status: 404 }));
+    });
+
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:movie-url");
+    vi.spyOn(URL, "revokeObjectURL");
+
+    const videoStub: Record<string, unknown> = {
+      duration: 5400,
+      videoWidth: 1920,
+      preload: "",
+      onloadedmetadata: null,
+      onerror: null,
+      canPlayType: vi.fn().mockReturnValue("probably"),
+      captureStream: vi.fn(),
+    };
+    Object.defineProperty(videoStub, "src", {
+      set(_: string) {
+        Promise.resolve().then(() => {
+          (videoStub.onloadedmetadata as (() => void) | null)?.();
+        });
+      },
+    });
+
+    const realCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation(
+      (tagName: string) =>
+        tagName === "video"
+          ? (videoStub as unknown as HTMLElement)
+          : realCreateElement(tagName),
+    );
+
+    renderPage();
+
+    await screen.findByText("Сервис готов");
+    await user.clear(screen.getByLabelText("Имя host"));
+    await user.type(screen.getByLabelText("Имя host"), "Dima");
+    await user.click(screen.getByRole("button", { name: "Создать" }));
+
+    await screen.findByText("Видеофайл");
+
+    const file = new File([""], "movie.mp4", { type: "video/mp4" });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(input, file);
+
+    await waitFor(() => {
+      expect(screen.getByText("movie.mp4")).toBeInTheDocument();
+    });
+    expect(screen.getByText(/1:30:00/)).toBeInTheDocument();
+  });
+
+  it("ошибка диагностики файла отображается в file picker", async () => {
+    vi.stubGlobal("WebSocket", MockWebSocket);
+    const user = userEvent.setup();
+
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const url = String(input);
+
+      if (url.endsWith("/health")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ status: "UP", checkedAt: "2026-07-10T10:00:00Z" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url.endsWith("/version")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              name: "watch-together-backend",
+              version: "0.1.0",
+              buildTime: "2026-07-10T10:00:00Z",
+              apiVersion: "v1",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      if (url.endsWith("/api/v1/rooms") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              room: createRoomSnapshot(),
+              hostSecret: "a".repeat(43),
+              invitePath: `/rooms/${roomId}`,
+            }),
+            { status: 201 },
+          ),
+        );
+      }
+
+      if (url.endsWith(`/api/v1/rooms/${roomId}/livekit-token`) && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              token: "header.payload.signature",
+              liveKitUrl: "ws://127.0.0.1:7880",
+              roomName: roomId,
+              participantId: hostId,
+              participantIdentity: hostId,
+              role: "HOST",
+              canPublish: true,
+              canPublishData: true,
+              expiresAt: "2026-07-10T11:00:00Z",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response(null, { status: 404 }));
+    });
+
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:movie-url");
+    vi.spyOn(URL, "revokeObjectURL");
+
+    const videoStub: Record<string, unknown> = {
+      duration: 0,
+      videoWidth: 0,
+      preload: "",
+      onloadedmetadata: null,
+      onerror: null,
+      canPlayType: vi.fn().mockReturnValue(""),
+      captureStream: vi.fn(),
+    };
+    Object.defineProperty(videoStub, "src", {
+      set(_: string) {
+        Promise.resolve().then(() => {
+          (videoStub.onloadedmetadata as (() => void) | null)?.();
+        });
+      },
+    });
+
+    const realCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation(
+      (tagName: string) =>
+        tagName === "video"
+          ? (videoStub as unknown as HTMLElement)
+          : realCreateElement(tagName),
+    );
+
+    renderPage();
+
+    await screen.findByText("Сервис готов");
+    await user.clear(screen.getByLabelText("Имя host"));
+    await user.type(screen.getByLabelText("Имя host"), "Dima");
+    await user.click(screen.getByRole("button", { name: "Создать" }));
+
+    await screen.findByText("Видеофайл");
+
+    const file = new File([""], "video.mkv", { type: "video/x-matroska" });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(input, file);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "Этот формат не поддерживается браузером. Используйте MP4 с кодеками H.264 и AAC.",
+        ),
+      ).toBeInTheDocument();
+    });
   });
 });
 

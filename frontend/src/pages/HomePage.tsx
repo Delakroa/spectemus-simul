@@ -1,9 +1,11 @@
-import { type FormEvent, useState } from "react";
+import { type ChangeEvent, type FormEvent, useRef, useState } from "react";
 import {
   CircleCheck,
   Clapperboard,
   Copy,
   DoorOpen,
+  FileVideo,
+  FolderOpen,
   Link as LinkIcon,
   LogIn,
   Plus,
@@ -49,6 +51,15 @@ export function HomePage() {
   const roomClosed = room?.status === "CLOSED" || room?.status === "EXPIRED";
   const isHost = participant?.role === "HOST";
   const isRoomActionPending = roomSession.pendingAction !== null;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (file) {
+      void roomSession.selectFile(file);
+    }
+    event.target.value = "";
+  }
 
   function handleCreateRoom(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -271,6 +282,65 @@ export function HomePage() {
 
         {room && (
           <div className="room-dashboard">
+            {isHost && !roomClosed && (
+              <section
+                className="room-card"
+                aria-labelledby="file-picker-title"
+                style={{ gridColumn: "1 / -1" }}
+              >
+                <div className="room-card__heading">
+                  <h3 id="file-picker-title">Видеофайл</h3>
+                  {roomSession.fileStatus === "ready" && (
+                    <span className="room-pill room-pill--ready">
+                      <FileVideo size={15} aria-hidden="true" />
+                      Готов
+                    </span>
+                  )}
+                </div>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="video/mp4,video/webm,video/*"
+                  aria-hidden="true"
+                  style={{ display: "none" }}
+                  tabIndex={-1}
+                  onChange={handleFileChange}
+                />
+
+                <div className="file-picker">
+                  <button
+                    className="button file-picker__trigger"
+                    type="button"
+                    disabled={roomSession.fileStatus === "checking"}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <FolderOpen size={18} aria-hidden="true" />
+                    {roomSession.fileStatus === "checking" ? "Проверка…" : "Выбрать файл"}
+                  </button>
+
+                  {roomSession.fileStatus === "ready" && roomSession.fileResult && (
+                    <div className="file-picker__info">
+                      <span className="file-picker__name">
+                        <FileVideo size={15} aria-hidden="true" />
+                        {roomSession.fileResult.displayName}
+                      </span>
+                      <span className="file-picker__meta">
+                        {formatDurationMs(roomSession.fileResult.durationMs)}
+                        {roomSession.fileResult.hasAudio ? " · со звуком" : " · без звука"}
+                      </span>
+                    </div>
+                  )}
+
+                  {roomSession.fileStatus === "error" && roomSession.fileError && (
+                    <p className="file-picker__error" role="alert">
+                      {roomSession.fileError}
+                    </p>
+                  )}
+                </div>
+              </section>
+            )}
+
             <section className="room-card" aria-labelledby="room-details-title">
               <div className="room-card__heading">
                 <h3 id="room-details-title">Состояние комнаты</h3>
@@ -535,4 +605,17 @@ function getMediaProgress(room: RoomSnapshot | null) {
   }
 
   return Math.min(100, Math.round((room.media.positionMs / room.media.durationMs) * 100));
+}
+
+function formatDurationMs(ms: number) {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }

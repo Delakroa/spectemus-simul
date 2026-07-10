@@ -27,6 +27,7 @@ P0 технически подтверждён.
 - WT-209 реализовал восстановление room session после refresh через `GET /api/v1/rooms/{roomId}`.
 - WT-301 добавляет выдачу LiveKit product tokens через backend room/access модель.
 - WT-302 подключает product frontend к LiveKit room через backend-issued token.
+- WT-303 добавляет диагностику локального видеофайла host-а: проверку формата, `captureStream` и metadata перед публикацией.
 
 P1 foundation и P2 room lifecycle завершены. Проект находится в P3 media integration. Chat и voice остаются вне текущего product UI.
 
@@ -144,6 +145,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-209 room snapshot restore](docs/WT-209_ROOM_SNAPSHOT_RESTORE.md)
 - [WT-301 LiveKit product tokens](docs/WT-301_LIVEKIT_PRODUCT_TOKENS.md)
 - [WT-302 LiveKit client connection](docs/WT-302_LIVEKIT_CLIENT_CONNECTION.md)
+- [WT-303 file diagnostics](docs/WT-303_FILE_DIAGNOSTICS.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation

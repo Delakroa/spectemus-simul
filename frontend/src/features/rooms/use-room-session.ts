@@ -24,6 +24,7 @@ import {
   parseRoomServerEvent,
   type RoomServerEvent,
 } from "./room-events";
+import { diagnoseFile, FileDiagnosticsFailure, type FileDiagnosticsResult } from "./file-diagnostics";
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const MAX_EVENT_LOG_ITEMS = 8;
@@ -31,6 +32,9 @@ const HOST_SECRET_STORAGE_PREFIX = "watch-together.host-secret.";
 
 export type RoomConnectionStatus = "idle" | "connecting" | "open" | "closed" | "error";
 export type RoomActionStatus = "create" | "join" | "restore" | "leave" | "close" | null;
+export type FileStatus = "idle" | "checking" | "ready" | "error";
+
+export type { FileDiagnosticsResult };
 
 export type RoomEventLogEntry = {
   eventId: string;
@@ -43,6 +47,9 @@ export type RoomSessionState = {
   connectionStatus: RoomConnectionStatus;
   error: string | null;
   events: RoomEventLogEntry[];
+  fileError: string | null;
+  fileResult: FileDiagnosticsResult | null;
+  fileStatus: FileStatus;
   hostSecret: string | null;
   invitePath: string | null;
   liveKitError: string | null;
@@ -56,6 +63,9 @@ const initialState: RoomSessionState = {
   connectionStatus: "idle",
   error: null,
   events: [],
+  fileError: null,
+  fileResult: null,
+  fileStatus: "idle",
   hostSecret: null,
   invitePath: null,
   liveKitError: null,
@@ -67,6 +77,7 @@ const initialState: RoomSessionState = {
 
 export function useRoomSession(routeRoomId?: string) {
   const [state, setState] = useState<RoomSessionState>(initialState);
+  const fileObjectUrlRef = useRef<string | null>(null);
   const heartbeatTimerRef = useRef<number | null>(null);
   const liveKitConnectionRef = useRef<LiveKitConnection | null>(null);
   const liveKitRequestIdRef = useRef(0);
@@ -86,6 +97,58 @@ export function useRoomSession(routeRoomId?: string) {
       heartbeatTimerRef.current = null;
     }
   }, []);
+
+  const revokeFileUrl = useCallback(() => {
+    if (fileObjectUrlRef.current) {
+      URL.revokeObjectURL(fileObjectUrlRef.current);
+      fileObjectUrlRef.current = null;
+    }
+  }, []);
+
+  const clearFileState = useCallback(() => {
+    revokeFileUrl();
+    setState((current) => ({
+      ...current,
+      fileError: null,
+      fileResult: null,
+      fileStatus: "idle",
+    }));
+  }, [revokeFileUrl]);
+
+  const selectFile = useCallback(
+    async (file: File) => {
+      revokeFileUrl();
+      setState((current) => ({
+        ...current,
+        fileError: null,
+        fileResult: null,
+        fileStatus: "checking",
+      }));
+
+      try {
+        const result = await diagnoseFile(file);
+        fileObjectUrlRef.current = result.objectUrl;
+        setState((current) => ({
+          ...current,
+          fileError: null,
+          fileResult: result,
+          fileStatus: "ready",
+        }));
+      } catch (error) {
+        const message =
+          error instanceof FileDiagnosticsFailure
+            ? error.message
+            : "Не удалось проверить файл.";
+        setState((current) => ({
+          ...current,
+          fileError: message,
+          fileResult: null,
+          fileStatus: "error",
+        }));
+      }
+    },
+    [revokeFileUrl],
+  );
 
   const disconnectLiveKit = useCallback((nextStatus: LiveKitConnectionStatus = "idle") => {
     liveKitRequestIdRef.current += 1;
@@ -437,6 +500,7 @@ export function useRoomSession(routeRoomId?: string) {
 
     try {
       await leaveRoom(room.roomId);
+      clearFileState();
       disconnectLiveKit("idle");
       disconnectSocket("idle");
       setState((current) => ({
@@ -450,7 +514,7 @@ export function useRoomSession(routeRoomId?: string) {
         pendingAction: null,
       }));
     }
-  }, [disconnectLiveKit, disconnectSocket]);
+  }, [clearFileState, disconnectLiveKit, disconnectSocket]);
 
   const close = useCallback(async () => {
     const room = roomRef.current;
@@ -464,6 +528,7 @@ export function useRoomSession(routeRoomId?: string) {
     try {
       await closeRoom(room.roomId, state.hostSecret);
       removeHostSecret(room.roomId);
+      clearFileState();
       disconnectLiveKit("disconnected");
       setState((current) => ({
         ...current,
@@ -476,7 +541,7 @@ export function useRoomSession(routeRoomId?: string) {
         pendingAction: null,
       }));
     }
-  }, [disconnectLiveKit, state.hostSecret]);
+  }, [clearFileState, disconnectLiveKit, state.hostSecret]);
 
   useEffect(() => {
     if (
@@ -495,10 +560,11 @@ export function useRoomSession(routeRoomId?: string) {
 
   useEffect(
     () => () => {
+      clearFileState();
       disconnectLiveKit("idle");
       disconnectSocket("idle");
     },
-    [disconnectLiveKit, disconnectSocket],
+    [clearFileState, disconnectLiveKit, disconnectSocket],
   );
 
   const inviteUrl = useMemo(() => {
@@ -515,6 +581,7 @@ export function useRoomSession(routeRoomId?: string) {
     leave,
     restore,
     routeRoomId,
+    selectFile,
   };
 }
 

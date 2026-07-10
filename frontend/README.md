@@ -92,6 +92,13 @@ WT-302 добавляет LiveKit client connection:
 - показывает отдельный статус LiveKit;
 - disconnect выполняется при leave, close, `room.closed` и unmount.
 
-Выбор локального файла, publish media tracks, remote playback, playback controls, чат и голос остаются вне текущего frontend product UI.
+WT-303 добавляет диагностику локального видеофайла:
+
+- host видит карточку «Видеофайл» в room dashboard после создания комнаты;
+- `diagnoseFile(file)` проверяет формат, `captureStream` и metadata до передачи файла в LiveKit;
+- объектный URL управляется в `use-room-session` и отзывается при leave, close и unmount;
+- guest не видит file picker.
+
+Publish media tracks, remote playback, playback controls, чат и голос остаются вне текущего frontend product UI.
 
 REST, WebSocket и error contracts находятся в [`../contracts`](../contracts/README.md). Все внешние payload должны проходить runtime validation до попадания в состояние приложения.
