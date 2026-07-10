@@ -9,10 +9,11 @@ React-приложение Watch Together, созданное в WT-103.
 - React Router.
 - TanStack Query.
 - Zod для runtime-валидации ответов бэкенда.
+- LiveKit Client SDK для product media-plane connection.
 - Vitest и React Testing Library.
 - ESLint и Prettier.
 
-Zustand и LiveKit Client SDK будут добавлены вместе с реальными сценариями product-state и media lifecycle. В foundation-каркасе для них пока нет задачи.
+Zustand будет добавлен вместе с реальными сценариями product-state, если состояние media controls станет достаточно сложным.
 
 ## Локальный запуск
 
@@ -82,6 +83,15 @@ WT-209 добавил восстановление room session:
 - после restore frontend снова подключает WebSocket и продолжает heartbeat;
 - host secret сохраняется только в `sessionStorage` текущего browser session, чтобы host мог закрыть комнату после refresh.
 
-WT-301 добавляет typed API client для `POST /api/v1/rooms/{roomId}/livekit-token`. Сам LiveKit client lifecycle, выбор локального файла, publish media tracks, playback controls, чат и голос остаются вне текущего frontend product UI.
+WT-301 добавляет typed API client для `POST /api/v1/rooms/{roomId}/livekit-token`.
+
+WT-302 добавляет LiveKit client connection:
+
+- после create/join/restore frontend запрашивает LiveKit token;
+- подключается к LiveKit room через `livekit-client`;
+- показывает отдельный статус LiveKit;
+- disconnect выполняется при leave, close, `room.closed` и unmount.
+
+Выбор локального файла, publish media tracks, remote playback, playback controls, чат и голос остаются вне текущего frontend product UI.
 
 REST, WebSocket и error contracts находятся в [`../contracts`](../contracts/README.md). Все внешние payload должны проходить runtime validation до попадания в состояние приложения.

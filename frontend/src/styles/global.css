@@ -330,6 +330,14 @@ a {
   letter-spacing: 0;
 }
 
+.room-connection-group {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 16px;
+}
+
 .room-connection {
   display: inline-flex;
   min-height: 34px;
@@ -342,12 +350,14 @@ a {
   font-weight: 750;
 }
 
+.room-connection--connected,
 .room-connection--open {
   color: var(--success);
 }
 
 .room-connection--error,
-.room-connection--closed {
+.room-connection--closed,
+.room-connection--disconnected {
   color: var(--danger);
 }
 

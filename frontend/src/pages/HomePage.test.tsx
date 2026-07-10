@@ -6,6 +6,54 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { createAppQueryClient } from "../app/query-client";
 import { HomePage } from "./HomePage";
 
+const liveKitMock = vi.hoisted(() => {
+  class MockLiveKitRoom {
+    handlers = new Map<string, Array<(value?: unknown) => void>>();
+    token: string | null = null;
+    url: string | null = null;
+
+    on(event: string, handler: (value?: unknown) => void) {
+      this.handlers.set(event, [...(this.handlers.get(event) ?? []), handler]);
+      return this;
+    }
+
+    async connect(url: string, token: string) {
+      this.url = url;
+      this.token = token;
+      this.emit("connectionStateChanged", "connected");
+    }
+
+    disconnect = vi.fn(() => {
+      this.emit("disconnected");
+    });
+
+    emit(event: string, value?: unknown) {
+      for (const handler of this.handlers.get(event) ?? []) {
+        handler(value);
+      }
+    }
+  }
+
+  const rooms: MockLiveKitRoom[] = [];
+
+  return { MockLiveKitRoom, rooms };
+});
+
+vi.mock("livekit-client", () => ({
+  Room: class extends liveKitMock.MockLiveKitRoom {
+    constructor() {
+      super();
+      liveKitMock.rooms.push(this);
+    }
+  },
+  RoomEvent: {
+    ConnectionStateChanged: "connectionStateChanged",
+    Disconnected: "disconnected",
+    Reconnected: "reconnected",
+    Reconnecting: "reconnecting",
+  },
+}));
+
 const roomId = "AbCdEfGhIjKlMnOpQrStUv";
 const hostId = "d0f8636f-e21e-4d7b-9fce-6fb0e6fb5678";
 const guestId = "8e7d79a8-a49f-48cc-a409-f07890dd3218";
@@ -32,6 +80,7 @@ function renderPage(initialEntries = ["/"]) {
 
 describe("HomePage", () => {
   afterEach(() => {
+    liveKitMock.rooms.length = 0;
     MockWebSocket.instances = [];
     window.sessionStorage.clear();
     vi.unstubAllGlobals();
@@ -131,6 +180,25 @@ describe("HomePage", () => {
         );
       }
 
+      if (url.endsWith(`/api/v1/rooms/${roomId}/livekit-token`) && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              token: "header.payload.signature",
+              liveKitUrl: "ws://127.0.0.1:7880",
+              roomName: roomId,
+              participantId: hostId,
+              participantIdentity: hostId,
+              role: "HOST",
+              canPublish: true,
+              canPublishData: true,
+              expiresAt: "2026-07-09T07:30:00Z",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
       return Promise.resolve(new Response(null, { status: 404 }));
     });
 
@@ -152,6 +220,9 @@ describe("HomePage", () => {
 
     MockWebSocket.instances[0]?.open();
     expect(await screen.findByText("live")).toBeInTheDocument();
+    expect(await screen.findByText("LiveKit: подключён")).toBeInTheDocument();
+    expect(liveKitMock.rooms[0]?.url).toBe("ws://127.0.0.1:7880");
+    expect(liveKitMock.rooms[0]?.token).toBe("header.payload.signature");
 
     MockWebSocket.instances[0]?.message({
       schemaVersion: 1,
@@ -177,7 +248,7 @@ describe("HomePage", () => {
   it("восстанавливает комнату при открытии invite route с активной session", async () => {
     vi.stubGlobal("WebSocket", MockWebSocket);
 
-    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
       const url = String(input);
 
       if (url.endsWith("/health")) {
@@ -218,6 +289,25 @@ describe("HomePage", () => {
         );
       }
 
+      if (url.endsWith(`/api/v1/rooms/${roomId}/livekit-token`) && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              token: "header.payload.signature",
+              liveKitUrl: "ws://127.0.0.1:7880",
+              roomName: roomId,
+              participantId: hostId,
+              participantIdentity: hostId,
+              role: "HOST",
+              canPublish: true,
+              canPublishData: true,
+              expiresAt: "2026-07-09T07:30:00Z",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
       return Promise.resolve(new Response(null, { status: 404 }));
     });
 
@@ -232,6 +322,7 @@ describe("HomePage", () => {
 
     MockWebSocket.instances[0]?.open();
     expect(await screen.findByText("live")).toBeInTheDocument();
+    expect(await screen.findByText("LiveKit: подключён")).toBeInTheDocument();
   });
 });
 

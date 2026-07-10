@@ -26,6 +26,7 @@ P0 технически подтверждён.
 - WT-208 подключил frontend к create/join flow и backend room WebSocket events.
 - WT-209 реализовал восстановление room session после refresh через `GET /api/v1/rooms/{roomId}`.
 - WT-301 добавляет выдачу LiveKit product tokens через backend room/access модель.
+- WT-302 подключает product frontend к LiveKit room через backend-issued token.
 
 P1 foundation и P2 room lifecycle завершены. Проект находится в P3 media integration. Chat и voice остаются вне текущего product UI.
 
@@ -142,6 +143,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-208 frontend room events](docs/WT-208_FRONTEND_ROOM_EVENTS.md)
 - [WT-209 room snapshot restore](docs/WT-209_ROOM_SNAPSHOT_RESTORE.md)
 - [WT-301 LiveKit product tokens](docs/WT-301_LIVEKIT_PRODUCT_TOKENS.md)
+- [WT-302 LiveKit client connection](docs/WT-302_LIVEKIT_CLIENT_CONNECTION.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation
