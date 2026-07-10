@@ -44,6 +44,7 @@
 - [WT-301_LIVEKIT_PRODUCT_TOKENS.md](WT-301_LIVEKIT_PRODUCT_TOKENS.md) — выдача LiveKit product tokens через backend room/access модель.
 - [WT-302_LIVEKIT_CLIENT_CONNECTION.md](WT-302_LIVEKIT_CLIENT_CONNECTION.md) — подключение product frontend к LiveKit room через backend-issued token.
 - [WT-303_FILE_DIAGNOSTICS.md](WT-303_FILE_DIAGNOSTICS.md) — диагностика локального видеофайла host-а перед публикацией.
+- [WT-304_LIVEKIT_FILE_PUBLISH.md](WT-304_LIVEKIT_FILE_PUBLISH.md) — публикация выбранного локального файла host-а в LiveKit.
 
 ## Как обновлять документы
 
