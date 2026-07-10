@@ -464,13 +464,19 @@ a {
 
 .room-pill--playing,
 .room-pill--ready,
-.room-pill--created {
+.room-pill--created,
+.room-pill--file-live {
   color: var(--success);
 }
 
 .room-pill--closed,
-.room-pill--expired {
+.room-pill--expired,
+.room-pill--file-error {
   color: var(--danger);
+}
+
+.room-pill--file-publishing {
+  color: #b15d10;
 }
 
 .room-metrics {
@@ -687,6 +693,13 @@ a {
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
+}
+
+.file-picker__actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .file-picker__error {

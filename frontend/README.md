@@ -96,9 +96,16 @@ WT-303 добавляет диагностику локального видео
 
 - host видит карточку «Видеофайл» в room dashboard после создания комнаты;
 - `diagnoseFile(file)` проверяет формат, `captureStream` и metadata до передачи файла в LiveKit;
-- объектный URL управляется в `use-room-session` и отзывается при leave, close и unmount;
+- объектный URL управляется в `use-room-session` и отзывается при leave, close, `room.closed` и unmount;
 - guest не видит file picker.
 
-Publish media tracks, remote playback, playback controls, чат и голос остаются вне текущего frontend product UI.
+WT-304 добавляет публикацию выбранного файла host-а в LiveKit:
+
+- `publishFile()` создаёт локальный `HTMLVideoElement`, получает tracks через `captureStream()` и публикует их в LiveKit;
+- `stopFilePublication()` снимает публикацию и останавливает captured tracks;
+- UI показывает состояния `Публикация`, `Live` и ошибку публикации;
+- cleanup выполняется при выборе нового файла, leave, close, `room.closed`, LiveKit disconnect и unmount.
+
+Remote playback, playback controls, чат и голос остаются вне текущего frontend product UI.
 
 REST, WebSocket и error contracts находятся в [`../contracts`](../contracts/README.md). Все внешние payload должны проходить runtime validation до попадания в состояние приложения.

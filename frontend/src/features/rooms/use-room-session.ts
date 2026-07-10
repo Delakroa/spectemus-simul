@@ -29,6 +29,12 @@ import {
   FileDiagnosticsFailure,
   type FileDiagnosticsResult,
 } from "./file-diagnostics";
+import {
+  FilePublicationFailure,
+  publishFileToLiveKit,
+  stopFilePublication as stopLiveKitFilePublication,
+  type FilePublication,
+} from "./file-publication";
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const MAX_EVENT_LOG_ITEMS = 8;
@@ -37,6 +43,7 @@ const HOST_SECRET_STORAGE_PREFIX = "watch-together.host-secret.";
 export type RoomConnectionStatus = "idle" | "connecting" | "open" | "closed" | "error";
 export type RoomActionStatus = "create" | "join" | "restore" | "leave" | "close" | null;
 export type FileStatus = "idle" | "checking" | "ready" | "error";
+export type FilePublicationStatus = "idle" | "publishing" | "live" | "error";
 
 export type { FileDiagnosticsResult };
 
@@ -52,6 +59,9 @@ export type RoomSessionState = {
   error: string | null;
   events: RoomEventLogEntry[];
   fileError: string | null;
+  filePublicationError: string | null;
+  filePublicationStatus: FilePublicationStatus;
+  filePublicationTrackCount: number;
   fileResult: FileDiagnosticsResult | null;
   fileStatus: FileStatus;
   hostSecret: string | null;
@@ -68,6 +78,9 @@ const initialState: RoomSessionState = {
   error: null,
   events: [],
   fileError: null,
+  filePublicationError: null,
+  filePublicationStatus: "idle",
+  filePublicationTrackCount: 0,
   fileResult: null,
   fileStatus: "idle",
   hostSecret: null,
@@ -83,6 +96,8 @@ export function useRoomSession(routeRoomId?: string) {
   const [state, setState] = useState<RoomSessionState>(initialState);
   const fileDiagnosticsRequestIdRef = useRef(0);
   const fileObjectUrlRef = useRef<string | null>(null);
+  const filePublicationRef = useRef<FilePublication | null>(null);
+  const filePublicationRequestIdRef = useRef(0);
   const heartbeatTimerRef = useRef<number | null>(null);
   const liveKitConnectionRef = useRef<LiveKitConnection | null>(null);
   const liveKitRequestIdRef = useRef(0);
@@ -110,25 +125,55 @@ export function useRoomSession(routeRoomId?: string) {
     }
   }, []);
 
+  const stopCurrentFilePublication = useCallback(() => {
+    const publication = filePublicationRef.current;
+    filePublicationRef.current = null;
+
+    if (publication) {
+      stopLiveKitFilePublication(liveKitConnectionRef.current?.room ?? null, publication);
+    }
+  }, []);
+
+  const stopFilePublication = useCallback(() => {
+    filePublicationRequestIdRef.current += 1;
+    stopCurrentFilePublication();
+    setState((current) => ({
+      ...current,
+      filePublicationError: null,
+      filePublicationStatus: "idle",
+      filePublicationTrackCount: 0,
+    }));
+  }, [stopCurrentFilePublication]);
+
   const clearFileState = useCallback(() => {
     fileDiagnosticsRequestIdRef.current += 1;
+    filePublicationRequestIdRef.current += 1;
+    stopCurrentFilePublication();
     revokeFileUrl();
     setState((current) => ({
       ...current,
       fileError: null,
+      filePublicationError: null,
+      filePublicationStatus: "idle",
+      filePublicationTrackCount: 0,
       fileResult: null,
       fileStatus: "idle",
     }));
-  }, [revokeFileUrl]);
+  }, [revokeFileUrl, stopCurrentFilePublication]);
 
   const selectFile = useCallback(
     async (file: File) => {
       const requestId = fileDiagnosticsRequestIdRef.current + 1;
       fileDiagnosticsRequestIdRef.current = requestId;
+      filePublicationRequestIdRef.current += 1;
+      stopCurrentFilePublication();
       revokeFileUrl();
       setState((current) => ({
         ...current,
         fileError: null,
+        filePublicationError: null,
+        filePublicationStatus: "idle",
+        filePublicationTrackCount: 0,
         fileResult: null,
         fileStatus: "checking",
       }));
@@ -144,6 +189,9 @@ export function useRoomSession(routeRoomId?: string) {
         setState((current) => ({
           ...current,
           fileError: null,
+          filePublicationError: null,
+          filePublicationStatus: "idle",
+          filePublicationTrackCount: 0,
           fileResult: result,
           fileStatus: "ready",
         }));
@@ -157,29 +205,118 @@ export function useRoomSession(routeRoomId?: string) {
         setState((current) => ({
           ...current,
           fileError: message,
+          filePublicationError: null,
+          filePublicationStatus: "idle",
+          filePublicationTrackCount: 0,
           fileResult: null,
           fileStatus: "error",
         }));
       }
     },
-    [revokeFileUrl],
+    [revokeFileUrl, stopCurrentFilePublication],
   );
 
-  const disconnectLiveKit = useCallback((nextStatus: LiveKitConnectionStatus = "idle") => {
-    liveKitRequestIdRef.current += 1;
+  const publishFile = useCallback(async () => {
+    const file = state.fileResult;
     const connection = liveKitConnectionRef.current;
-    liveKitConnectionRef.current = null;
+    const participant = participantRef.current;
 
-    if (connection) {
-      connection.disconnect();
+    if (participant?.role !== "HOST") {
+      setState((current) => ({
+        ...current,
+        filePublicationError: "Публиковать файл может только host.",
+        filePublicationStatus: "error",
+        filePublicationTrackCount: 0,
+      }));
+      return;
     }
 
+    if (!file) {
+      setState((current) => ({
+        ...current,
+        filePublicationError: "Сначала выберите видеофайл.",
+        filePublicationStatus: "error",
+        filePublicationTrackCount: 0,
+      }));
+      return;
+    }
+
+    if (!connection || state.liveKitStatus !== "connected") {
+      setState((current) => ({
+        ...current,
+        filePublicationError: "LiveKit ещё не подключён.",
+        filePublicationStatus: "error",
+        filePublicationTrackCount: 0,
+      }));
+      return;
+    }
+
+    const requestId = filePublicationRequestIdRef.current + 1;
+    filePublicationRequestIdRef.current = requestId;
+    stopCurrentFilePublication();
     setState((current) => ({
       ...current,
-      liveKitError: null,
-      liveKitStatus: nextStatus,
+      filePublicationError: null,
+      filePublicationStatus: "publishing",
+      filePublicationTrackCount: 0,
     }));
-  }, []);
+
+    try {
+      const publication = await publishFileToLiveKit(connection.room, file);
+      if (filePublicationRequestIdRef.current !== requestId) {
+        stopLiveKitFilePublication(connection.room, publication);
+        return;
+      }
+
+      filePublicationRef.current = publication;
+      setState((current) => ({
+        ...current,
+        filePublicationError: null,
+        filePublicationStatus: "live",
+        filePublicationTrackCount: publication.tracks.length,
+      }));
+    } catch (error) {
+      if (filePublicationRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      const message =
+        error instanceof FilePublicationFailure
+          ? error.message
+          : "Не удалось опубликовать файл в LiveKit.";
+      filePublicationRef.current = null;
+      setState((current) => ({
+        ...current,
+        filePublicationError: message,
+        filePublicationStatus: "error",
+        filePublicationTrackCount: 0,
+      }));
+    }
+  }, [state.fileResult, state.liveKitStatus, stopCurrentFilePublication]);
+
+  const disconnectLiveKit = useCallback(
+    (nextStatus: LiveKitConnectionStatus = "idle") => {
+      liveKitRequestIdRef.current += 1;
+      filePublicationRequestIdRef.current += 1;
+      stopCurrentFilePublication();
+      const connection = liveKitConnectionRef.current;
+      liveKitConnectionRef.current = null;
+
+      if (connection) {
+        connection.disconnect();
+      }
+
+      setState((current) => ({
+        ...current,
+        filePublicationError: null,
+        filePublicationStatus: "idle",
+        filePublicationTrackCount: 0,
+        liveKitError: null,
+        liveKitStatus: nextStatus,
+      }));
+    },
+    [stopCurrentFilePublication],
+  );
 
   const disconnectSocket = useCallback(
     (nextStatus: RoomConnectionStatus = "idle") => {
@@ -199,70 +336,84 @@ export function useRoomSession(routeRoomId?: string) {
     [stopHeartbeat],
   );
 
-  const connectLiveKit = useCallback(async (room: RoomSnapshot) => {
-    const requestId = liveKitRequestIdRef.current + 1;
-    liveKitRequestIdRef.current = requestId;
-    const existingConnection = liveKitConnectionRef.current;
-    liveKitConnectionRef.current = null;
+  const connectLiveKit = useCallback(
+    async (room: RoomSnapshot) => {
+      const requestId = liveKitRequestIdRef.current + 1;
+      liveKitRequestIdRef.current = requestId;
+      const existingConnection = liveKitConnectionRef.current;
+      liveKitConnectionRef.current = null;
+      stopCurrentFilePublication();
 
-    if (existingConnection) {
-      existingConnection.disconnect();
-    }
-
-    setState((current) => ({
-      ...current,
-      liveKitError: null,
-      liveKitStatus: "connecting",
-    }));
-
-    try {
-      const token = await mintLiveKitToken(room.roomId);
-      if (liveKitRequestIdRef.current !== requestId) {
-        return;
-      }
-
-      const connection = await connectLiveKitRoom(token, {
-        onError: (message) => {
-          if (liveKitRequestIdRef.current !== requestId) {
-            return;
-          }
-
-          setState((current) => ({
-            ...current,
-            liveKitError: message,
-            liveKitStatus: "error",
-          }));
-        },
-        onStatusChange: (status) => {
-          if (liveKitRequestIdRef.current !== requestId) {
-            return;
-          }
-
-          setState((current) => ({
-            ...current,
-            liveKitError: status === "error" ? current.liveKitError : null,
-            liveKitStatus: status,
-          }));
-        },
-      });
-      if (liveKitRequestIdRef.current !== requestId) {
-        connection.disconnect();
-        return;
-      }
-
-      liveKitConnectionRef.current = connection;
-    } catch (error) {
-      if (liveKitRequestIdRef.current !== requestId) {
-        return;
+      if (existingConnection) {
+        existingConnection.disconnect();
       }
 
       setState((current) => ({
         ...current,
-        liveKitError: getErrorMessage(error),
-        liveKitStatus: "error",
+        liveKitError: null,
+        liveKitStatus: "connecting",
       }));
-    }
-  }, []);
+
+      try {
+        const token = await mintLiveKitToken(room.roomId);
+        if (liveKitRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        const connection = await connectLiveKitRoom(token, {
+          onError: (message) => {
+            if (liveKitRequestIdRef.current !== requestId) {
+              return;
+            }
+
+            setState((current) => ({
+              ...current,
+              liveKitError: message,
+              liveKitStatus: "error",
+            }));
+          },
+          onStatusChange: (status) => {
+            if (liveKitRequestIdRef.current !== requestId) {
+              return;
+            }
+
+            if (status === "disconnected") {
+              filePublicationRequestIdRef.current += 1;
+              stopCurrentFilePublication();
+            }
+
+            setState((current) => ({
+              ...current,
+              filePublicationError: status === "disconnected" ? null : current.filePublicationError,
+              filePublicationStatus:
+                status === "disconnected" ? "idle" : current.filePublicationStatus,
+              filePublicationTrackCount:
+                status === "disconnected" ? 0 : current.filePublicationTrackCount,
+              liveKitError: status === "error" ? current.liveKitError : null,
+              liveKitStatus: status,
+            }));
+          },
+        });
+        if (liveKitRequestIdRef.current !== requestId) {
+          connection.disconnect();
+          return;
+        }
+
+        liveKitConnectionRef.current = connection;
+      } catch (error) {
+        if (liveKitRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        setState((current) => ({
+          ...current,
+          liveKitError: getErrorMessage(error),
+          liveKitStatus: "error",
+        }));
+      }
+    },
+    [stopCurrentFilePublication],
+  );
 
   const sendHeartbeat = useCallback((socket: WebSocket) => {
     const participant = participantRef.current;
@@ -595,9 +746,11 @@ export function useRoomSession(routeRoomId?: string) {
     inviteUrl,
     join,
     leave,
+    publishFile,
     restore,
     routeRoomId,
     selectFile,
+    stopFilePublication,
   };
 }
 

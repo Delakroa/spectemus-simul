@@ -9,6 +9,11 @@ import { HomePage } from "./HomePage";
 const liveKitMock = vi.hoisted(() => {
   class MockLiveKitRoom {
     handlers = new Map<string, Array<(value?: unknown) => void>>();
+    localParticipant = {
+      publishTrack: vi.fn().mockResolvedValue({}),
+      trackPublications: new Map(),
+      unpublishTrack: vi.fn().mockResolvedValue(undefined),
+    };
     token: string | null = null;
     url: string | null = null;
 
@@ -49,8 +54,15 @@ vi.mock("livekit-client", () => ({
   RoomEvent: {
     ConnectionStateChanged: "connectionStateChanged",
     Disconnected: "disconnected",
+    LocalTrackPublished: "localTrackPublished",
     Reconnected: "reconnected",
     Reconnecting: "reconnecting",
+  },
+  Track: {
+    Source: {
+      Camera: "camera",
+      ScreenShareAudio: "screen_share_audio",
+    },
   },
 }));
 
@@ -604,6 +616,127 @@ describe("HomePage", () => {
     expect(screen.getByText(/1:30:00/)).toBeInTheDocument();
   });
 
+  it("host публикует выбранный файл в LiveKit и останавливает публикацию", async () => {
+    vi.stubGlobal("WebSocket", MockWebSocket);
+    const user = userEvent.setup();
+
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const url = String(input);
+
+      if (url.endsWith("/health")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ status: "UP", checkedAt: "2026-07-10T10:00:00Z" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url.endsWith("/version")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              name: "watch-together-backend",
+              version: "0.1.0",
+              buildTime: "2026-07-10T10:00:00Z",
+              apiVersion: "v1",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      if (url.endsWith("/api/v1/rooms") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              room: createRoomSnapshot(),
+              hostSecret: "a".repeat(43),
+              invitePath: `/rooms/${roomId}`,
+            }),
+            { status: 201 },
+          ),
+        );
+      }
+
+      if (url.endsWith(`/api/v1/rooms/${roomId}/livekit-token`) && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              token: "header.payload.signature",
+              liveKitUrl: "ws://127.0.0.1:7880",
+              roomName: roomId,
+              participantId: hostId,
+              participantIdentity: hostId,
+              role: "HOST",
+              canPublish: true,
+              canPublishData: true,
+              expiresAt: "2026-07-10T11:00:00Z",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response(null, { status: 404 }));
+    });
+
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:movie-url");
+    vi.spyOn(URL, "revokeObjectURL");
+
+    const videoTrack = createTrack("video");
+    const audioTrack = createTrack("audio");
+    const publishStream = createStream([videoTrack], [audioTrack]);
+    const videoStubs = [createVideoStub(), createVideoStub(publishStream)];
+    const realCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation((tagName: string) =>
+      tagName === "video"
+        ? ((videoStubs.shift() ?? createVideoStub(publishStream)) as unknown as HTMLElement)
+        : realCreateElement(tagName),
+    );
+
+    renderPage();
+
+    await screen.findByText("Сервис готов");
+    await user.clear(screen.getByLabelText("Имя host"));
+    await user.type(screen.getByLabelText("Имя host"), "Dima");
+    await user.click(screen.getByRole("button", { name: "Создать" }));
+
+    await screen.findByText("LiveKit: подключён");
+    await screen.findByText("Видеофайл");
+
+    const file = new File([""], "movie.mp4", { type: "video/mp4" });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(input, file);
+
+    await screen.findByText("movie.mp4");
+    await user.click(screen.getByRole("button", { name: "Опубликовать" }));
+
+    expect(await screen.findByText("Live · 2 дорожки")).toBeInTheDocument();
+    expect(liveKitMock.rooms[0]?.localParticipant.publishTrack).toHaveBeenCalledWith(
+      videoTrack,
+      expect.objectContaining({ name: "movie-video", source: "camera" }),
+    );
+    expect(liveKitMock.rooms[0]?.localParticipant.publishTrack).toHaveBeenCalledWith(
+      audioTrack,
+      expect.objectContaining({ name: "movie-audio", source: "screen_share_audio" }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Остановить" }));
+
+    await waitFor(() => {
+      expect(liveKitMock.rooms[0]?.localParticipant.unpublishTrack).toHaveBeenCalledWith(
+        videoTrack,
+        true,
+      );
+    });
+    expect(liveKitMock.rooms[0]?.localParticipant.unpublishTrack).toHaveBeenCalledWith(
+      audioTrack,
+      true,
+    );
+    expect(videoTrack.stop).toHaveBeenCalled();
+    expect(audioTrack.stop).toHaveBeenCalled();
+  });
+
   it("ошибка диагностики файла отображается в file picker", async () => {
     vi.stubGlobal("WebSocket", MockWebSocket);
     const user = userEvent.setup();
@@ -716,6 +849,60 @@ describe("HomePage", () => {
     });
   });
 });
+
+function createTrack(kind: MediaStreamTrack["kind"]) {
+  return {
+    kind,
+    stop: vi.fn(),
+  } as unknown as MediaStreamTrack;
+}
+
+function createStream(videoTracks: MediaStreamTrack[], audioTracks: MediaStreamTrack[] = []) {
+  return {
+    getAudioTracks: () => audioTracks,
+    getTracks: () => [...videoTracks, ...audioTracks],
+    getVideoTracks: () => videoTracks,
+  } as unknown as MediaStream;
+}
+
+function createVideoStub(stream = createStream([createTrack("video")])) {
+  const listeners = new Map<string, Set<() => void>>();
+  const stub: Record<string, unknown> = {
+    duration: 5400,
+    videoWidth: 1920,
+    readyState: 0,
+    preload: "",
+    onloadedmetadata: null,
+    onerror: null,
+    canPlayType: vi.fn().mockReturnValue("probably"),
+    captureStream: vi.fn(() => stream),
+    play: vi.fn().mockResolvedValue(undefined),
+    pause: vi.fn(),
+    removeAttribute: vi.fn(),
+    load: vi.fn(),
+    addEventListener: vi.fn((type: string, listener: EventListenerOrEventListenerObject) => {
+      const callback = listener as () => void;
+      listeners.set(type, new Set([...(listeners.get(type) ?? []), callback]));
+    }),
+    removeEventListener: vi.fn((type: string, listener: EventListenerOrEventListenerObject) => {
+      listeners.get(type)?.delete(listener as () => void);
+    }),
+  };
+
+  Object.defineProperty(stub, "src", {
+    set(_src: string) {
+      void _src;
+      Promise.resolve().then(() => {
+        (stub.onloadedmetadata as (() => void) | null)?.();
+        for (const listener of listeners.get("loadedmetadata") ?? []) {
+          listener();
+        }
+      });
+    },
+  });
+
+  return stub;
+}
 
 function createRoomSnapshot() {
   return {

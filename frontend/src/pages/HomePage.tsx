@@ -10,8 +10,10 @@ import {
   LogIn,
   Plus,
   Power,
+  Radio,
   RefreshCw,
   Server,
+  Square,
   Users,
   Wifi,
   WifiOff,
@@ -20,7 +22,11 @@ import { useParams } from "react-router-dom";
 
 import { type Participant, type RoomSnapshot } from "../features/rooms/room-api";
 import { type LiveKitConnectionStatus } from "../features/rooms/livekit-connection";
-import { type RoomConnectionStatus, useRoomSession } from "../features/rooms/use-room-session";
+import {
+  type FilePublicationStatus,
+  type RoomConnectionStatus,
+  useRoomSession,
+} from "../features/rooms/use-room-session";
 import { useSystemStatus } from "../features/system/use-system-status";
 
 function formatCheckedAt(value?: string) {
@@ -51,6 +57,14 @@ export function HomePage() {
   const roomClosed = room?.status === "CLOSED" || room?.status === "EXPIRED";
   const isHost = participant?.role === "HOST";
   const isRoomActionPending = roomSession.pendingAction !== null;
+  const isFilePublishing = roomSession.filePublicationStatus === "publishing";
+  const canPublishFile =
+    roomSession.fileStatus === "ready" &&
+    roomSession.liveKitStatus === "connected" &&
+    !isFilePublishing;
+  const canStopFilePublication =
+    roomSession.filePublicationStatus === "publishing" ||
+    roomSession.filePublicationStatus === "live";
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -291,9 +305,14 @@ export function HomePage() {
                 <div className="room-card__heading">
                   <h3 id="file-picker-title">Видеофайл</h3>
                   {roomSession.fileStatus === "ready" && (
-                    <span className="room-pill room-pill--ready">
-                      <FileVideo size={15} aria-hidden="true" />
-                      Готов
+                    <span
+                      className={`room-pill room-pill--file-${roomSession.filePublicationStatus}`}
+                    >
+                      <Radio size={15} aria-hidden="true" />
+                      {formatFilePublicationStatus(
+                        roomSession.filePublicationStatus,
+                        roomSession.filePublicationTrackCount,
+                      )}
                     </span>
                   )}
                 </div>
@@ -312,7 +331,7 @@ export function HomePage() {
                   <button
                     className="button file-picker__trigger"
                     type="button"
-                    disabled={roomSession.fileStatus === "checking"}
+                    disabled={roomSession.fileStatus === "checking" || isFilePublishing}
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <FolderOpen size={18} aria-hidden="true" />
@@ -330,6 +349,35 @@ export function HomePage() {
                         {roomSession.fileResult.hasAudio ? " · со звуком" : " · без звука"}
                       </span>
                     </div>
+                  )}
+
+                  {roomSession.fileStatus === "ready" && (
+                    <div className="file-picker__actions">
+                      <button
+                        className="button button--primary"
+                        type="button"
+                        disabled={!canPublishFile}
+                        onClick={() => void roomSession.publishFile()}
+                      >
+                        <Radio size={18} aria-hidden="true" />
+                        {isFilePublishing ? "Публикуется…" : "Опубликовать"}
+                      </button>
+                      <button
+                        className="button"
+                        type="button"
+                        disabled={!canStopFilePublication}
+                        onClick={() => roomSession.stopFilePublication()}
+                      >
+                        <Square size={16} aria-hidden="true" />
+                        Остановить
+                      </button>
+                    </div>
+                  )}
+
+                  {roomSession.filePublicationError && (
+                    <p className="file-picker__error" role="alert">
+                      {roomSession.filePublicationError}
+                    </p>
                   )}
 
                   {roomSession.fileStatus === "error" && roomSession.fileError && (
@@ -584,6 +632,29 @@ function formatLiveKitStatus(status: LiveKitConnectionStatus) {
   };
 
   return labels[status];
+}
+
+function formatFilePublicationStatus(status: FilePublicationStatus, trackCount: number) {
+  const labels: Record<FilePublicationStatus, string> = {
+    error: "Ошибка",
+    idle: "Не опубликовано",
+    live: `Live · ${formatTrackCount(trackCount)}`,
+    publishing: "Публикация",
+  };
+
+  return labels[status];
+}
+
+function formatTrackCount(count: number) {
+  if (count === 1) {
+    return "1 дорожка";
+  }
+
+  if (count > 1 && count < 5) {
+    return `${count} дорожки`;
+  }
+
+  return `${count} дорожек`;
 }
 
 function formatShortRoomId(roomId: string) {
