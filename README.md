@@ -32,6 +32,7 @@ P0 технически подтверждён.
 - WT-305 добавляет guest playback remote video/audio tracks из LiveKit.
 - WT-306 добавляет синхронизацию host playback state через LiveKit data channel.
 - WT-401 добавляет управление воспроизведением для host: play/pause/seek, rollback при ошибке.
+- WT-402 добавляет reconnect host: `HOST_DISCONNECTED`, grace period, восстановление роли и закрытие комнаты по таймауту.
 - WT-403 добавляет текстовый чат комнаты: лимит длины, серверный rate limit, XSS-защита, системные сообщения, эфемерная история.
 
 P1 foundation, P2 room lifecycle и P3 media integration завершены. Проект находится в P4 host UX. Voice остаётся вне текущего product UI.
@@ -155,6 +156,8 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-305 просмотр LiveKit-потока гостем](docs/WT-305_GUEST_LIVEKIT_PLAYBACK.md)
 - [WT-306 синхронизация playback state](docs/WT-306_PLAYBACK_STATE_SYNC.md)
 - [WT-401 host controls](docs/WT-401_HOST_CONTROLS.md)
+- [WT-402 host reconnect](docs/WT-402_HOST_RECONNECT.md)
+- [WT-403 текстовый чат](docs/WT-403_TEXT_CHAT.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation

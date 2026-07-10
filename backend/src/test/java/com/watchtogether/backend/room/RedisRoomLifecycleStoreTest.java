@@ -12,6 +12,8 @@ import java.util.UUID;
 
 import com.watchtogether.backend.room.RoomCreationStore.StoredParticipant;
 import com.watchtogether.backend.room.RoomCreationStore.StoredRoom;
+import com.watchtogether.backend.room.RoomLifecycleStore.HostPresenceOutcome;
+import com.watchtogether.backend.room.RoomLifecycleStore.HostPresenceResult;
 import com.watchtogether.backend.room.RoomLifecycleStore.LeaveOutcome;
 import com.watchtogether.backend.room.RoomLifecycleStore.LeaveResult;
 import com.watchtogether.backend.room.RoomLifecycleStore.LifecycleOutcome;
@@ -128,6 +130,29 @@ class RedisRoomLifecycleStoreTest {
         assertThat(hostCannotLeave.outcome()).isEqualTo(LeaveOutcome.HOST_CANNOT_LEAVE);
         assertThat(hostCannotLeave.room()).isNull();
         assertThat(roomUnavailable.outcome()).isEqualTo(LeaveOutcome.ROOM_UNAVAILABLE);
+        assertThat(roomUnavailable.room()).isNull();
+    }
+
+    @Test
+    void readsHostPresenceResults() throws Exception {
+        StoredRoom restored = room(RoomStatus.PLAYING);
+        when(redis.execute(any(), anyList(), any(Object[].class)))
+                .thenReturn("CHANGED:" + objectMapper.writeValueAsString(restored))
+                .thenReturn("UNCHANGED")
+                .thenReturn("ROOM_UNAVAILABLE");
+
+        HostPresenceResult changed =
+                store.recoverHost(ROOM_ID, Instant.parse("2026-07-09T12:00:00Z"));
+        HostPresenceResult unchanged =
+                store.recoverHost(ROOM_ID, Instant.parse("2026-07-09T12:00:00Z"));
+        HostPresenceResult roomUnavailable =
+                store.recoverHost(ROOM_ID, Instant.parse("2026-07-09T12:00:00Z"));
+
+        assertThat(changed.outcome()).isEqualTo(HostPresenceOutcome.CHANGED);
+        assertThat(changed.room()).isEqualTo(restored);
+        assertThat(unchanged.outcome()).isEqualTo(HostPresenceOutcome.UNCHANGED);
+        assertThat(unchanged.room()).isNull();
+        assertThat(roomUnavailable.outcome()).isEqualTo(HostPresenceOutcome.ROOM_UNAVAILABLE);
         assertThat(roomUnavailable.room()).isNull();
     }
 

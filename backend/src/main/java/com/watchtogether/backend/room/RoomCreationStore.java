@@ -48,7 +48,29 @@ interface RoomCreationStore {
             long roomVersion,
             Instant expiresAt,
             Instant updatedAt,
-            String hostSecretHash) {
+            String hostSecretHash,
+            RoomStatus statusBeforeHostDisconnect) {
+
+        StoredRoom(
+                String roomId,
+                RoomStatus status,
+                UUID hostParticipantId,
+                List<StoredParticipant> participants,
+                long roomVersion,
+                Instant expiresAt,
+                Instant updatedAt,
+                String hostSecretHash) {
+            this(
+                    roomId,
+                    status,
+                    hostParticipantId,
+                    participants,
+                    roomVersion,
+                    expiresAt,
+                    updatedAt,
+                    hostSecretHash,
+                    null);
+        }
 
         public StoredRoom {
             participants = List.copyOf(participants);

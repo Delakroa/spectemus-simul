@@ -1108,6 +1108,16 @@ a {
   font-size: 13px;
 }
 
+.system-message--warning {
+  border-color: #e8d199;
+  color: var(--warning);
+  background: #fdf7ea;
+}
+
+.system-message--warning span {
+  color: #7a6a3f;
+}
+
 .not-found,
 .fatal-error {
   display: flex;

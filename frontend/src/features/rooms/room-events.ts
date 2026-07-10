@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   participantSchema,
   roomIdSchema,
+  roomStatusSchema,
   roomSnapshotSchema,
   type Participant,
   type RoomSnapshot,
@@ -31,7 +32,7 @@ const participantPresencePayloadSchema = z.object({
 });
 
 const roomClosedPayloadSchema = z.object({
-  reason: z.enum(["HOST_CLOSED", "EXPIRED", "INTERNAL"]),
+  reason: z.enum(["HOST_CLOSED", "EXPIRED", "HOST_TIMEOUT", "INTERNAL"]),
   closedAt: z.iso.datetime(),
 });
 
@@ -41,6 +42,16 @@ const chatMessagePayloadSchema = z.object({
   displayName: z.string().min(1).max(64),
   text: z.string().min(1).max(1000),
   sentAt: z.iso.datetime(),
+});
+
+const hostDisconnectedPayloadSchema = z.object({
+  reconnectDeadline: z.iso.datetime(),
+});
+
+const hostReconnectedPayloadSchema = z.object({
+  participantId: z.uuid(),
+  status: roomStatusSchema,
+  updatedAt: z.iso.datetime(),
 });
 
 type EventEnvelope = z.infer<typeof eventEnvelopeSchema>;
@@ -75,6 +86,16 @@ export type ChatMessageEvent = EventEnvelope & {
   payload: z.infer<typeof chatMessagePayloadSchema>;
 };
 
+export type HostDisconnectedEvent = EventEnvelope & {
+  type: "host.disconnected";
+  payload: z.infer<typeof hostDisconnectedPayloadSchema>;
+};
+
+export type HostReconnectedEvent = EventEnvelope & {
+  type: "host.reconnected";
+  payload: z.infer<typeof hostReconnectedPayloadSchema>;
+};
+
 export type UnknownRoomServerEvent = EventEnvelope & {
   known: false;
 };
@@ -85,7 +106,9 @@ export type KnownRoomServerEvent =
   | ParticipantLeftEvent
   | ParticipantPresenceEvent
   | RoomClosedEvent
-  | ChatMessageEvent;
+  | ChatMessageEvent
+  | HostDisconnectedEvent
+  | HostReconnectedEvent;
 
 export type RoomServerEvent = KnownRoomServerEvent | UnknownRoomServerEvent;
 
@@ -129,6 +152,18 @@ export function parseRoomServerEvent(value: unknown): RoomServerEvent {
         ...envelope,
         type: "chat.message",
         payload: chatMessagePayloadSchema.parse(envelope.payload),
+      };
+    case "host.disconnected":
+      return {
+        ...envelope,
+        type: "host.disconnected",
+        payload: hostDisconnectedPayloadSchema.parse(envelope.payload),
+      };
+    case "host.reconnected":
+      return {
+        ...envelope,
+        type: "host.reconnected",
+        payload: hostReconnectedPayloadSchema.parse(envelope.payload),
       };
     default:
       return {
@@ -193,6 +228,30 @@ export function applyRoomServerEvent(
     case "chat.message":
       // Chat messages are transient and never mutate authoritative room state.
       return room;
+    case "host.disconnected":
+      return {
+        ...room,
+        status: "HOST_DISCONNECTED",
+        participants: room.participants.map((participant) =>
+          participant.participantId === event.participantId
+            ? { ...participant, online: false }
+            : participant,
+        ),
+        roomVersion: event.roomVersion,
+        updatedAt: event.occurredAt,
+      };
+    case "host.reconnected":
+      return {
+        ...room,
+        status: event.payload.status,
+        participants: room.participants.map((participant) =>
+          participant.participantId === event.payload.participantId
+            ? { ...participant, online: true }
+            : participant,
+        ),
+        roomVersion: event.roomVersion,
+        updatedAt: event.payload.updatedAt,
+      };
   }
 }
 
@@ -217,9 +276,20 @@ export function describeRoomServerEvent(event: RoomServerEvent) {
     case "participant.offline":
       return "Участник офлайн";
     case "room.closed":
-      return event.payload.reason === "EXPIRED" ? "Комната истекла" : "Комната закрыта";
+      switch (event.payload.reason) {
+        case "EXPIRED":
+          return "Комната истекла";
+        case "HOST_TIMEOUT":
+          return "Host не вернулся, комната закрыта";
+        default:
+          return "Комната закрыта";
+      }
     case "chat.message":
       return `${event.payload.displayName}: ${event.payload.text}`;
+    case "host.disconnected":
+      return "Host отключился, ждём переподключения";
+    case "host.reconnected":
+      return "Host снова в сети";
   }
 }
 

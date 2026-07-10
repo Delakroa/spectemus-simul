@@ -50,6 +50,8 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
             new ConcurrentHashMap<>();
     private final Map<String, Set<WebSocketSession>> sessionsByRoom = new ConcurrentHashMap<>();
     private final Map<String, ScheduledFuture<?>> expiryTasksByRoom = new ConcurrentHashMap<>();
+    private final Map<String, ScheduledFuture<?>> hostReconnectTasksByRoom =
+            new ConcurrentHashMap<>();
     private final Map<ParticipantConnectionKey, ChatRateWindow> chatRateByParticipant =
             new ConcurrentHashMap<>();
 
@@ -95,11 +97,34 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
         ActiveConnection previous = register(roomId, participantId, connectionId, session);
         closePrevious(previous);
 
-        var snapshot = RoomResponseMapper.toSnapshot(presence.room());
+        StoredRoom room = presence.room();
+        boolean hostRecovered = false;
+        if (participantId.equals(room.hostParticipantId())) {
+            cancelHostReconnect(roomId);
+            if (room.status() == RoomStatus.HOST_DISCONNECTED) {
+                var recovery = lifecycleStore.recoverHost(roomId, Instant.now(clock));
+                if (recovery.changed()) {
+                    room = recovery.room();
+                    hostRecovered = true;
+                }
+            }
+        }
+
+        var snapshot = RoomResponseMapper.toSnapshot(room);
         var event = RoomServerEvent.snapshot(snapshot, Instant.now(clock));
         session.sendMessage(new TextMessage(objectMapper.writeValueAsString(event)));
         scheduleExpiry(snapshot.roomId(), snapshot.expiresAt());
         broadcastPresenceChange(roomId, presence, session);
+        if (hostRecovered) {
+            var reconnected = RoomServerEvent.hostReconnected(
+                    roomId,
+                    participantId,
+                    room.roomVersion(),
+                    room.status(),
+                    room.updatedAt(),
+                    Instant.now(clock));
+            broadcast(roomId, objectMapper.writeValueAsString(reconnected), session);
+        }
     }
 
     @Override
@@ -263,6 +288,27 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
         PresenceResult presence =
                 store.disconnect(roomId, sessionHash, participantId, connectionId, Instant.now(clock));
         broadcastPresenceChange(roomId, presence, session);
+        handleHostDisconnect(roomId, participantId, presence);
+    }
+
+    private void handleHostDisconnect(String roomId, UUID participantId, PresenceResult presence)
+            throws IOException {
+        if (presence.outcome() != PresenceOutcome.OFFLINE
+                || presence.room() == null
+                || !participantId.equals(presence.room().hostParticipantId())) {
+            return;
+        }
+
+        var marked = lifecycleStore.markHostDisconnected(roomId, Instant.now(clock));
+        if (!marked.changed()) {
+            return;
+        }
+
+        Instant deadline = Instant.now(clock).plus(properties.hostReconnectGrace());
+        var event = RoomServerEvent.hostDisconnected(
+                roomId, participantId, marked.room().roomVersion(), deadline, Instant.now(clock));
+        broadcast(roomId, objectMapper.writeValueAsString(event), null);
+        scheduleHostReconnect(roomId, deadline);
     }
 
     private boolean validEnvelope(WebSocketSession session, ClientEvent event) {
@@ -476,6 +522,7 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
         if (expiryTask != null) {
             expiryTask.cancel(false);
         }
+        cancelHostReconnect(room.roomId());
         forgetChatRateWindows(room.roomId());
 
         var event = RoomServerEvent.roomClosed(
@@ -541,6 +588,37 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
             publishRoomClosed(result.room(), RoomClosedReason.EXPIRED, result.room().updatedAt());
         } catch (IOException exception) {
             throw new IllegalStateException("Unable to publish room expiry event", exception);
+        }
+    }
+
+    private void scheduleHostReconnect(String roomId, Instant deadline) {
+        hostReconnectTasksByRoom.compute(roomId, (key, existingTask) -> {
+            if (existingTask != null && !existingTask.isDone()) {
+                existingTask.cancel(false);
+            }
+            return taskScheduler.schedule(() -> closeAbandonedRoom(roomId), deadline);
+        });
+    }
+
+    private void cancelHostReconnect(String roomId) {
+        ScheduledFuture<?> task = hostReconnectTasksByRoom.remove(roomId);
+        if (task != null) {
+            task.cancel(false);
+        }
+    }
+
+    private void closeAbandonedRoom(String roomId) {
+        hostReconnectTasksByRoom.remove(roomId);
+        var result = lifecycleStore.closeAbandonedRoom(roomId, Instant.now(clock));
+        if (!result.changed()) {
+            return;
+        }
+
+        try {
+            publishRoomClosed(
+                    result.room(), RoomClosedReason.HOST_TIMEOUT, result.room().updatedAt());
+        } catch (IOException exception) {
+            throw new IllegalStateException("Unable to publish host timeout close", exception);
         }
     }
 

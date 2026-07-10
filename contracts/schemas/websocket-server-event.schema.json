@@ -221,10 +221,17 @@
           "payload": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["participantId"],
+            "required": ["participantId", "status", "updatedAt"],
             "properties": {
               "participantId": {
                 "$ref": "https://watch-together.local/contracts/schemas/common.schema.json#/$defs/ParticipantId"
+              },
+              "status": {
+                "$ref": "https://watch-together.local/contracts/schemas/common.schema.json#/$defs/RoomStatus"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
               }
             }
           }
@@ -249,7 +256,7 @@
             "properties": {
               "reason": {
                 "type": "string",
-                "enum": ["HOST_CLOSED", "EXPIRED", "INTERNAL"]
+                "enum": ["HOST_CLOSED", "EXPIRED", "HOST_TIMEOUT", "INTERNAL"]
               },
               "closedAt": {
                 "type": "string",

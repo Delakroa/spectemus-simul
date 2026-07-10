@@ -73,6 +73,40 @@ class RedisRoomRealtimeStoreTest {
     }
 
     @Test
+    void authenticatesRoomStoredBeforeHostReconnectStateFieldExisted() {
+        String oldRoomJson =
+                """
+                {
+                  "roomId": "%s",
+                  "status": "CREATED",
+                  "hostParticipantId": "%s",
+                  "participants": [
+                    {
+                      "participantId": "%s",
+                      "displayName": "Host",
+                      "role": "HOST",
+                      "online": true,
+                      "joinedAt": "2030-07-09T10:00:00Z",
+                      "sessionCredentialHash": "%s"
+                    }
+                  ],
+                  "roomVersion": 2,
+                  "expiresAt": "2030-07-09T14:00:00Z",
+                  "updatedAt": "2030-07-09T10:00:00Z",
+                  "hostSecretHash": "host-secret-hash"
+                }
+                """
+                        .formatted(ROOM_ID, HOST_ID, HOST_ID, SecureHash.sha256(SESSION));
+        when(values.get("watch-together:v1:room:" + ROOM_ID)).thenReturn(oldRoomJson);
+
+        AuthenticationResult result =
+                store.authenticateAndLoad(ROOM_ID, SecureHash.sha256(SESSION));
+
+        assertThat(result.outcome()).isEqualTo(AuthenticationOutcome.AUTHENTICATED);
+        assertThat(result.room().statusBeforeHostDisconnect()).isNull();
+    }
+
+    @Test
     void rejectsUnknownSessionWithoutLeakingRoomState() throws Exception {
         when(values.get("watch-together:v1:room:" + ROOM_ID))
                 .thenReturn(objectMapper.writeValueAsString(room(RoomStatus.CREATED)));

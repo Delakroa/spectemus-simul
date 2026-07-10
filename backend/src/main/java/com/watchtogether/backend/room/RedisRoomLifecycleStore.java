@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 
 import com.watchtogether.backend.room.RoomCreationStore.StoredRoom;
+import com.watchtogether.backend.room.RoomLifecycleStore.HostPresenceResult;
 import com.watchtogether.backend.room.RoomLifecycleStore.LeaveResult;
 import com.watchtogether.backend.room.RoomLifecycleStore.LifecycleResult;
 
@@ -27,6 +28,8 @@ class RedisRoomLifecycleStore implements RoomLifecycleStore {
     private static final String HOST_CANNOT_LEAVE = "HOST_CANNOT_LEAVE";
     private static final String LEFT_PREFIX = "LEFT:";
     private static final String ROOM_UNAVAILABLE = "ROOM_UNAVAILABLE";
+    private static final String CHANGED_PREFIX = "CHANGED:";
+    private static final String UNCHANGED = "UNCHANGED";
     private static final int PARTICIPANT_ID_LENGTH = 36;
 
     private static final DefaultRedisScript<String> CLOSE_BY_HOST_SCRIPT =
@@ -71,6 +74,7 @@ class RedisRoomLifecycleStore implements RoomLifecycleStore {
                     end
 
                     room.status = 'CLOSED'
+                    room.statusBeforeHostDisconnect = nil
                     room.roomVersion = room.roomVersion + 1
                     room.updatedAt = ARGV[3]
                     for _, participant in ipairs(room.participants) do
@@ -115,6 +119,7 @@ class RedisRoomLifecycleStore implements RoomLifecycleStore {
             end
 
             room.status = 'EXPIRED'
+            room.statusBeforeHostDisconnect = nil
             room.roomVersion = room.roomVersion + 1
             room.updatedAt = ARGV[1]
             for _, participant in ipairs(room.participants) do
@@ -179,6 +184,100 @@ class RedisRoomLifecycleStore implements RoomLifecycleStore {
             """,
             String.class);
 
+    private static final DefaultRedisScript<String> MARK_HOST_DISCONNECTED_SCRIPT =
+            new DefaultRedisScript<>(
+                    """
+                    local roomJson = redis.call('GET', KEYS[1])
+                    if not roomJson then
+                      return 'ROOM_UNAVAILABLE'
+                    end
+
+                    local room = cjson.decode(roomJson)
+                    local activeStatuses = {
+                      CREATED = true,
+                      WAITING_FOR_HOST = true,
+                      READY = true,
+                      PLAYING = true,
+                      PAUSED = true
+                    }
+                    if not activeStatuses[room.status] then
+                      return 'UNCHANGED'
+                    end
+
+                    room.statusBeforeHostDisconnect = room.status
+                    room.status = 'HOST_DISCONNECTED'
+                    room.roomVersion = room.roomVersion + 1
+                    room.updatedAt = ARGV[1]
+
+                    local updatedRoomJson = cjson.encode(room)
+                    redis.call('SET', KEYS[1], updatedRoomJson, 'KEEPTTL')
+                    return 'CHANGED:' .. updatedRoomJson
+                    """,
+                    String.class);
+
+    private static final DefaultRedisScript<String> RECOVER_HOST_SCRIPT = new DefaultRedisScript<>(
+            """
+            local roomJson = redis.call('GET', KEYS[1])
+            if not roomJson then
+              return 'ROOM_UNAVAILABLE'
+            end
+
+            local room = cjson.decode(roomJson)
+            if room.status ~= 'HOST_DISCONNECTED' then
+              return 'UNCHANGED'
+            end
+
+            local restorableStatuses = {
+              CREATED = true,
+              WAITING_FOR_HOST = true,
+              READY = true,
+              PLAYING = true,
+              PAUSED = true
+            }
+            local restoredStatus = room.statusBeforeHostDisconnect
+            if not restorableStatuses[restoredStatus] then
+              restoredStatus = 'CREATED'
+            end
+
+            room.status = restoredStatus
+            room.statusBeforeHostDisconnect = nil
+            room.roomVersion = room.roomVersion + 1
+            room.updatedAt = ARGV[1]
+
+            local updatedRoomJson = cjson.encode(room)
+            redis.call('SET', KEYS[1], updatedRoomJson, 'KEEPTTL')
+            return 'CHANGED:' .. updatedRoomJson
+            """,
+            String.class);
+
+    private static final DefaultRedisScript<String> CLOSE_ABANDONED_SCRIPT =
+            new DefaultRedisScript<>(
+                    """
+                    local roomJson = redis.call('GET', KEYS[1])
+                    if not roomJson then
+                      return 'ROOM_UNAVAILABLE'
+                    end
+
+                    local room = cjson.decode(roomJson)
+                    if room.status ~= 'HOST_DISCONNECTED' then
+                      return 'UNCHANGED'
+                    end
+
+                    room.status = 'CLOSED'
+                    room.statusBeforeHostDisconnect = nil
+                    room.roomVersion = room.roomVersion + 1
+                    room.updatedAt = ARGV[1]
+                    for _, participant in ipairs(room.participants) do
+                      participant.online = false
+                      redis.call('DEL', ARGV[2] .. participant.participantId)
+                    end
+
+                    local updatedRoomJson = cjson.encode(room)
+                    redis.call('SET', KEYS[1], updatedRoomJson, 'KEEPTTL')
+                    return 'CHANGED:' .. updatedRoomJson
+                    """,
+                    String.class);
+
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
 
@@ -219,6 +318,55 @@ class RedisRoomLifecycleStore implements RoomLifecycleStore {
                 leftAt.toString(),
                 presenceRedisKeyPrefix(roomId));
         return readLeaveResult(result);
+    }
+
+    @Override
+    public HostPresenceResult markHostDisconnected(String roomId, Instant occurredAt) {
+        String result = redis.execute(
+                MARK_HOST_DISCONNECTED_SCRIPT,
+                List.of(roomRedisKey(roomId)),
+                occurredAt.toString());
+        return readHostPresenceResult(result);
+    }
+
+    @Override
+    public HostPresenceResult recoverHost(String roomId, Instant occurredAt) {
+        String result = redis.execute(
+                RECOVER_HOST_SCRIPT, List.of(roomRedisKey(roomId)), occurredAt.toString());
+        return readHostPresenceResult(result);
+    }
+
+    @Override
+    public HostPresenceResult closeAbandonedRoom(String roomId, Instant closedAt) {
+        String result = redis.execute(
+                CLOSE_ABANDONED_SCRIPT,
+                List.of(roomRedisKey(roomId)),
+                closedAt.toString(),
+                presenceRedisKeyPrefix(roomId));
+        return readHostPresenceResult(result);
+    }
+
+    private HostPresenceResult readHostPresenceResult(String result) {
+        if (result == null) {
+            throw new IllegalStateException("Redis host presence script returned null");
+        }
+        if (ROOM_UNAVAILABLE.equals(result)) {
+            return HostPresenceResult.roomUnavailable();
+        }
+        if (UNCHANGED.equals(result)) {
+            return HostPresenceResult.unchanged();
+        }
+
+        try {
+            if (result.startsWith(CHANGED_PREFIX)) {
+                return HostPresenceResult.changed(
+                        readRoom(result.substring(CHANGED_PREFIX.length())));
+            }
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("Unable to read host presence state", exception);
+        }
+
+        throw new IllegalStateException("Redis host presence script returned unknown result");
     }
 
     private LifecycleResult readLifecycleResult(String result) {

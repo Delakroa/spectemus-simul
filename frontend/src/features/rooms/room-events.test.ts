@@ -196,4 +196,57 @@ describe("room events", () => {
       }),
     ).toThrow();
   });
+
+  it("host.disconnected переводит комнату в HOST_DISCONNECTED, host.reconnected восстанавливает статус", () => {
+    const room = { ...createRoomSnapshot(), status: "PLAYING" as const };
+
+    const disconnected = parseRoomServerEvent({
+      schemaVersion: 1,
+      eventId: "a7f1c2d3-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+      type: "host.disconnected",
+      roomId,
+      participantId: hostId,
+      roomVersion: 2,
+      occurredAt: "2026-07-09T07:33:00Z",
+      payload: { reconnectDeadline: "2026-07-09T07:34:00Z" },
+    });
+    if ("known" in disconnected) {
+      throw new Error("host.disconnected должен быть известным событием");
+    }
+
+    const afterDisconnect = applyRoomServerEvent(room, disconnected);
+    expect(afterDisconnect?.status).toBe("HOST_DISCONNECTED");
+    expect(
+      afterDisconnect?.participants.find((participant) => participant.participantId === hostId)
+        ?.online,
+    ).toBe(false);
+    expect(afterDisconnect?.roomVersion).toBe(2);
+
+    const reconnected = parseRoomServerEvent({
+      schemaVersion: 1,
+      eventId: "b8e2d3c4-5f6a-4b7c-8d9e-0f1a2b3c4d5e",
+      type: "host.reconnected",
+      roomId,
+      participantId: hostId,
+      roomVersion: 3,
+      occurredAt: "2026-07-09T07:33:30Z",
+      payload: {
+        participantId: hostId,
+        status: "PLAYING",
+        updatedAt: "2026-07-09T07:33:30Z",
+      },
+    });
+    if ("known" in reconnected) {
+      throw new Error("host.reconnected должен быть известным событием");
+    }
+
+    const afterReconnect = applyRoomServerEvent(afterDisconnect, reconnected);
+    expect(afterReconnect?.status).toBe("PLAYING");
+    expect(
+      afterReconnect?.participants.find((participant) => participant.participantId === hostId)
+        ?.online,
+    ).toBe(true);
+    expect(afterReconnect?.roomVersion).toBe(3);
+    expect(afterReconnect?.updatedAt).toBe("2026-07-09T07:33:30Z");
+  });
 });

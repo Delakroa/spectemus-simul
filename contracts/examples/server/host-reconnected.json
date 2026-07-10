@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "eventId": "b8e2d3c4-5f6a-4b7c-8d9e-0f1a2b3c4d5e",
+  "type": "host.reconnected",
+  "roomId": "AbCdEfGhIjKlMnOpQrStUv",
+  "participantId": "d0f8636f-e21e-4d7b-9fce-6fb0e6fb5678",
+  "roomVersion": 48,
+  "occurredAt": "2026-07-09T07:33:30Z",
+  "payload": {
+    "participantId": "d0f8636f-e21e-4d7b-9fce-6fb0e6fb5678",
+    "status": "PLAYING",
+    "updatedAt": "2026-07-09T07:33:30Z"
+  }
+}
