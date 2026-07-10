@@ -53,7 +53,9 @@ WT-402 добавляет backend lifecycle для host reconnect: `HOST_DISCONN
 
 WT-403 добавляет текстовый чат поверх room WebSocket: server-side validation, per-participant rate limit, `chat.message` broadcast и `error` events для `VALIDATION_FAILED` / `RATE_LIMITED`.
 
-Вне текущей области: PostgreSQL product state, Flyway migrations, persisted chat history, voice, distributed grace timers и distributed chat rate limit.
+WT-404 добавляет voice chat на LiveKit media plane. Backend выдаёт guest token с `canPublish=true` для публикации microphone track; `canPublishData` для guest остаётся `false`, а playback-state data channel остаётся host-only.
+
+Вне текущей области: PostgreSQL product state, Flyway migrations, persisted chat history, distributed grace timers и distributed chat rate limit.
 
 REST, WebSocket и error contracts находятся в [`../contracts`](../contracts/README.md). Новые product endpoints реализуются contract-first и не должны расходиться с OpenAPI/JSON Schema.
 

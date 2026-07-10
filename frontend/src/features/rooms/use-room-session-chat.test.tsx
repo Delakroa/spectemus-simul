@@ -59,6 +59,7 @@ vi.mock("./livekit-connection", () => ({
             localParticipant: { publishData: vi.fn() },
             on: vi.fn().mockReturnThis(),
             off: vi.fn(),
+            remoteParticipants: new Map(),
           },
         };
       },
@@ -372,5 +373,47 @@ describe("useRoomSession text chat", () => {
     await user.click(screen.getByRole("button", { name: "Отправить длинное" }));
     expect(screen.getByTestId("chat-error")).toHaveTextContent("длиннее 1000");
     expect(sentPayloads(socket).some((payload) => payload.type === "chat.message")).toBe(false);
+  });
+});
+
+describe("useRoomSession room reconnect", () => {
+  it("не переподключается после room.closed при нормальном закрытии сокета (1000)", async () => {
+    const user = userEvent.setup();
+    const socket = await openSession(user);
+
+    // Реальная последовательность: сервер шлёт room.closed и сразу закрывает
+    // сокет нормальным кодом — до того как React закоммитит новое состояние.
+    act(() => {
+      socket.onmessage?.({
+        data: JSON.stringify({
+          schemaVersion: 1,
+          eventId: "88888888-8888-4888-8888-888888888888",
+          type: "room.closed",
+          roomId: ROOM_ID,
+          participantId: null,
+          roomVersion: 3,
+          occurredAt: "2026-07-10T10:06:00Z",
+          payload: { reason: "HOST_CLOSED", closedAt: "2026-07-10T10:06:00Z" },
+        }),
+      } as MessageEvent<string>);
+      socket.onclose?.(new CloseEvent("close", { code: 1000 }));
+    });
+
+    // Синхронно после закрытия: сразу "closed", без промежуточного
+    // "reconnecting" и без запланированного переподключения.
+    expect(screen.getByTestId("conn")).toHaveTextContent("closed");
+    expect(screen.getByTestId("conn")).not.toHaveTextContent("reconnecting");
+    expect(MockWebSocket.instances).toHaveLength(1);
+  });
+
+  it("переподключается при аварийном закрытии сокета (1006)", async () => {
+    const user = userEvent.setup();
+    const socket = await openSession(user);
+
+    act(() => {
+      socket.onclose?.(new CloseEvent("close", { code: 1006 }));
+    });
+
+    await waitFor(() => expect(screen.getByTestId("conn")).toHaveTextContent("reconnecting"));
   });
 });

@@ -8,6 +8,12 @@ import { PLAYBACK_STATE_TOPIC } from "../features/rooms/playback-state";
 import { HomePage } from "./HomePage";
 
 const liveKitMock = vi.hoisted(() => {
+  const localAudioTrack = {
+    mute: vi.fn().mockResolvedValue(undefined),
+    stop: vi.fn(),
+    unmute: vi.fn().mockResolvedValue(undefined),
+  };
+
   class MockLiveKitRoom {
     handlers = new Map<string, Array<(...values: unknown[]) => void>>();
     localParticipant = {
@@ -52,10 +58,11 @@ const liveKitMock = vi.hoisted(() => {
 
   const rooms: MockLiveKitRoom[] = [];
 
-  return { MockLiveKitRoom, rooms };
+  return { MockLiveKitRoom, localAudioTrack, rooms };
 });
 
 vi.mock("livekit-client", () => ({
+  createLocalAudioTrack: vi.fn().mockResolvedValue(liveKitMock.localAudioTrack),
   Room: class extends liveKitMock.MockLiveKitRoom {
     constructor() {
       super();
@@ -76,6 +83,7 @@ vi.mock("livekit-client", () => ({
   Track: {
     Source: {
       Camera: "camera",
+      Microphone: "microphone",
       ScreenShareAudio: "screen_share_audio",
     },
   },
@@ -270,6 +278,96 @@ describe("HomePage", () => {
 
     expect(await screen.findByText("Guest")).toBeInTheDocument();
     expect(screen.getByText("Guest вошёл в комнату")).toBeInTheDocument();
+  });
+
+  it("после закрытия комнаты снова показывает формы для новой комнаты", async () => {
+    vi.stubGlobal("WebSocket", MockWebSocket);
+    const user = userEvent.setup();
+
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const url = String(input);
+
+      if (url.endsWith("/health")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ status: "UP", checkedAt: "2026-07-08T16:30:00Z" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url.endsWith("/version")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              name: "watch-together-backend",
+              version: "0.1.0",
+              buildTime: "2026-07-08T16:00:00Z",
+              apiVersion: "v1",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      if (url.endsWith("/api/v1/rooms") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              room: createRoomSnapshot(),
+              hostSecret: "a".repeat(43),
+              invitePath: `/rooms/${roomId}`,
+            }),
+            { status: 201 },
+          ),
+        );
+      }
+
+      if (url.endsWith(`/api/v1/rooms/${roomId}/livekit-token`) && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              token: "header.payload.signature",
+              liveKitUrl: "ws://127.0.0.1:7880",
+              roomName: roomId,
+              participantId: hostId,
+              participantIdentity: hostId,
+              role: "HOST",
+              canPublish: true,
+              canPublishData: true,
+              expiresAt: "2026-07-09T07:30:00Z",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response(null, { status: 404 }));
+    });
+
+    renderPage();
+
+    await screen.findByText("Сервис готов");
+    await user.click(screen.getByRole("button", { name: "Создать" }));
+
+    expect(await screen.findByText("Состояние комнаты")).toBeInTheDocument();
+    // Пока комната активна, формы создания/входа скрыты.
+    expect(screen.queryByLabelText("Invite-ссылка или ID комнаты")).not.toBeInTheDocument();
+
+    MockWebSocket.instances[0]?.open();
+    MockWebSocket.instances[0]?.message({
+      schemaVersion: 1,
+      eventId: "a4394a01-d223-4849-8e87-73017750d0c8",
+      type: "room.closed",
+      roomId,
+      participantId: null,
+      roomVersion: 2,
+      occurredAt: "2026-07-09T07:31:00Z",
+      payload: { reason: "HOST_CLOSED", closedAt: "2026-07-09T07:31:00Z" },
+    });
+
+    // После закрытия формы снова доступны, и можно создать новую комнату.
+    expect(await screen.findByLabelText("Invite-ссылка или ID комнаты")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Создать" })).toBeEnabled();
   });
 
   it("восстанавливает комнату при открытии invite route с активной session", async () => {
@@ -498,7 +596,7 @@ describe("HomePage", () => {
               participantId: guestId,
               participantIdentity: guestId,
               role: "GUEST",
-              canPublish: false,
+              canPublish: true,
               canPublishData: true,
               expiresAt: "2026-07-10T11:00:00Z",
             }),
@@ -597,7 +695,7 @@ describe("HomePage", () => {
               participantId: guestId,
               participantIdentity: guestId,
               role: "GUEST",
-              canPublish: false,
+              canPublish: true,
               canPublishData: true,
               expiresAt: "2026-07-10T11:00:00Z",
             }),
@@ -620,6 +718,15 @@ describe("HomePage", () => {
     await waitFor(() => {
       expect(screen.getAllByText("Ждём host").length).toBeGreaterThan(0);
     });
+    const player = document.querySelector(".remote-player") as HTMLDivElement;
+    const requestFullscreen = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(player, "requestFullscreen", {
+      configurable: true,
+      value: requestFullscreen,
+    });
+
+    await user.click(screen.getByRole("button", { name: "Развернуть видео на весь экран" }));
+    expect(requestFullscreen).toHaveBeenCalledTimes(1);
 
     const videoTrack = createRemoteTrack("video");
     const audioTrack = createRemoteTrack("audio");
@@ -861,11 +968,14 @@ describe("HomePage", () => {
     const videoTrack = createTrack("video");
     const audioTrack = createTrack("audio");
     const publishStream = createStream([videoTrack], [audioTrack]);
-    const videoStubs = [createVideoStub(), createVideoStub(publishStream)];
     const realCreateElement = document.createElement.bind(document);
+    const videoStubs = [
+      createVideoStub(undefined, realCreateElement),
+      createVideoStub(publishStream, realCreateElement),
+    ];
     vi.spyOn(document, "createElement").mockImplementation((tagName: string) =>
       tagName === "video"
-        ? ((videoStubs.shift() ?? createVideoStub(publishStream)) as unknown as HTMLElement)
+        ? (videoStubs.shift() ?? createVideoStub(publishStream, realCreateElement))
         : realCreateElement(tagName),
     );
 
@@ -887,6 +997,10 @@ describe("HomePage", () => {
     await user.click(screen.getByRole("button", { name: "Опубликовать" }));
 
     expect(await screen.findByText("Live · 2 дорожки")).toBeInTheDocument();
+    expect(await screen.findByText("Совместный просмотр")).toBeInTheDocument();
+    const hostPreview = document.querySelector(".remote-player__video") as HTMLVideoElement;
+    expect(hostPreview.srcObject).toBe(publishStream);
+    expect(hostPreview.muted).toBe(false);
     expect(liveKitMock.rooms[0]?.localParticipant.publishTrack).toHaveBeenCalledWith(
       videoTrack,
       expect.objectContaining({ name: "movie-video", source: "camera" }),
@@ -1048,32 +1162,55 @@ function createStream(videoTracks: MediaStreamTrack[], audioTracks: MediaStreamT
   } as unknown as MediaStream;
 }
 
-function createVideoStub(stream = createStream([createTrack("video")])) {
+function createVideoStub(
+  stream = createStream([createTrack("video")]),
+  createElement: typeof document.createElement = document.createElement.bind(document),
+) {
   const listeners = new Map<string, Set<() => void>>();
-  const stub: Record<string, unknown> = {
-    duration: 5400,
-    currentTime: 0,
-    ended: false,
-    paused: false,
-    videoWidth: 1920,
-    readyState: 0,
-    preload: "",
-    onloadedmetadata: null,
-    onerror: null,
+  const stub = createElement("video") as HTMLVideoElement & {
+    captureStream: () => MediaStream;
+  };
+
+  Object.defineProperties(stub, {
+    duration: { configurable: true, value: 5400 },
+    ended: { configurable: true, value: false },
+    paused: { configurable: true, value: false },
+    readyState: { configurable: true, value: 0 },
+    videoWidth: { configurable: true, value: 1920 },
+  });
+
+  Object.assign(stub, {
     canPlayType: vi.fn().mockReturnValue("probably"),
     captureStream: vi.fn(() => stream),
     play: vi.fn().mockResolvedValue(undefined),
     pause: vi.fn(),
     removeAttribute: vi.fn(),
     load: vi.fn(),
-    addEventListener: vi.fn((type: string, listener: EventListenerOrEventListenerObject) => {
+  });
+
+  const addEventListener = stub.addEventListener.bind(stub);
+  const removeEventListener = stub.removeEventListener.bind(stub);
+  stub.addEventListener = vi.fn(
+    (
+      type: string,
+      listener: EventListenerOrEventListenerObject,
+      options?: boolean | AddEventListenerOptions,
+    ) => {
       const callback = listener as () => void;
       listeners.set(type, new Set([...(listeners.get(type) ?? []), callback]));
-    }),
-    removeEventListener: vi.fn((type: string, listener: EventListenerOrEventListenerObject) => {
+      addEventListener(type, listener, options);
+    },
+  );
+  stub.removeEventListener = vi.fn(
+    (
+      type: string,
+      listener: EventListenerOrEventListenerObject,
+      options?: boolean | EventListenerOptions,
+    ) => {
       listeners.get(type)?.delete(listener as () => void);
-    }),
-  };
+      removeEventListener(type, listener, options);
+    },
+  );
 
   Object.defineProperty(stub, "src", {
     set(_src: string) {

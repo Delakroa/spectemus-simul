@@ -11,8 +11,13 @@ function createTrack(kind: "audio" | "video", name: string) {
   };
 }
 
-function createPublication(track: ReturnType<typeof createTrack>, trackName: string) {
+function createPublication(
+  track: ReturnType<typeof createTrack>,
+  trackName: string,
+  source?: string,
+) {
   return {
+    source,
     track,
     trackName,
   };
@@ -102,6 +107,31 @@ describe("createRemotePlaybackController", () => {
     expect(onStateChange).toHaveBeenLastCalledWith(
       expect.objectContaining({
         status: "lost",
+        trackCount: 0,
+      }),
+    );
+
+    controller.disconnect();
+  });
+
+  it("игнорирует microphone audio tracks, чтобы не смешивать голос с фильмом", () => {
+    const voiceTrack = createTrack("audio", "voice-track");
+    const voicePublication = createPublication(voiceTrack, "voice-microphone", "microphone");
+    const participant = createParticipant();
+    const room = createRoom(participant);
+    const onStateChange = vi.fn();
+    const audioElement = document.createElement("audio");
+    vi.spyOn(audioElement, "play").mockResolvedValue(undefined);
+
+    const controller = createRemotePlaybackController(room as never, { onStateChange });
+    controller.setElements({ audioElement, videoElement: null });
+
+    room.emit("trackSubscribed", voiceTrack, voicePublication, participant);
+
+    expect(voiceTrack.attach).not.toHaveBeenCalled();
+    expect(onStateChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        status: "waiting",
         trackCount: 0,
       }),
     );

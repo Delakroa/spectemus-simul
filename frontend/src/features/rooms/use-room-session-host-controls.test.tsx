@@ -93,6 +93,7 @@ vi.mock("./livekit-connection", () => ({
             localParticipant: { publishData: vi.fn() },
             on: vi.fn().mockReturnThis(),
             off: vi.fn(),
+            remoteParticipants: new Map(),
           },
         };
       },
@@ -325,6 +326,19 @@ describe("useRoomSession host playback controls", () => {
       ),
     );
     expect(screen.getByTestId("pb-status")).toHaveTextContent("paused");
+  });
+
+  it("hostPlay не показывает браузерный AbortError от прерванного play()", async () => {
+    const user = userEvent.setup();
+    await setupLivePublication(user);
+
+    const error = new Error("The play() request was interrupted by a call to pause().");
+    error.name = "AbortError";
+    mockVideoElement.play.mockRejectedValueOnce(error);
+
+    await user.click(screen.getByRole("button", { name: "Play" }));
+
+    await waitFor(() => expect(screen.getByTestId("pb-error")).toHaveTextContent(""));
   });
 
   it("hostSeek устанавливает currentTime, отрицательные значения приводятся к 0", async () => {

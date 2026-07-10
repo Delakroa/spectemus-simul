@@ -61,6 +61,8 @@ class LiveKitTokenService {
                         "Authenticated participant is absent from room state"));
 
         boolean host = participant.role() == ParticipantRole.HOST;
+        boolean canPublish = true;
+        boolean canPublishData = host;
         String participantIdentity = participant.participantId().toString();
         Instant issuedAt = clock.instant();
         Instant expiresAt = issuedAt.plus(properties.tokenTtl());
@@ -69,8 +71,8 @@ class LiveKitTokenService {
                 result.room().roomId(),
                 participantIdentity,
                 participant.displayName(),
-                host,
-                host,
+                canPublish,
+                canPublishData,
                 issuedAt,
                 expiresAt);
 
@@ -81,8 +83,8 @@ class LiveKitTokenService {
                 participant.participantId(),
                 participantIdentity,
                 participant.role(),
-                host,
-                host,
+                canPublish,
+                canPublishData,
                 expiresAt);
     }
 

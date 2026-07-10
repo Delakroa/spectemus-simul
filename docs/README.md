@@ -53,6 +53,7 @@
 - [WT-401_HOST_CONTROLS.md](WT-401_HOST_CONTROLS.md) — управление воспроизведением для host: play/pause/seek, rollback при ошибке.
 - [WT-402_HOST_RECONNECT.md](WT-402_HOST_RECONNECT.md) — reconnect host: `HOST_DISCONNECTED`, grace period, восстановление роли, закрытие по таймауту (`HOST_TIMEOUT`).
 - [WT-403_TEXT_CHAT.md](WT-403_TEXT_CHAT.md) — текстовый чат комнаты: лимит длины, серверный rate limit, XSS-защита, системные сообщения, эфемерная история.
+- [WT-404_VOICE_CHAT.md](WT-404_VOICE_CHAT.md) — voice chat: явное включение микрофона, mute/unmute, отдельные microphone tracks и cleanup.
 - [WT-406_FRONTEND_WEBSOCKET_RECONNECT.md](WT-406_FRONTEND_WEBSOCKET_RECONNECT.md) — frontend auto-reconnect room WebSocket, сохранение локального чата и восстановление host-публикации после LiveKit reconnect.
 
 ## Как обновлять документы

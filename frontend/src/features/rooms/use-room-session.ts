@@ -43,6 +43,17 @@ import {
   type RemotePlaybackStatus,
 } from "./remote-playback";
 import {
+  createRemoteVoiceController,
+  muteVoicePublication,
+  publishVoiceToLiveKit,
+  stopVoicePublication as stopLiveKitVoicePublication,
+  unmuteVoicePublication,
+  VoiceChatFailure,
+  type RemoteVoiceController,
+  type VoiceChatStatus,
+  type VoicePublication,
+} from "./voice-chat";
+import {
   createGuestPlaybackStateReceiver,
   createHostPlaybackStatePublisher,
   type GuestPlaybackStateReceiver,
@@ -58,6 +69,9 @@ const MAX_CHAT_MESSAGE_LENGTH = 1000;
 const HOST_SECRET_STORAGE_PREFIX = "watch-together.host-secret.";
 const MAX_ROOM_RECONNECT_ATTEMPTS = 10;
 const ROOM_RECONNECT_DELAYS_MS = [1_000, 2_000, 5_000, 10_000, 15_000] as const;
+// Server closes the room WebSocket with a normal code (1000) on intentional
+// shutdown (room.closed, participant.left) — those must not trigger a reconnect.
+const NORMAL_WS_CLOSE_CODE = 1000;
 
 export type RoomConnectionStatus =
   "idle" | "connecting" | "open" | "reconnecting" | "closed" | "error";
@@ -66,7 +80,13 @@ export type FileStatus = "idle" | "checking" | "ready" | "error";
 export type FilePublicationStatus = "idle" | "publishing" | "live" | "error";
 export type HostPlaybackStatus = "idle" | "playing" | "paused" | "ended";
 
-export type { FileDiagnosticsResult, PlaybackStatus, RemotePlaybackElements, RemotePlaybackStatus };
+export type {
+  FileDiagnosticsResult,
+  PlaybackStatus,
+  RemotePlaybackElements,
+  RemotePlaybackStatus,
+  VoiceChatStatus,
+};
 
 export type RoomEventLogEntry = {
   eventId: string;
@@ -129,6 +149,11 @@ export type RoomSessionState = {
   remotePlaybackTrackCount: number;
   remotePlaybackVideoTrackName: string | null;
   room: RoomSnapshot | null;
+  voiceError: string | null;
+  voiceRemoteError: string | null;
+  voiceRemoteParticipantCount: number;
+  voiceRemoteParticipantIdentities: string[];
+  voiceStatus: VoiceChatStatus;
 };
 
 const initialState: RoomSessionState = {
@@ -171,6 +196,11 @@ const initialState: RoomSessionState = {
   remotePlaybackTrackCount: 0,
   remotePlaybackVideoTrackName: null,
   room: null,
+  voiceError: null,
+  voiceRemoteError: null,
+  voiceRemoteParticipantCount: 0,
+  voiceRemoteParticipantIdentities: [],
+  voiceStatus: "idle",
 };
 
 export function useRoomSession(routeRoomId?: string) {
@@ -182,6 +212,7 @@ export function useRoomSession(routeRoomId?: string) {
   const fileDiagnosticsRequestIdRef = useRef(0);
   const fileObjectUrlRef = useRef<string | null>(null);
   const hostPlaybackCleanupRef = useRef<(() => void) | null>(null);
+  const hostPreviewElementRef = useRef<HTMLVideoElement | null>(null);
   const hostPublicationRecoveryRequestedRef = useRef(false);
   const filePublicationRef = useRef<FilePublication | null>(null);
   const filePublicationRequestIdRef = useRef(0);
@@ -197,11 +228,14 @@ export function useRoomSession(routeRoomId?: string) {
     audioElement: null,
     videoElement: null,
   });
+  const remoteVoiceControllerRef = useRef<RemoteVoiceController | null>(null);
   const restoredRouteRoomIdRef = useRef<string | null>(null);
   const roomRef = useRef<RoomSnapshot | null>(null);
   const socketReconnectAttemptRef = useRef(0);
   const socketReconnectTimerRef = useRef<number | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  const voicePublicationRef = useRef<VoicePublication | null>(null);
+  const voiceRequestIdRef = useRef(0);
 
   useEffect(() => {
     participantRef.current = state.participant;
@@ -251,6 +285,28 @@ export function useRoomSession(routeRoomId?: string) {
     }));
   }, []);
 
+  const disconnectRemoteVoice = useCallback(() => {
+    const controller = remoteVoiceControllerRef.current;
+    remoteVoiceControllerRef.current = null;
+    controller?.disconnect();
+
+    setState((current) => ({
+      ...current,
+      voiceRemoteError: null,
+      voiceRemoteParticipantCount: 0,
+      voiceRemoteParticipantIdentities: [],
+    }));
+  }, []);
+
+  const stopCurrentVoicePublication = useCallback(() => {
+    const publication = voicePublicationRef.current;
+    voicePublicationRef.current = null;
+
+    if (publication) {
+      stopLiveKitVoicePublication(liveKitConnectionRef.current?.room ?? null, publication);
+    }
+  }, []);
+
   const resetPlaybackSyncState = useCallback(() => {
     setState((current) => ({
       ...current,
@@ -286,6 +342,55 @@ export function useRoomSession(routeRoomId?: string) {
     playbackStateReceiverRef.current?.setVideoElement(elements.videoElement);
   }, []);
 
+  const detachHostPreview = useCallback((videoElement: HTMLVideoElement | null) => {
+    if (!videoElement) {
+      return;
+    }
+
+    videoElement.pause();
+    videoElement.removeAttribute("src");
+    videoElement.srcObject = null;
+    videoElement.load();
+  }, []);
+
+  const attachHostPreview = useCallback((publication: FilePublication | null) => {
+    const videoElement = hostPreviewElementRef.current;
+    if (!videoElement || !publication) {
+      return;
+    }
+
+    videoElement.autoplay = true;
+    videoElement.muted = false;
+    videoElement.playsInline = true;
+    videoElement.srcObject = publication.stream;
+    void videoElement.play().catch((error: unknown) => {
+      if (isBenignPlayInterruption(error)) {
+        return;
+      }
+
+      setState((current) => ({
+        ...current,
+        hostPlaybackError:
+          error instanceof Error ? error.message : "Не удалось показать локальный preview.",
+      }));
+    });
+  }, []);
+
+  const setHostPreviewElement = useCallback(
+    (videoElement: HTMLVideoElement | null) => {
+      if (hostPreviewElementRef.current && hostPreviewElementRef.current !== videoElement) {
+        detachHostPreview(hostPreviewElementRef.current);
+      }
+
+      hostPreviewElementRef.current = videoElement;
+
+      if (videoElement) {
+        attachHostPreview(filePublicationRef.current);
+      }
+    },
+    [attachHostPreview, detachHostPreview],
+  );
+
   const stopHostPlaybackTracking = useCallback(() => {
     const cleanup = hostPlaybackCleanupRef.current;
     hostPlaybackCleanupRef.current = null;
@@ -302,13 +407,14 @@ export function useRoomSession(routeRoomId?: string) {
   const stopCurrentFilePublication = useCallback(() => {
     const publication = filePublicationRef.current;
     filePublicationRef.current = null;
+    detachHostPreview(hostPreviewElementRef.current);
     stopPlaybackStatePublisher();
     stopHostPlaybackTracking();
 
     if (publication) {
       stopLiveKitFilePublication(liveKitConnectionRef.current?.room ?? null, publication);
     }
-  }, [stopHostPlaybackTracking, stopPlaybackStatePublisher]);
+  }, [detachHostPreview, stopHostPlaybackTracking, stopPlaybackStatePublisher]);
 
   const stopFilePublication = useCallback(() => {
     hostPublicationRecoveryRequestedRef.current = false;
@@ -458,7 +564,16 @@ export function useRoomSession(routeRoomId?: string) {
 
     try {
       await publication.videoElement.play();
+      attachHostPreview(publication);
     } catch (error) {
+      if (isBenignPlayInterruption(error)) {
+        setState((current) => ({
+          ...current,
+          hostPlaybackError: null,
+        }));
+        return;
+      }
+
       setState((current) => ({
         ...current,
         hostPlaybackError:
@@ -466,7 +581,7 @@ export function useRoomSession(routeRoomId?: string) {
         hostPlaybackStatus: "paused",
       }));
     }
-  }, []);
+  }, [attachHostPreview]);
 
   const hostPause = useCallback(() => {
     filePublicationRef.current?.videoElement.pause();
@@ -535,6 +650,7 @@ export function useRoomSession(routeRoomId?: string) {
       }
 
       filePublicationRef.current = publication;
+      attachHostPreview(publication);
       playbackStatePublisherRef.current = createHostPlaybackStatePublisher(
         connection.room,
         publication.videoElement,
@@ -565,6 +681,7 @@ export function useRoomSession(routeRoomId?: string) {
       }));
     }
   }, [
+    attachHostPreview,
     startHostPlaybackTracking,
     state.fileResult,
     state.liveKitStatus,
@@ -576,7 +693,10 @@ export function useRoomSession(routeRoomId?: string) {
       liveKitRequestIdRef.current += 1;
       filePublicationRequestIdRef.current += 1;
       stopCurrentFilePublication();
+      voiceRequestIdRef.current += 1;
+      stopCurrentVoicePublication();
       disconnectRemotePlayback();
+      disconnectRemoteVoice();
       disconnectPlaybackStateReceiver();
       const connection = liveKitConnectionRef.current;
       liveKitConnectionRef.current = null;
@@ -592,9 +712,17 @@ export function useRoomSession(routeRoomId?: string) {
         filePublicationTrackCount: 0,
         liveKitError: null,
         liveKitStatus: nextStatus,
+        voiceError: null,
+        voiceStatus: "idle",
       }));
     },
-    [disconnectPlaybackStateReceiver, disconnectRemotePlayback, stopCurrentFilePublication],
+    [
+      disconnectPlaybackStateReceiver,
+      disconnectRemotePlayback,
+      disconnectRemoteVoice,
+      stopCurrentFilePublication,
+      stopCurrentVoicePublication,
+    ],
   );
 
   const disconnectSocket = useCallback(
@@ -628,7 +756,10 @@ export function useRoomSession(routeRoomId?: string) {
       const existingConnection = liveKitConnectionRef.current;
       liveKitConnectionRef.current = null;
       stopCurrentFilePublication();
+      voiceRequestIdRef.current += 1;
+      stopCurrentVoicePublication();
       disconnectRemotePlayback();
+      disconnectRemoteVoice();
       disconnectPlaybackStateReceiver();
 
       if (existingConnection) {
@@ -669,7 +800,10 @@ export function useRoomSession(routeRoomId?: string) {
                 participantRef.current?.role === "HOST" && filePublicationRef.current !== null;
               filePublicationRequestIdRef.current += 1;
               stopCurrentFilePublication();
+              voiceRequestIdRef.current += 1;
+              stopCurrentVoicePublication();
               disconnectRemotePlayback();
+              disconnectRemoteVoice();
               disconnectPlaybackStateReceiver();
             }
 
@@ -682,6 +816,8 @@ export function useRoomSession(routeRoomId?: string) {
                 status === "disconnected" ? 0 : current.filePublicationTrackCount,
               liveKitError: status === "error" ? current.liveKitError : null,
               liveKitStatus: status,
+              voiceError: status === "disconnected" ? null : current.voiceError,
+              voiceStatus: status === "disconnected" ? "idle" : current.voiceStatus,
             }));
           },
         });
@@ -691,6 +827,22 @@ export function useRoomSession(routeRoomId?: string) {
         }
 
         liveKitConnectionRef.current = connection;
+        const voiceController = createRemoteVoiceController(connection.room, {
+          onStateChange: (remoteVoice) => {
+            if (liveKitRequestIdRef.current !== requestId) {
+              return;
+            }
+
+            setState((current) => ({
+              ...current,
+              voiceRemoteError: remoteVoice.error,
+              voiceRemoteParticipantCount: remoteVoice.trackCount,
+              voiceRemoteParticipantIdentities: remoteVoice.participantIdentities,
+            }));
+          },
+        });
+        remoteVoiceControllerRef.current = voiceController;
+
         if (participantRef.current?.role === "GUEST") {
           const playbackController = createRemotePlaybackController(connection.room, {
             onStateChange: (remotePlayback) => {
@@ -752,7 +904,13 @@ export function useRoomSession(routeRoomId?: string) {
         }));
       }
     },
-    [disconnectPlaybackStateReceiver, disconnectRemotePlayback, stopCurrentFilePublication],
+    [
+      disconnectPlaybackStateReceiver,
+      disconnectRemotePlayback,
+      disconnectRemoteVoice,
+      stopCurrentFilePublication,
+      stopCurrentVoicePublication,
+    ],
   );
 
   const sendHeartbeat = useCallback((socket: WebSocket) => {
@@ -821,6 +979,112 @@ export function useRoomSession(routeRoomId?: string) {
     return true;
   }, []);
 
+  const startVoiceChat = useCallback(async () => {
+    const connection = liveKitConnectionRef.current;
+    if (!connection || state.liveKitStatus !== "connected") {
+      setState((current) => ({
+        ...current,
+        voiceError: "LiveKit ещё не подключён.",
+        voiceStatus: "error",
+      }));
+      return;
+    }
+
+    if (voicePublicationRef.current || state.voiceStatus === "requesting") {
+      return;
+    }
+
+    const requestId = voiceRequestIdRef.current + 1;
+    voiceRequestIdRef.current = requestId;
+    setState((current) => ({
+      ...current,
+      voiceError: null,
+      voiceStatus: "requesting",
+    }));
+
+    try {
+      const publication = await publishVoiceToLiveKit(connection.room);
+      if (voiceRequestIdRef.current !== requestId) {
+        stopLiveKitVoicePublication(connection.room, publication);
+        return;
+      }
+
+      voicePublicationRef.current = publication;
+      setState((current) => ({
+        ...current,
+        voiceError: null,
+        voiceStatus: "live",
+      }));
+    } catch (error) {
+      if (voiceRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      setState((current) => ({
+        ...current,
+        voiceError:
+          error instanceof VoiceChatFailure ? error.message : "Не удалось включить голосовой чат.",
+        voiceStatus: "error",
+      }));
+    }
+  }, [state.liveKitStatus, state.voiceStatus]);
+
+  const muteVoiceChat = useCallback(async () => {
+    const publication = voicePublicationRef.current;
+    if (!publication) {
+      return;
+    }
+
+    try {
+      await muteVoicePublication(publication);
+      setState((current) => ({
+        ...current,
+        voiceError: null,
+        voiceStatus: "muted",
+      }));
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        voiceError:
+          error instanceof VoiceChatFailure ? error.message : "Не удалось выключить микрофон.",
+        voiceStatus: "error",
+      }));
+    }
+  }, []);
+
+  const unmuteVoiceChat = useCallback(async () => {
+    const publication = voicePublicationRef.current;
+    if (!publication) {
+      return;
+    }
+
+    try {
+      await unmuteVoicePublication(publication);
+      setState((current) => ({
+        ...current,
+        voiceError: null,
+        voiceStatus: "live",
+      }));
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        voiceError:
+          error instanceof VoiceChatFailure ? error.message : "Не удалось включить микрофон.",
+        voiceStatus: "error",
+      }));
+    }
+  }, []);
+
+  const stopVoiceChat = useCallback(() => {
+    voiceRequestIdRef.current += 1;
+    stopCurrentVoicePublication();
+    setState((current) => ({
+      ...current,
+      voiceError: null,
+      voiceStatus: "idle",
+    }));
+  }, [stopCurrentVoicePublication]);
+
   const scheduleRoomReconnect = useCallback(() => {
     clearSocketReconnectTimer();
 
@@ -852,6 +1116,10 @@ export function useRoomSession(routeRoomId?: string) {
       const latestRoom = roomRef.current;
       const latestParticipant = participantRef.current;
       if (!latestRoom || !latestParticipant || isTerminalRoomStatus(latestRoom.status)) {
+        setState((current) => ({
+          ...current,
+          connectionStatus: current.room ? "closed" : "idle",
+        }));
         return;
       }
 
@@ -953,14 +1221,22 @@ export function useRoomSession(routeRoomId?: string) {
         }));
       };
 
-      socket.onclose = () => {
+      socket.onclose = (event) => {
         if (socketRef.current !== socket) {
           return;
         }
 
         socketRef.current = null;
         stopHeartbeat();
-        if (pendingActionRef.current !== "close") {
+
+        const currentRoom = roomRef.current;
+        const intentionalClose =
+          event.code === NORMAL_WS_CLOSE_CODE ||
+          pendingActionRef.current === "close" ||
+          pendingActionRef.current === "leave" ||
+          (currentRoom !== null && isTerminalRoomStatus(currentRoom.status));
+
+        if (!intentionalClose) {
           scheduleRoomReconnect();
           return;
         }
@@ -972,7 +1248,10 @@ export function useRoomSession(routeRoomId?: string) {
             current.pendingAction === "close"
               ? addLocalEvent(current.events, "Комната закрыта")
               : current.events,
-          pendingAction: current.pendingAction === "close" ? null : current.pendingAction,
+          pendingAction:
+            current.pendingAction === "close" || current.pendingAction === "leave"
+              ? null
+              : current.pendingAction,
           room:
             current.pendingAction === "close" && current.room
               ? markRoomClosed(current.room)
@@ -1254,13 +1533,18 @@ export function useRoomSession(routeRoomId?: string) {
     inviteUrl,
     join,
     leave,
+    muteVoiceChat,
     publishFile,
     restore,
     routeRoomId,
     selectFile,
     sendChatMessage,
+    setHostPreviewElement,
     setRemotePlaybackElements,
     stopFilePublication,
+    stopVoiceChat,
+    startVoiceChat,
+    unmuteVoiceChat,
   };
 }
 
@@ -1436,6 +1720,18 @@ function extractRoomId(value: string) {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Не удалось выполнить действие.";
+}
+
+function isBenignPlayInterruption(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.name === "AbortError" ||
+    error.message.includes("interrupted by a call to pause") ||
+    error.message.includes("interrupted by a new load request")
+  );
 }
 
 function isTerminalRoomStatus(status: RoomSnapshot["status"]) {

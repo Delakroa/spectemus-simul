@@ -5,6 +5,8 @@ import type {
   Room as LiveKitRoom,
 } from "livekit-client";
 
+import { isVoiceTrackPublication } from "./voice-chat";
+
 export type RemotePlaybackStatus = "idle" | "waiting" | "receiving" | "lost" | "error";
 
 export type RemotePlaybackState = {
@@ -130,6 +132,10 @@ export function createRemotePlaybackController(
       return;
     }
 
+    if (track.kind === "audio" && !isMovieAudioPublication(publication)) {
+      return;
+    }
+
     hasReceivedTracks = true;
     participantIdentity = participant.identity;
 
@@ -222,4 +228,13 @@ export function createRemotePlaybackController(
       emitState();
     },
   };
+}
+
+function isMovieAudioPublication(publication: RemoteTrackPublication) {
+  const source = (publication as { source?: unknown }).source;
+  return (
+    publication.trackName === "movie-audio" ||
+    source === "screen_share_audio" ||
+    !isVoiceTrackPublication(publication)
+  );
 }
