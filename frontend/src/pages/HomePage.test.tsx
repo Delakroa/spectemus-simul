@@ -572,7 +572,8 @@ describe("HomePage", () => {
       captureStream: vi.fn(),
     };
     Object.defineProperty(videoStub, "src", {
-      set(_: string) {
+      set(_src: string) {
+        void _src;
         Promise.resolve().then(() => {
           (videoStub.onloadedmetadata as (() => void) | null)?.();
         });
@@ -580,11 +581,8 @@ describe("HomePage", () => {
     });
 
     const realCreateElement = document.createElement.bind(document);
-    vi.spyOn(document, "createElement").mockImplementation(
-      (tagName: string) =>
-        tagName === "video"
-          ? (videoStub as unknown as HTMLElement)
-          : realCreateElement(tagName),
+    vi.spyOn(document, "createElement").mockImplementation((tagName: string) =>
+      tagName === "video" ? (videoStub as unknown as HTMLElement) : realCreateElement(tagName),
     );
 
     renderPage();
@@ -683,7 +681,8 @@ describe("HomePage", () => {
       captureStream: vi.fn(),
     };
     Object.defineProperty(videoStub, "src", {
-      set(_: string) {
+      set(_src: string) {
+        void _src;
         Promise.resolve().then(() => {
           (videoStub.onloadedmetadata as (() => void) | null)?.();
         });
@@ -691,11 +690,8 @@ describe("HomePage", () => {
     });
 
     const realCreateElement = document.createElement.bind(document);
-    vi.spyOn(document, "createElement").mockImplementation(
-      (tagName: string) =>
-        tagName === "video"
-          ? (videoStub as unknown as HTMLElement)
-          : realCreateElement(tagName),
+    vi.spyOn(document, "createElement").mockImplementation((tagName: string) =>
+      tagName === "video" ? (videoStub as unknown as HTMLElement) : realCreateElement(tagName),
     );
 
     renderPage();

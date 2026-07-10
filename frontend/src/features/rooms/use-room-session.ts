@@ -24,7 +24,11 @@ import {
   parseRoomServerEvent,
   type RoomServerEvent,
 } from "./room-events";
-import { diagnoseFile, FileDiagnosticsFailure, type FileDiagnosticsResult } from "./file-diagnostics";
+import {
+  diagnoseFile,
+  FileDiagnosticsFailure,
+  type FileDiagnosticsResult,
+} from "./file-diagnostics";
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const MAX_EVENT_LOG_ITEMS = 8;
@@ -77,6 +81,7 @@ const initialState: RoomSessionState = {
 
 export function useRoomSession(routeRoomId?: string) {
   const [state, setState] = useState<RoomSessionState>(initialState);
+  const fileDiagnosticsRequestIdRef = useRef(0);
   const fileObjectUrlRef = useRef<string | null>(null);
   const heartbeatTimerRef = useRef<number | null>(null);
   const liveKitConnectionRef = useRef<LiveKitConnection | null>(null);
@@ -106,6 +111,7 @@ export function useRoomSession(routeRoomId?: string) {
   }, []);
 
   const clearFileState = useCallback(() => {
+    fileDiagnosticsRequestIdRef.current += 1;
     revokeFileUrl();
     setState((current) => ({
       ...current,
@@ -117,6 +123,8 @@ export function useRoomSession(routeRoomId?: string) {
 
   const selectFile = useCallback(
     async (file: File) => {
+      const requestId = fileDiagnosticsRequestIdRef.current + 1;
+      fileDiagnosticsRequestIdRef.current = requestId;
       revokeFileUrl();
       setState((current) => ({
         ...current,
@@ -127,6 +135,11 @@ export function useRoomSession(routeRoomId?: string) {
 
       try {
         const result = await diagnoseFile(file);
+        if (fileDiagnosticsRequestIdRef.current !== requestId) {
+          URL.revokeObjectURL(result.objectUrl);
+          return;
+        }
+
         fileObjectUrlRef.current = result.objectUrl;
         setState((current) => ({
           ...current,
@@ -135,10 +148,12 @@ export function useRoomSession(routeRoomId?: string) {
           fileStatus: "ready",
         }));
       } catch (error) {
+        if (fileDiagnosticsRequestIdRef.current !== requestId) {
+          return;
+        }
+
         const message =
-          error instanceof FileDiagnosticsFailure
-            ? error.message
-            : "Не удалось проверить файл.";
+          error instanceof FileDiagnosticsFailure ? error.message : "Не удалось проверить файл.";
         setState((current) => ({
           ...current,
           fileError: message,
@@ -319,6 +334,7 @@ export function useRoomSession(routeRoomId?: string) {
           const event = parseRoomServerEvent(JSON.parse(message.data));
           setState((current) => applyEventToState(current, event));
           if (event.type === "room.closed") {
+            clearFileState();
             disconnectLiveKit("disconnected");
           }
         } catch {
@@ -363,7 +379,7 @@ export function useRoomSession(routeRoomId?: string) {
         }));
       };
     },
-    [disconnectLiveKit, disconnectSocket, sendHeartbeat, stopHeartbeat],
+    [clearFileState, disconnectLiveKit, disconnectSocket, sendHeartbeat, stopHeartbeat],
   );
 
   const create = useCallback(

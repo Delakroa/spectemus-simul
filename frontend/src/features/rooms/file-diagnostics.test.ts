@@ -2,13 +2,15 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 
 import { diagnoseFile, FileDiagnosticsFailure } from "./file-diagnostics";
 
-function makeVideoStub(overrides: {
-  canPlayTypeResult?: string;
-  captureStream?: unknown;
-  videoWidth?: number;
-  duration?: number;
-  triggerError?: boolean;
-} = {}) {
+function makeVideoStub(
+  overrides: {
+    canPlayTypeResult?: string;
+    captureStream?: unknown;
+    videoWidth?: number;
+    duration?: number;
+    triggerError?: boolean;
+  } = {},
+) {
   const {
     canPlayTypeResult = "probably",
     videoWidth = 1920,
@@ -30,7 +32,8 @@ function makeVideoStub(overrides: {
   };
 
   Object.defineProperty(stub, "src", {
-    set(_: string) {
+    set(_src: string) {
+      void _src;
       Promise.resolve().then(() => {
         if (triggerError) {
           (stub.onerror as (() => void) | null)?.();
@@ -103,8 +106,7 @@ describe("diagnoseFile", () => {
     const file = new File([""], "movie.mp4", { type: "video/mp4" });
 
     await expect(diagnoseFile(file)).rejects.toSatisfy(
-      (e) =>
-        e instanceof FileDiagnosticsFailure && e.code === "CAPTURE_STREAM_UNAVAILABLE",
+      (e) => e instanceof FileDiagnosticsFailure && e.code === "CAPTURE_STREAM_UNAVAILABLE",
     );
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:test-url");
   });
