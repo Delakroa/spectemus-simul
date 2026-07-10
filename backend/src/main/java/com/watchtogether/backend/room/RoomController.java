@@ -13,6 +13,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -27,6 +28,7 @@ public class RoomController {
     private static final String SESSION_COOKIE = "wt_session";
 
     private final RoomCreationService roomCreationService;
+    private final RoomRestoreService roomRestoreService;
     private final RoomJoinService roomJoinService;
     private final RoomCloseService roomCloseService;
     private final RoomLeaveService roomLeaveService;
@@ -34,11 +36,13 @@ public class RoomController {
 
     RoomController(
             RoomCreationService roomCreationService,
+            RoomRestoreService roomRestoreService,
             RoomJoinService roomJoinService,
             RoomCloseService roomCloseService,
             RoomLeaveService roomLeaveService,
             RoomProperties properties) {
         this.roomCreationService = roomCreationService;
+        this.roomRestoreService = roomRestoreService;
         this.roomJoinService = roomJoinService;
         this.roomCloseService = roomCloseService;
         this.roomLeaveService = roomLeaveService;
@@ -59,6 +63,15 @@ public class RoomController {
                 .cacheControl(CacheControl.noStore())
                 .header(HttpHeaders.SET_COOKIE, sessionCookie.toString())
                 .body(result.response());
+    }
+
+    @GetMapping("/{roomId}")
+    ResponseEntity<GetRoomResponse> getRoom(
+            @PathVariable String roomId,
+            @CookieValue(name = SESSION_COOKIE, required = false) String sessionCredential) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(roomRestoreService.restore(roomId, sessionCredential));
     }
 
     @PostMapping("/{roomId}/join")

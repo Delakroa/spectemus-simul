@@ -55,6 +55,9 @@ class RoomJoinControllerTest {
     private RoomCreationService roomCreationService;
 
     @MockitoBean
+    private RoomRestoreService roomRestoreService;
+
+    @MockitoBean
     private RoomJoinService roomJoinService;
 
     @MockitoBean

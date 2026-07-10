@@ -52,7 +52,23 @@ async function postJson(url, body, headers = {}) {
   return {
     status: response.status,
     headers: response.headers,
-    body: await response.json(),
+    body: await readJsonResponse(response, `POST ${url}`),
+  };
+}
+
+async function getJson(url, headers = {}) {
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      ...headers,
+    },
+    signal: AbortSignal.timeout(5_000),
+  });
+
+  return {
+    status: response.status,
+    headers: response.headers,
+    body: await readJsonResponse(response, `GET ${url}`),
   };
 }
 
@@ -77,6 +93,24 @@ function assertIncludes(value, expected, label) {
   if (!value.includes(expected)) {
     throw new Error(
       `${label} response does not include ${JSON.stringify(expected)}`,
+    );
+  }
+}
+
+async function readJsonResponse(response, label) {
+  const body = await response.text();
+  if (!body) {
+    throw new Error(
+      `${label} returned empty response body (HTTP ${response.status})`,
+    );
+  }
+
+  try {
+    return JSON.parse(body);
+  } catch (error) {
+    throw new Error(
+      `${label} returned non-JSON response body (HTTP ${response.status}): ${body.slice(0, 240)}`,
+      { cause: error },
     );
   }
 }
@@ -365,6 +399,30 @@ if (
   throw new Error("repeated join created a duplicate participant");
 }
 
+const restoredHost = await getJson(`${appUrl}/api/v1/rooms/${roomId}`, {
+  Cookie: hostCookie,
+});
+if (
+  restoredHost.status !== 200 ||
+  restoredHost.body.participant?.role !== "HOST" ||
+  restoredHost.body.room?.roomId !== roomId ||
+  restoredHost.body.room?.participants?.length !== 2
+) {
+  throw new Error("host room restore returned invalid state");
+}
+
+const restoredGuest = await getJson(`${appUrl}/api/v1/rooms/${roomId}`, {
+  Cookie: guestCookie,
+});
+if (
+  restoredGuest.status !== 200 ||
+  restoredGuest.body.participant?.participantId !== guestParticipantId ||
+  restoredGuest.body.participant?.role !== "GUEST" ||
+  restoredGuest.body.room?.roomId !== roomId
+) {
+  throw new Error("guest room restore returned invalid state");
+}
+
 const eventsUrl = new URL(`/api/v1/rooms/${roomId}/events`, appUrl);
 eventsUrl.protocol = eventsUrl.protocol === "https:" ? "wss:" : "ws:";
 
@@ -442,6 +500,7 @@ if (
 
 console.log("[ok] guest join through proxy: joined");
 console.log("[ok] guest join session replay: restored");
+console.log("[ok] room restore through proxy: restored");
 console.log("[ok] room WebSocket participant joined: broadcast");
 console.log("[ok] room capacity: enforced");
 console.log("[ok] unavailable room: hidden");

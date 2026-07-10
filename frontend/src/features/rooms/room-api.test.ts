@@ -1,4 +1,4 @@
-import { createRoom, joinRoom, resolveRoomEventsUrl } from "./room-api";
+import { createRoom, getRoom, joinRoom, resolveRoomEventsUrl } from "./room-api";
 
 const roomId = "AbCdEfGhIjKlMnOpQrStUv";
 
@@ -67,6 +67,34 @@ describe("room api", () => {
     );
 
     await expect(joinRoom(roomId, "Guest")).rejects.toThrow();
+  });
+
+  it("восстанавливает комнату по текущей session cookie", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          participant: room.participants[0],
+          room,
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await expect(getRoom(roomId)).resolves.toMatchObject({
+      participant: {
+        role: "HOST",
+      },
+      room: {
+        roomId,
+      },
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/v1/rooms/${roomId}`,
+      expect.objectContaining({
+        credentials: "include",
+        method: "GET",
+      }),
+    );
   });
 
   it("строит WebSocket URL от текущего origin", () => {

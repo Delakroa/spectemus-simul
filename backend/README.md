@@ -34,6 +34,7 @@ pnpm backend:bootRun
 - `GET /api/v1/version`
 - `GET /actuator/health`
 - `POST /api/v1/rooms`
+- `GET /api/v1/rooms/{roomId}`
 - `POST /api/v1/rooms/{roomId}/join`
 - `POST /api/v1/rooms/{roomId}/leave`
 - `POST /api/v1/rooms/{roomId}/close`
@@ -43,7 +44,7 @@ pnpm backend:bootRun
 
 WT-102 создал backend foundation: воспроизводимую сборку, REST endpoints `health/version`, validation dependency, stateless security baseline, actuator и тесты.
 
-WT-201, WT-202, WT-203, WT-204, WT-205, WT-206 и WT-207 добавили создание комнаты, вход гостя, авторизованный WebSocket snapshot, backend-owned presence heartbeat, `participant.joined`, закрытие комнаты host-ом и явный выход guest participant. Эти сценарии используют Redis persistence, TTL, idempotency и session identity.
+WT-201, WT-202, WT-203, WT-204, WT-205, WT-206, WT-207 и WT-209 добавили создание комнаты, вход гостя, восстановление snapshot по session cookie, авторизованный WebSocket snapshot, backend-owned presence heartbeat, `participant.joined`, закрытие комнаты host-ом и явный выход guest participant. Эти сценарии используют Redis persistence, TTL, idempotency и session identity.
 
 Вне текущей области: PostgreSQL product state, Flyway migrations, LiveKit product tokens, chat и voice.
 
@@ -62,4 +63,4 @@ ROOM_CLEANUP_GRACE=5m
 WEBSOCKET_PRESENCE_TTL=30s
 ```
 
-Создание комнаты, вход гостя, выход guest participant, закрытие комнаты, WebSocket snapshot и presence heartbeat требуют работающий Redis. Полная локальная среда запускается командами `pnpm infra:up` и `pnpm infra:check`.
+Создание комнаты, восстановление snapshot, вход гостя, выход guest participant, закрытие комнаты, WebSocket snapshot и presence heartbeat требуют работающий Redis. Полная локальная среда запускается командами `pnpm infra:up` и `pnpm infra:check`.

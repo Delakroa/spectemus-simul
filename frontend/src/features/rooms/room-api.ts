@@ -58,6 +58,11 @@ const joinRoomResponseSchema = z.object({
   room: roomSnapshotSchema,
 });
 
+const getRoomResponseSchema = z.object({
+  participant: participantSchema,
+  room: roomSnapshotSchema,
+});
+
 type RequestOptions = {
   body?: unknown;
   headers?: HeadersInit;
@@ -69,6 +74,7 @@ export type Participant = z.infer<typeof participantSchema>;
 export type RoomSnapshot = z.infer<typeof roomSnapshotSchema>;
 export type CreateRoomResponse = z.infer<typeof createRoomResponseSchema>;
 export type JoinRoomResponse = z.infer<typeof joinRoomResponseSchema>;
+export type GetRoomResponse = z.infer<typeof getRoomResponseSchema>;
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
@@ -150,6 +156,12 @@ export function joinRoom(roomId: string, displayName: string, signal?: AbortSign
   return request(`/api/v1/rooms/${encodeURIComponent(roomId)}/join`, joinRoomResponseSchema, {
     method: "POST",
     body: { displayName },
+    signal,
+  });
+}
+
+export function getRoom(roomId: string, signal?: AbortSignal) {
+  return request(`/api/v1/rooms/${encodeURIComponent(roomId)}`, getRoomResponseSchema, {
     signal,
   });
 }

@@ -67,5 +67,5 @@ pnpm security:audit
 ## Известные ограничения
 
 - WT-208 не добавляет выбор видео, LiveKit product tokens и playback controls.
-- Автоматическое восстановление комнаты после refresh без повторного join/create не входит в WT-208, потому что `GET /api/v1/rooms/{roomId}` ещё остаётся planned contract.
+- Автоматическое восстановление комнаты после refresh без повторного join/create реализовано в WT-209.
 - UI пока не делает browser notification/toast слой; журнал событий отображается внутри экрана комнаты.

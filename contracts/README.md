@@ -24,6 +24,7 @@
 - Production cookie обязана иметь `HttpOnly`, `Secure` и `SameSite=Strict`.
 - Host secret передаётся отдельно и никогда не включается в invite path.
 - `POST /api/v1/rooms` требует `Idempotency-Key`.
+- `GET /api/v1/rooms/{roomId}` восстанавливает текущего participant и room snapshot по session cookie.
 - `POST /api/v1/rooms/{roomId}/leave` удаляет текущего guest participant по session cookie.
 - `POST /api/v1/rooms/{roomId}/close` требует host session cookie и `X-Host-Secret`.
 - Внешние ответы не содержат локальные пути, movie bytes, stack trace или инфраструктурные секреты.
