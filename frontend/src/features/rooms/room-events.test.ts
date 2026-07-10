@@ -143,4 +143,57 @@ describe("room events", () => {
 
     expect("known" in event).toBe(true);
   });
+
+  it("разбирает chat.message и не меняет authoritative состояние комнаты", () => {
+    const event = parseRoomServerEvent({
+      schemaVersion: 1,
+      eventId: "c2b2e3d4-5e6f-4b7c-9d8e-0f1a2b3c4d5e",
+      type: "chat.message",
+      roomId,
+      participantId: guestId,
+      roomVersion: 2,
+      occurredAt: "2026-07-09T07:32:10Z",
+      payload: {
+        messageId: "5d9f1a2b-3c4d-4e5f-8a9b-0c1d2e3f4a5b",
+        participantId: guestId,
+        displayName: "Guest",
+        text: "Погнали смотреть",
+        sentAt: "2026-07-09T07:32:10Z",
+      },
+    });
+
+    if ("known" in event) {
+      throw new Error("chat.message должен быть известным событием");
+    }
+    if (event.type !== "chat.message") {
+      throw new Error("ожидался chat.message");
+    }
+
+    expect(event.payload.text).toBe("Погнали смотреть");
+    expect(event.payload.displayName).toBe("Guest");
+
+    const room = createRoomSnapshot();
+    expect(applyRoomServerEvent(room, event)).toBe(room);
+  });
+
+  it("отклоняет chat.message с текстом длиннее 1000 символов", () => {
+    expect(() =>
+      parseRoomServerEvent({
+        schemaVersion: 1,
+        eventId: "c2b2e3d4-5e6f-4b7c-9d8e-0f1a2b3c4d5e",
+        type: "chat.message",
+        roomId,
+        participantId: guestId,
+        roomVersion: 2,
+        occurredAt: "2026-07-09T07:32:10Z",
+        payload: {
+          messageId: "5d9f1a2b-3c4d-4e5f-8a9b-0c1d2e3f4a5b",
+          participantId: guestId,
+          displayName: "Guest",
+          text: "a".repeat(1001),
+          sentAt: "2026-07-09T07:32:10Z",
+        },
+      }),
+    ).toThrow();
+  });
 });

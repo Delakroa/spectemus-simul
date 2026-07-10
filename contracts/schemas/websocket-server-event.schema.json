@@ -264,6 +264,52 @@
       "if": {
         "properties": {
           "type": {
+            "const": "chat.message"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "messageId",
+              "participantId",
+              "displayName",
+              "text",
+              "sentAt"
+            ],
+            "properties": {
+              "messageId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "participantId": {
+                "$ref": "https://watch-together.local/contracts/schemas/common.schema.json#/$defs/ParticipantId"
+              },
+              "displayName": {
+                "$ref": "https://watch-together.local/contracts/schemas/common.schema.json#/$defs/DisplayName"
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "sentAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
             "const": "error"
           }
         },

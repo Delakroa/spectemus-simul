@@ -32,8 +32,9 @@ P0 технически подтверждён.
 - WT-305 добавляет guest playback remote video/audio tracks из LiveKit.
 - WT-306 добавляет синхронизацию host playback state через LiveKit data channel.
 - WT-401 добавляет управление воспроизведением для host: play/pause/seek, rollback при ошибке.
+- WT-403 добавляет текстовый чат комнаты: лимит длины, серверный rate limit, XSS-защита, системные сообщения, эфемерная история.
 
-P1 foundation, P2 room lifecycle и P3 media integration завершены. Проект находится в P4 host UX. Chat и voice остаются вне текущего product UI.
+P1 foundation, P2 room lifecycle и P3 media integration завершены. Проект находится в P4 host UX. Voice остаётся вне текущего product UI.
 
 ## Как читать репозиторий
 

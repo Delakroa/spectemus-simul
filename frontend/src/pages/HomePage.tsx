@@ -8,6 +8,7 @@ import {
   FolderOpen,
   Link as LinkIcon,
   LogIn,
+  MessageSquare,
   MonitorPlay,
   Pause,
   Play,
@@ -15,6 +16,7 @@ import {
   Power,
   Radio,
   RefreshCw,
+  Send,
   Server,
   Square,
   Users,
@@ -57,6 +59,7 @@ export function HomePage() {
   const [inviteCopied, setInviteCopied] = useState(false);
   const [roomIdCopied, setRoomIdCopied] = useState(false);
   const [seekBarValue, setSeekBarValue] = useState<number | null>(null);
+  const [chatDraft, setChatDraft] = useState("");
   const joinRoomId = joinRoomIdDraft || routeRoomId || "";
   const isOnline = !isPending && !isError;
   const room = roomSession.room;
@@ -75,6 +78,8 @@ export function HomePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const chatEndRef = useRef<HTMLLIElement>(null);
+  const chatMessageCount = roomSession.chatMessages.length;
 
   useEffect(() => {
     setRemotePlaybackElements({
@@ -89,6 +94,13 @@ export function HomePage() {
       });
     };
   }, [isHost, room?.roomId, roomClosed, setRemotePlaybackElements]);
+
+  useEffect(() => {
+    const node = chatEndRef.current;
+    if (node && typeof node.scrollIntoView === "function") {
+      node.scrollIntoView({ block: "nearest" });
+    }
+  }, [chatMessageCount]);
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -106,6 +118,13 @@ export function HomePage() {
   function handleJoinRoom(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void roomSession.join(joinRoomId, guestDisplayName);
+  }
+
+  function handleSendChat(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (roomSession.sendChatMessage(chatDraft)) {
+      setChatDraft("");
+    }
   }
 
   async function handleCopyInvite() {
@@ -663,6 +682,82 @@ export function HomePage() {
                 </ol>
               ) : (
                 <p className="room-card__empty">Событий пока нет</p>
+              )}
+            </section>
+
+            <section
+              className="room-card room-card--chat"
+              aria-labelledby="chat-title"
+              style={{ gridColumn: "1 / -1" }}
+            >
+              <div className="room-card__heading">
+                <h3 id="chat-title">Чат</h3>
+                <span className="room-count">
+                  <MessageSquare size={16} aria-hidden="true" />
+                  {roomSession.chatMessages.length}
+                </span>
+              </div>
+
+              {roomSession.chatMessages.length > 0 ? (
+                <ol className="chat-list">
+                  {roomSession.chatMessages.map((message) =>
+                    message.kind === "system" ? (
+                      <li key={message.id} className="chat-message chat-message--system">
+                        <span>{message.text}</span>
+                        <time dateTime={message.sentAt}>{formatCheckedAt(message.sentAt)}</time>
+                      </li>
+                    ) : (
+                      <li
+                        key={message.id}
+                        className={`chat-message${
+                          message.participantId === participant?.participantId
+                            ? " chat-message--own"
+                            : ""
+                        }`}
+                      >
+                        <div className="chat-message__meta">
+                          <strong>{message.displayName}</strong>
+                          <time dateTime={message.sentAt}>{formatCheckedAt(message.sentAt)}</time>
+                        </div>
+                        <span className="chat-message__text">{message.text}</span>
+                      </li>
+                    ),
+                  )}
+                  <li ref={chatEndRef} className="chat-list__anchor" aria-hidden="true" />
+                </ol>
+              ) : (
+                <p className="room-card__empty">Сообщений пока нет</p>
+              )}
+
+              <form className="chat-form" onSubmit={handleSendChat}>
+                <input
+                  type="text"
+                  value={chatDraft}
+                  maxLength={1000}
+                  onChange={(event) => setChatDraft(event.target.value)}
+                  placeholder={roomClosed ? "Комната закрыта" : "Написать сообщение…"}
+                  disabled={roomSession.connectionStatus !== "open" || roomClosed}
+                  aria-label="Сообщение в чат"
+                  autoComplete="off"
+                />
+                <button
+                  className="button button--primary"
+                  type="submit"
+                  disabled={
+                    roomSession.connectionStatus !== "open" ||
+                    roomClosed ||
+                    chatDraft.trim().length === 0
+                  }
+                >
+                  <Send size={16} aria-hidden="true" />
+                  Отправить
+                </button>
+              </form>
+
+              {roomSession.chatError && (
+                <p className="chat-form__error" role="alert">
+                  {roomSession.chatError}
+                </p>
               )}
             </section>
           </div>

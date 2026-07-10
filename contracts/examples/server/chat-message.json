@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "eventId": "c2b2e3d4-5e6f-4b7c-9d8e-0f1a2b3c4d5e",
+  "type": "chat.message",
+  "roomId": "AbCdEfGhIjKlMnOpQrStUv",
+  "participantId": "8e7d79a8-a49f-48cc-a409-f07890dd3218",
+  "roomVersion": 42,
+  "occurredAt": "2026-07-09T07:32:10Z",
+  "payload": {
+    "messageId": "5d9f1a2b-3c4d-4e5f-8a9b-0c1d2e3f4a5b",
+    "participantId": "8e7d79a8-a49f-48cc-a409-f07890dd3218",
+    "displayName": "Guest",
+    "text": "Погнали смотреть!",
+    "sentAt": "2026-07-09T07:32:10Z"
+  }
+}

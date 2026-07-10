@@ -49,6 +49,8 @@ Endpoint: `/api/v1/rooms/{roomId}/events`. Upgrade использует same-ori
 - изменения presence приходят как `participant.online` и `participant.offline`;
 - явный выход guest приходит как `participant.left`, после чего WebSocket-сессия ушедшего участника закрывается;
 - закрытие комнаты приходит как `room.closed`, после чего WebSocket-сессия закрывается;
+- текстовое сообщение отправляется как `chat.message` (client) и транслируется всем сессиям как `chat.message` (server) с серверными `messageId`, `displayName` и `sentAt`;
+- превышение лимита чата или невалидный текст возвращаются как `error` server event (`RATE_LIMITED` / `VALIDATION_FAILED`) без закрытия сессии;
 - неизвестный server event с валидным envelope безопасно игнорируется;
 - неизвестный client command отклоняется;
 - `participantId` берётся из session и сверяется с payload;

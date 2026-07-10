@@ -52,29 +52,38 @@ const validateServerEvent = ajv.compile(serverEventSchema);
 const [
   problemExample,
   heartbeatExample,
+  chatMessageClientExample,
   snapshotExample,
   participantJoinedExample,
   participantOnlineExample,
   participantOfflineExample,
   participantLeftExample,
   roomClosedExample,
+  chatMessageServerExample,
   errorExample,
   unknownServerEvent,
 ] = await Promise.all([
   readJson("examples/problem-details.json"),
   readJson("examples/client/participant-heartbeat.json"),
+  readJson("examples/client/chat-message.json"),
   readJson("examples/server/room-snapshot.json"),
   readJson("examples/server/participant-joined.json"),
   readJson("examples/server/participant-online.json"),
   readJson("examples/server/participant-offline.json"),
   readJson("examples/server/participant-left.json"),
   readJson("examples/server/room-closed.json"),
+  readJson("examples/server/chat-message.json"),
   readJson("examples/server/error.json"),
   readJson("examples/server/unknown-event.json"),
 ]);
 
 assertValid(validateProblem, problemExample, "Problem Details example");
 assertValid(validateClientEvent, heartbeatExample, "Client event example");
+assertValid(
+  validateClientEvent,
+  chatMessageClientExample,
+  "Client chat message example",
+);
 assertValid(validateServerEvent, snapshotExample, "Server snapshot example");
 assertValid(
   validateServerEvent,
@@ -100,6 +109,11 @@ assertValid(
   validateServerEvent,
   roomClosedExample,
   "Server room closed example",
+);
+assertValid(
+  validateServerEvent,
+  chatMessageServerExample,
+  "Server chat message example",
 );
 assertValid(validateServerEvent, errorExample, "Server error example");
 assertValid(

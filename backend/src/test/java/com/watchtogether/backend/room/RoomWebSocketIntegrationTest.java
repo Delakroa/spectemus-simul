@@ -43,12 +43,15 @@ import tools.jackson.databind.ObjectMapper;
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
             "management.health.redis.enabled=false",
-            "watch-together.websocket.container-limits-enabled=true"
+            "watch-together.websocket.container-limits-enabled=true",
+            "watch-together.websocket.chat-rate-limit=2"
         })
 class RoomWebSocketIntegrationTest {
 
     private static final String ROOM_ID = "AbCdEfGhIjKlMnOpQrStUv";
     private static final String MISSING_ROOM_ID = "0000000000000000000000";
+    private static final String UUID_PATTERN =
+            "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
     private static final String SESSION = "A".repeat(43);
     private static final String GUEST_SESSION = "B".repeat(43);
     private static final UUID HOST_ID =
@@ -307,6 +310,106 @@ class RoomWebSocketIntegrationTest {
         assertThat(connection.listener().closeCode()).isEqualTo(1007);
     }
 
+    @Test
+    void broadcastsChatMessageToEveryRoomSession() throws Exception {
+        currentRoom.set(room(3, true));
+        Connection host = connect(ROOM_ID, SESSION, null);
+        host.listener().nextText();
+        Connection guest = connect(ROOM_ID, GUEST_SESSION, null);
+        guest.listener().nextText();
+
+        guest.webSocket()
+                .sendText(chatJson(GUEST_ID, UUID.randomUUID(), "Погнали смотреть", 3), true)
+                .join();
+
+        JsonNode hostEvent = objectMapper.readTree(host.listener().nextText());
+        JsonNode guestEvent = objectMapper.readTree(guest.listener().nextText());
+
+        assertThat(hostEvent.get("type").stringValue()).isEqualTo("chat.message");
+        assertThat(hostEvent.get("roomId").stringValue()).isEqualTo(ROOM_ID);
+        assertThat(hostEvent.get("participantId").stringValue()).isEqualTo(GUEST_ID.toString());
+        assertThat(hostEvent.get("roomVersion").asLong()).isEqualTo(3);
+        assertThat(hostEvent.at("/payload/messageId").stringValue()).matches(UUID_PATTERN);
+        assertThat(hostEvent.at("/payload/participantId").stringValue())
+                .isEqualTo(GUEST_ID.toString());
+        assertThat(hostEvent.at("/payload/displayName").stringValue()).isEqualTo("Guest");
+        assertThat(hostEvent.at("/payload/text").stringValue()).isEqualTo("Погнали смотреть");
+        assertThat(hostEvent.at("/payload/sentAt").stringValue()).isNotBlank();
+        assertThat(guestEvent).isEqualTo(hostEvent);
+        assertThat(host.listener().isClosed()).isFalse();
+        assertThat(guest.listener().isClosed()).isFalse();
+
+        close(guest, "test complete");
+        close(host, "test complete");
+    }
+
+    @Test
+    void rejectsOversizedChatMessageWithErrorEventAndKeepsConnectionOpen() throws Exception {
+        Connection connection = connect(ROOM_ID, SESSION, null);
+        connection.listener().nextText();
+
+        connection.webSocket()
+                .sendText(chatJson(HOST_ID, UUID.randomUUID(), "a".repeat(1001), 2), true)
+                .join();
+
+        JsonNode error = objectMapper.readTree(connection.listener().nextText());
+
+        assertThat(error.get("type").stringValue()).isEqualTo("error");
+        assertThat(error.get("participantId").stringValue()).isEqualTo(HOST_ID.toString());
+        assertThat(error.at("/payload/code").stringValue()).isEqualTo("VALIDATION_FAILED");
+        assertThat(error.at("/payload/status").asInt()).isEqualTo(422);
+        assertThat(error.at("/payload/retryable").booleanValue()).isFalse();
+        assertThat(error.at("/payload/instance").stringValue())
+                .isEqualTo("/api/v1/rooms/" + ROOM_ID + "/events");
+        assertThat(connection.listener().isClosed()).isFalse();
+
+        close(connection, "test complete");
+    }
+
+    @Test
+    void throttlesChatMessagesWithRetryableRateLimitedErrorEvent() throws Exception {
+        currentRoom.set(room(3, true));
+        Connection guest = connect(ROOM_ID, GUEST_SESSION, null);
+        guest.listener().nextText();
+
+        guest.webSocket().sendText(chatJson(GUEST_ID, UUID.randomUUID(), "one", 3), true).join();
+        assertThat(objectMapper.readTree(guest.listener().nextText()).get("type").stringValue())
+                .isEqualTo("chat.message");
+        guest.webSocket().sendText(chatJson(GUEST_ID, UUID.randomUUID(), "two", 3), true).join();
+        assertThat(objectMapper.readTree(guest.listener().nextText()).get("type").stringValue())
+                .isEqualTo("chat.message");
+        guest.webSocket().sendText(chatJson(GUEST_ID, UUID.randomUUID(), "three", 3), true).join();
+
+        JsonNode error = objectMapper.readTree(guest.listener().nextText());
+
+        assertThat(error.get("type").stringValue()).isEqualTo("error");
+        assertThat(error.at("/payload/code").stringValue()).isEqualTo("RATE_LIMITED");
+        assertThat(error.at("/payload/status").asInt()).isEqualTo(429);
+        assertThat(error.at("/payload/retryable").booleanValue()).isTrue();
+        assertThat(guest.listener().isClosed()).isFalse();
+
+        close(guest, "test complete");
+    }
+
+    @Test
+    void closesChatMessageWithMissingClientMessageIdUsingBadData() throws Exception {
+        Connection connection = connect(ROOM_ID, SESSION, null);
+        connection.listener().nextText();
+
+        String json = objectMapper.writeValueAsString(java.util.Map.of(
+                "schemaVersion", 1,
+                "eventId", UUID.randomUUID(),
+                "type", "chat.message",
+                "roomId", ROOM_ID,
+                "participantId", HOST_ID,
+                "expectedRoomVersion", 2,
+                "occurredAt", "2026-07-09T10:00:05Z",
+                "payload", java.util.Map.of("text", "hi")));
+        connection.webSocket().sendText(json, true).join();
+
+        assertThat(connection.listener().closeCode()).isEqualTo(1007);
+    }
+
     private void assertHandshakeStatus(
             String roomId, String sessionCredential, String query, int expectedStatus) {
         assertThatThrownBy(() -> connect(roomId, sessionCredential, query))
@@ -386,6 +489,20 @@ class RoomWebSocketIntegrationTest {
                 "expectedRoomVersion", roomVersion,
                 "occurredAt", "2026-07-09T10:00:05Z",
                 "payload", java.util.Map.of("sentAt", "2026-07-09T10:00:05Z"));
+        return objectMapper.writeValueAsString(payload);
+    }
+
+    private String chatJson(UUID participantId, UUID clientMessageId, String text, long roomVersion)
+            throws Exception {
+        var payload = java.util.Map.of(
+                "schemaVersion", 1,
+                "eventId", UUID.randomUUID(),
+                "type", "chat.message",
+                "roomId", ROOM_ID,
+                "participantId", participantId,
+                "expectedRoomVersion", roomVersion,
+                "occurredAt", "2026-07-09T10:00:05Z",
+                "payload", java.util.Map.of("clientMessageId", clientMessageId, "text", text));
         return objectMapper.writeValueAsString(payload);
     }
 

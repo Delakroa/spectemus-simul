@@ -35,6 +35,14 @@ const roomClosedPayloadSchema = z.object({
   closedAt: z.iso.datetime(),
 });
 
+const chatMessagePayloadSchema = z.object({
+  messageId: z.uuid(),
+  participantId: z.uuid(),
+  displayName: z.string().min(1).max(64),
+  text: z.string().min(1).max(1000),
+  sentAt: z.iso.datetime(),
+});
+
 type EventEnvelope = z.infer<typeof eventEnvelopeSchema>;
 
 export type RoomSnapshotEvent = EventEnvelope & {
@@ -62,6 +70,11 @@ export type RoomClosedEvent = EventEnvelope & {
   payload: z.infer<typeof roomClosedPayloadSchema>;
 };
 
+export type ChatMessageEvent = EventEnvelope & {
+  type: "chat.message";
+  payload: z.infer<typeof chatMessagePayloadSchema>;
+};
+
 export type UnknownRoomServerEvent = EventEnvelope & {
   known: false;
 };
@@ -71,7 +84,8 @@ export type KnownRoomServerEvent =
   | ParticipantJoinedEvent
   | ParticipantLeftEvent
   | ParticipantPresenceEvent
-  | RoomClosedEvent;
+  | RoomClosedEvent
+  | ChatMessageEvent;
 
 export type RoomServerEvent = KnownRoomServerEvent | UnknownRoomServerEvent;
 
@@ -109,6 +123,12 @@ export function parseRoomServerEvent(value: unknown): RoomServerEvent {
         ...envelope,
         type: "room.closed",
         payload: roomClosedPayloadSchema.parse(envelope.payload),
+      };
+    case "chat.message":
+      return {
+        ...envelope,
+        type: "chat.message",
+        payload: chatMessagePayloadSchema.parse(envelope.payload),
       };
     default:
       return {
@@ -170,6 +190,9 @@ export function applyRoomServerEvent(
         roomVersion: event.roomVersion,
         updatedAt: event.payload.closedAt,
       };
+    case "chat.message":
+      // Chat messages are transient and never mutate authoritative room state.
+      return room;
   }
 }
 
@@ -195,6 +218,8 @@ export function describeRoomServerEvent(event: RoomServerEvent) {
       return "Участник офлайн";
     case "room.closed":
       return event.payload.reason === "EXPIRED" ? "Комната истекла" : "Комната закрыта";
+    case "chat.message":
+      return `${event.payload.displayName}: ${event.payload.text}`;
   }
 }
 

@@ -98,9 +98,58 @@ record RoomServerEvent(
                 new ParticipantLeftPayload(participantId, reason));
     }
 
+    static RoomServerEvent chatMessage(
+            String roomId,
+            UUID participantId,
+            String displayName,
+            long roomVersion,
+            UUID messageId,
+            String text,
+            Instant sentAt) {
+        return new RoomServerEvent(
+                CURRENT_SCHEMA_VERSION,
+                UUID.randomUUID(),
+                "chat.message",
+                roomId,
+                participantId,
+                roomVersion,
+                sentAt,
+                new ChatMessagePayload(messageId, participantId, displayName, text, sentAt));
+    }
+
+    static RoomServerEvent error(
+            String roomId,
+            UUID participantId,
+            long roomVersion,
+            ProblemDetails problem,
+            Instant occurredAt) {
+        return new RoomServerEvent(
+                CURRENT_SCHEMA_VERSION,
+                UUID.randomUUID(),
+                "error",
+                roomId,
+                participantId,
+                roomVersion,
+                occurredAt,
+                problem);
+    }
+
     record ParticipantPresencePayload(UUID participantId, boolean online, Instant updatedAt) {}
 
     record RoomClosedPayload(RoomClosedReason reason, Instant closedAt) {}
 
     record ParticipantLeftPayload(UUID participantId, ParticipantLeftReason reason) {}
+
+    record ChatMessagePayload(
+            UUID messageId, UUID participantId, String displayName, String text, Instant sentAt) {}
+
+    record ProblemDetails(
+            String type,
+            String title,
+            int status,
+            String code,
+            String detail,
+            String instance,
+            UUID correlationId,
+            boolean retryable) {}
 }

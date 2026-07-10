@@ -3,6 +3,7 @@ package com.watchtogether.backend.room;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
@@ -16,6 +17,7 @@ import com.watchtogether.backend.room.RoomRealtimeStore.AuthenticationResult;
 import com.watchtogether.backend.room.RoomRealtimeStore.PresenceOutcome;
 import com.watchtogether.backend.room.RoomRealtimeStore.PresenceResult;
 import com.watchtogether.backend.room.RoomCreationStore.StoredRoom;
+import com.watchtogether.backend.room.RoomServerEvent.ProblemDetails;
 
 import org.springframework.stereotype.Component;
 import org.springframework.scheduling.TaskScheduler;
@@ -24,15 +26,19 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
 class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPublisher {
 
     static final int MAX_TEXT_MESSAGE_BYTES = 16 * 1024;
+    static final int MAX_CHAT_TEXT_LENGTH = 1000;
     private static final String CONNECTION_ID_ATTRIBUTE = "watchTogether.connectionId";
     private static final int CURRENT_SCHEMA_VERSION = 1;
     private static final String HEARTBEAT_TYPE = "participant.heartbeat";
+    private static final String CHAT_MESSAGE_TYPE = "chat.message";
+    private static final String PROBLEM_TYPE_PREFIX = "https://watch-together.local/problems/";
 
     private final RoomRealtimeStore store;
     private final RoomLifecycleStore lifecycleStore;
@@ -44,6 +50,8 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
             new ConcurrentHashMap<>();
     private final Map<String, Set<WebSocketSession>> sessionsByRoom = new ConcurrentHashMap<>();
     private final Map<String, ScheduledFuture<?>> expiryTasksByRoom = new ConcurrentHashMap<>();
+    private final Map<ParticipantConnectionKey, ChatRateWindow> chatRateByParticipant =
+            new ConcurrentHashMap<>();
 
     RoomWebSocketHandler(
             RoomRealtimeStore store,
@@ -111,12 +119,17 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
             return;
         }
 
-        if (!HEARTBEAT_TYPE.equals(event.type())) {
+        if (HEARTBEAT_TYPE.equals(event.type())) {
+            handleHeartbeat(session, event);
+        } else if (CHAT_MESSAGE_TYPE.equals(event.type())) {
+            handleChatMessage(session, event);
+        } else {
             session.close(CloseStatus.BAD_DATA);
-            return;
         }
+    }
 
-        if (!validHeartbeat(session, event)) {
+    private void handleHeartbeat(WebSocketSession session, ClientEvent event) throws IOException {
+        if (!validEnvelope(session, event) || heartbeatPayload(event) == null) {
             session.close(CloseStatus.BAD_DATA);
             return;
         }
@@ -149,6 +162,88 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
         broadcastPresenceChange(roomId, presence, null);
     }
 
+    private void handleChatMessage(WebSocketSession session, ClientEvent event) throws IOException {
+        ChatPayload payload = chatPayload(event);
+        if (!validEnvelope(session, event)
+                || payload == null
+                || payload.clientMessageId() == null) {
+            session.close(CloseStatus.BAD_DATA);
+            return;
+        }
+
+        Map<String, Object> attributes = session.getAttributes();
+        String roomId = requiredString(
+                attributes, RoomWebSocketAuthenticationInterceptor.ROOM_ID_ATTRIBUTE);
+        String sessionHash = requiredString(
+                attributes, RoomWebSocketAuthenticationInterceptor.SESSION_HASH_ATTRIBUTE);
+        UUID participantId = requiredUuid(
+                attributes, RoomWebSocketAuthenticationInterceptor.PARTICIPANT_ID_ATTRIBUTE);
+
+        if (!validChatText(payload.text())) {
+            sendError(
+                    session,
+                    roomId,
+                    participantId,
+                    event.expectedRoomVersion(),
+                    422,
+                    "VALIDATION_FAILED",
+                    "chat-message-invalid",
+                    "Сообщение отклонено",
+                    "Сообщение должно быть от 1 до " + MAX_CHAT_TEXT_LENGTH
+                            + " символов без управляющих символов.",
+                    false);
+            return;
+        }
+
+        if (!allowChatMessage(
+                new ParticipantConnectionKey(roomId, participantId), Instant.now(clock))) {
+            sendError(
+                    session,
+                    roomId,
+                    participantId,
+                    event.expectedRoomVersion(),
+                    429,
+                    "RATE_LIMITED",
+                    "chat-rate-limited",
+                    "Слишком много сообщений",
+                    "Подождите несколько секунд перед следующим сообщением.",
+                    true);
+            return;
+        }
+
+        AuthenticationResult authentication = store.authenticateAndLoad(roomId, sessionHash);
+        if (authentication.outcome() != AuthenticationOutcome.AUTHENTICATED
+                || !participantId.equals(authentication.participantId())) {
+            session.close(CloseStatus.POLICY_VIOLATION);
+            return;
+        }
+
+        StoredRoom room = authentication.room();
+        if (room.status() == RoomStatus.CLOSED || room.status() == RoomStatus.EXPIRED) {
+            return;
+        }
+
+        String displayName = room.participants().stream()
+                .filter(participant -> participant.participantId().equals(participantId))
+                .map(participant -> participant.displayName())
+                .findFirst()
+                .orElse(null);
+        if (displayName == null) {
+            session.close(CloseStatus.POLICY_VIOLATION);
+            return;
+        }
+
+        var chatEvent = RoomServerEvent.chatMessage(
+                roomId,
+                participantId,
+                displayName,
+                room.roomVersion(),
+                UUID.randomUUID(),
+                payload.text(),
+                Instant.now(clock));
+        broadcast(roomId, objectMapper.writeValueAsString(chatEvent), null);
+    }
+
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status)
             throws Exception {
@@ -170,7 +265,7 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
         broadcastPresenceChange(roomId, presence, session);
     }
 
-    private boolean validHeartbeat(WebSocketSession session, ClientEvent event) {
+    private boolean validEnvelope(WebSocketSession session, ClientEvent event) {
         if (event.schemaVersion() == null
                 || event.schemaVersion() != CURRENT_SCHEMA_VERSION
                 || event.eventId() == null
@@ -179,8 +274,7 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
                 || event.expectedRoomVersion() == null
                 || event.expectedRoomVersion() < 0
                 || event.occurredAt() == null
-                || event.payload() == null
-                || event.payload().sentAt() == null) {
+                || event.payload() == null) {
             return false;
         }
 
@@ -190,6 +284,100 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
                 && event.participantId().equals(optionalUuid(
                         attributes,
                         RoomWebSocketAuthenticationInterceptor.PARTICIPANT_ID_ATTRIBUTE));
+    }
+
+    private HeartbeatPayload heartbeatPayload(ClientEvent event) {
+        if (event.payload() == null) {
+            return null;
+        }
+        try {
+            HeartbeatPayload payload =
+                    objectMapper.treeToValue(event.payload(), HeartbeatPayload.class);
+            return payload.sentAt() == null ? null : payload;
+        } catch (Exception exception) {
+            return null;
+        }
+    }
+
+    private ChatPayload chatPayload(ClientEvent event) {
+        if (event.payload() == null) {
+            return null;
+        }
+        try {
+            return objectMapper.treeToValue(event.payload(), ChatPayload.class);
+        } catch (Exception exception) {
+            return null;
+        }
+    }
+
+    private boolean validChatText(String text) {
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+        int length = text.codePointCount(0, text.length());
+        if (length < 1 || length > MAX_CHAT_TEXT_LENGTH) {
+            return false;
+        }
+        return text.codePoints().noneMatch(RoomWebSocketHandler::isDisallowedControlChar);
+    }
+
+    private static boolean isDisallowedControlChar(int codePoint) {
+        if (codePoint == '\n' || codePoint == '\t') {
+            return false;
+        }
+        return codePoint < 0x20 || codePoint == 0x7F;
+    }
+
+    private boolean allowChatMessage(ParticipantConnectionKey key, Instant now) {
+        Duration window = properties.chatRateWindow();
+        ChatRateWindow updated = chatRateByParticipant.compute(key, (ignored, existing) -> {
+            if (existing == null
+                    || Duration.between(existing.windowStart(), now).compareTo(window) >= 0) {
+                return new ChatRateWindow(now, 1);
+            }
+            return new ChatRateWindow(existing.windowStart(), existing.count() + 1);
+        });
+        return updated.count() <= properties.chatRateLimit();
+    }
+
+    private void sendError(
+            WebSocketSession session,
+            String roomId,
+            UUID participantId,
+            long roomVersion,
+            int status,
+            String code,
+            String problemSlug,
+            String title,
+            String detail,
+            boolean retryable)
+            throws IOException {
+        if (!session.isOpen()) {
+            return;
+        }
+        var problem = new ProblemDetails(
+                PROBLEM_TYPE_PREFIX + problemSlug,
+                title,
+                status,
+                code,
+                detail,
+                "/api/v1/rooms/" + roomId + "/events",
+                UUID.randomUUID(),
+                retryable);
+        var event = RoomServerEvent.error(
+                roomId, participantId, roomVersion, problem, Instant.now(clock));
+        session.sendMessage(new TextMessage(objectMapper.writeValueAsString(event)));
+    }
+
+    private void broadcast(String roomId, String payload, WebSocketSession excludedSession)
+            throws IOException {
+        String excludedId = excludedSession == null ? null : excludedSession.getId();
+        Set<WebSocketSession> roomSessions = sessionsByRoom.getOrDefault(roomId, Set.of());
+        for (WebSocketSession roomSession : roomSessions) {
+            if (roomSession.isOpen() && !Objects.equals(roomSession.getId(), excludedId)) {
+                roomSession.sendMessage(new TextMessage(payload));
+            }
+        }
     }
 
     private boolean presenceAccepted(PresenceResult presence, UUID participantId) {
@@ -215,12 +403,17 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
             roomSessions.remove(session);
             if (roomSessions.isEmpty()) {
                 sessionsByRoom.remove(roomId, roomSessions);
+                forgetChatRateWindows(roomId);
             }
         }
 
         connectionsByParticipant.remove(
                 new ParticipantConnectionKey(roomId, participantId),
                 new ActiveConnection(connectionId, session));
+    }
+
+    private void forgetChatRateWindows(String roomId) {
+        chatRateByParticipant.keySet().removeIf(key -> key.roomId().equals(roomId));
     }
 
     private void closePrevious(ActiveConnection previous) throws IOException {
@@ -283,6 +476,7 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
         if (expiryTask != null) {
             expiryTask.cancel(false);
         }
+        forgetChatRateWindows(room.roomId());
 
         var event = RoomServerEvent.roomClosed(
                 room.roomId(),
@@ -388,7 +582,11 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
             UUID participantId,
             Long expectedRoomVersion,
             Instant occurredAt,
-            HeartbeatPayload payload) {}
+            JsonNode payload) {}
 
     private record HeartbeatPayload(Instant sentAt) {}
+
+    private record ChatPayload(UUID clientMessageId, String text) {}
+
+    private record ChatRateWindow(Instant windowStart, int count) {}
 }

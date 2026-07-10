@@ -22,6 +22,7 @@ import {
   describeRoomServerEvent,
   isKnownRoomServerEvent,
   parseRoomServerEvent,
+  type KnownRoomServerEvent,
   type RoomServerEvent,
 } from "./room-events";
 import {
@@ -52,6 +53,8 @@ import {
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const MAX_EVENT_LOG_ITEMS = 8;
+const MAX_CHAT_MESSAGES = 200;
+const MAX_CHAT_MESSAGE_LENGTH = 1000;
 const HOST_SECRET_STORAGE_PREFIX = "watch-together.host-secret.";
 
 export type RoomConnectionStatus = "idle" | "connecting" | "open" | "closed" | "error";
@@ -69,7 +72,18 @@ export type RoomEventLogEntry = {
   type: string;
 };
 
+export type ChatMessageEntry = {
+  id: string;
+  kind: "user" | "system";
+  participantId: string | null;
+  displayName: string | null;
+  text: string;
+  sentAt: string;
+};
+
 export type RoomSessionState = {
+  chatError: string | null;
+  chatMessages: ChatMessageEntry[];
   connectionStatus: RoomConnectionStatus;
   error: string | null;
   events: RoomEventLogEntry[];
@@ -109,6 +123,8 @@ export type RoomSessionState = {
 };
 
 const initialState: RoomSessionState = {
+  chatError: null,
+  chatMessages: [],
   connectionStatus: "idle",
   error: null,
   events: [],
@@ -721,6 +737,47 @@ export function useRoomSession(routeRoomId?: string) {
     );
   }, []);
 
+  const sendChatMessage = useCallback((text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      return false;
+    }
+    if (trimmed.length > MAX_CHAT_MESSAGE_LENGTH) {
+      setState((current) => ({
+        ...current,
+        chatError: `Сообщение длиннее ${MAX_CHAT_MESSAGE_LENGTH} символов.`,
+      }));
+      return false;
+    }
+
+    const participant = participantRef.current;
+    const room = roomRef.current;
+    const socket = socketRef.current;
+    if (!participant || !room || !socket || socket.readyState !== socket.OPEN) {
+      setState((current) => ({ ...current, chatError: "Нет соединения с комнатой." }));
+      return false;
+    }
+
+    const occurredAt = new Date().toISOString();
+    socket.send(
+      JSON.stringify({
+        schemaVersion: 1,
+        eventId: createEventId(),
+        type: "chat.message",
+        roomId: room.roomId,
+        participantId: participant.participantId,
+        expectedRoomVersion: room.roomVersion,
+        occurredAt,
+        payload: {
+          clientMessageId: createEventId(),
+          text: trimmed,
+        },
+      }),
+    );
+    setState((current) => (current.chatError ? { ...current, chatError: null } : current));
+    return true;
+  }, []);
+
   const connectRoomEvents = useCallback(
     (room: RoomSnapshot, participant: Participant) => {
       disconnectSocket("connecting");
@@ -736,6 +793,8 @@ export function useRoomSession(routeRoomId?: string) {
 
       participantRef.current = participant;
       roomRef.current = room;
+
+      setState((current) => ({ ...current, chatError: null, chatMessages: [] }));
 
       const socket = new WebSocket(resolveRoomEventsUrl(room.roomId));
       socketRef.current = socket;
@@ -1034,25 +1093,107 @@ export function useRoomSession(routeRoomId?: string) {
     restore,
     routeRoomId,
     selectFile,
+    sendChatMessage,
     setRemotePlaybackElements,
     stopFilePublication,
   };
 }
 
 function applyEventToState(current: RoomSessionState, event: RoomServerEvent): RoomSessionState {
-  const nextRoom = isKnownRoomServerEvent(event)
-    ? applyRoomServerEvent(current.room, event)
-    : current.room;
+  if (!isKnownRoomServerEvent(event)) {
+    if (event.type === "error") {
+      const problem = extractProblem(event.payload);
+      const message = problem.detail ?? problem.title ?? "Действие отклонено сервером.";
+      if (problem.code === "RATE_LIMITED" || problem.code === "VALIDATION_FAILED") {
+        return { ...current, chatError: message };
+      }
+      return { ...current, error: message };
+    }
+
+    return {
+      ...current,
+      error: null,
+      events: addServerEvent(current.events, event),
+    };
+  }
+
+  if (event.type === "chat.message") {
+    return {
+      ...current,
+      error: null,
+      chatError: null,
+      chatMessages: appendChatMessage(current.chatMessages, {
+        id: event.payload.messageId,
+        kind: "user",
+        participantId: event.payload.participantId,
+        displayName: event.payload.displayName,
+        text: event.payload.text,
+        sentAt: event.payload.sentAt,
+      }),
+    };
+  }
+
+  const nextRoom = applyRoomServerEvent(current.room, event);
   const nextParticipant = syncParticipant(current.participant, nextRoom);
+  const systemText = systemChatText(event, current.room);
+  const nextChatMessages = systemText
+    ? appendChatMessage(current.chatMessages, {
+        id: event.eventId,
+        kind: "system",
+        participantId: null,
+        displayName: null,
+        text: systemText,
+        sentAt: event.occurredAt,
+      })
+    : current.chatMessages;
 
   return {
     ...current,
+    chatMessages: nextChatMessages,
     connectionStatus: event.type === "room.closed" ? "closed" : current.connectionStatus,
     error: null,
     events: addServerEvent(current.events, event),
     participant: nextParticipant,
     pendingAction: event.type === "room.closed" ? null : current.pendingAction,
     room: nextRoom,
+  };
+}
+
+function systemChatText(event: KnownRoomServerEvent, room: RoomSnapshot | null): string | null {
+  switch (event.type) {
+    case "participant.joined":
+      return `${event.payload.displayName} присоединился к комнате`;
+    case "participant.left": {
+      const name = room?.participants.find(
+        (participant) => participant.participantId === event.payload.participantId,
+      )?.displayName;
+      return `${name ?? "Участник"} покинул комнату`;
+    }
+    case "room.closed":
+      return event.payload.reason === "EXPIRED" ? "Комната истекла" : "Комната закрыта";
+    default:
+      return null;
+  }
+}
+
+function appendChatMessage(messages: ChatMessageEntry[], entry: ChatMessageEntry) {
+  return [...messages, entry].slice(-MAX_CHAT_MESSAGES);
+}
+
+function extractProblem(payload: unknown): {
+  code?: string;
+  detail?: string;
+  title?: string;
+} {
+  if (!payload || typeof payload !== "object") {
+    return {};
+  }
+
+  const record = payload as Record<string, unknown>;
+  return {
+    code: typeof record.code === "string" ? record.code : undefined,
+    detail: typeof record.detail === "string" ? record.detail : undefined,
+    title: typeof record.title === "string" ? record.title : undefined,
   };
 }
 

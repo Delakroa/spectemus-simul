@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "eventId": "b1a1f2c3-4d5e-4a6b-8c7d-9e0f1a2b3c4d",
+  "type": "chat.message",
+  "roomId": "AbCdEfGhIjKlMnOpQrStUv",
+  "participantId": "8e7d79a8-a49f-48cc-a409-f07890dd3218",
+  "expectedRoomVersion": 42,
+  "occurredAt": "2026-07-09T07:32:10Z",
+  "payload": {
+    "clientMessageId": "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
+    "text": "Погнали смотреть!"
+  }
+}

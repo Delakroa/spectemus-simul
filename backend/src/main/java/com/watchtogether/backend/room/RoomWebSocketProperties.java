@@ -5,9 +5,12 @@ import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties("watch-together.websocket")
-public record RoomWebSocketProperties(Duration presenceTtl) {
+public record RoomWebSocketProperties(
+        Duration presenceTtl, Integer chatRateLimit, Duration chatRateWindow) {
 
     private static final Duration DEFAULT_PRESENCE_TTL = Duration.ofSeconds(30);
+    private static final int DEFAULT_CHAT_RATE_LIMIT = 5;
+    private static final Duration DEFAULT_CHAT_RATE_WINDOW = Duration.ofSeconds(5);
 
     public RoomWebSocketProperties {
         if (presenceTtl == null) {
@@ -16,6 +19,20 @@ public record RoomWebSocketProperties(Duration presenceTtl) {
         if (presenceTtl.isZero() || presenceTtl.isNegative()) {
             throw new IllegalArgumentException(
                     "watch-together.websocket.presence-ttl must be positive");
+        }
+        if (chatRateLimit == null) {
+            chatRateLimit = DEFAULT_CHAT_RATE_LIMIT;
+        }
+        if (chatRateLimit < 1) {
+            throw new IllegalArgumentException(
+                    "watch-together.websocket.chat-rate-limit must be positive");
+        }
+        if (chatRateWindow == null) {
+            chatRateWindow = DEFAULT_CHAT_RATE_WINDOW;
+        }
+        if (chatRateWindow.isZero() || chatRateWindow.isNegative()) {
+            throw new IllegalArgumentException(
+                    "watch-together.websocket.chat-rate-window must be positive");
         }
     }
 }
