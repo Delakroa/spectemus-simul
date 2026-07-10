@@ -115,6 +115,15 @@ async function readJsonResponse(response, label) {
   }
 }
 
+function decodeJwtPayload(token) {
+  const parts = token.split(".");
+  if (parts.length !== 3) {
+    throw new Error("LiveKit token is not a JWT");
+  }
+
+  return JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+}
+
 function connectRoomEvents(url, cookie) {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(url, {
@@ -326,6 +335,7 @@ if (replayedRoom.status !== 201) {
 }
 
 const roomId = createdRoom.body.room?.roomId;
+const hostParticipantId = createdRoom.body.room?.hostParticipantId;
 const hostSecret = createdRoom.body.hostSecret;
 const invitePath = createdRoom.body.invitePath;
 const sessionCookie = createdRoom.headers.get("set-cookie") ?? "";
@@ -333,6 +343,9 @@ const hostCookie = sessionCookie.split(";", 1)[0];
 
 if (!/^[A-Za-z0-9_-]{22}$/.test(roomId)) {
   throw new Error("create room returned invalid roomId");
+}
+if (!/^[0-9a-f-]{36}$/.test(hostParticipantId)) {
+  throw new Error("create room returned invalid host participant id");
 }
 if (!/^[A-Za-z0-9_-]{43}$/.test(hostSecret)) {
   throw new Error("create room returned invalid hostSecret");
@@ -423,6 +436,66 @@ if (
   throw new Error("guest room restore returned invalid state");
 }
 
+const hostToken = await postJson(
+  `${appUrl}/api/v1/rooms/${roomId}/livekit-token`,
+  undefined,
+  { Cookie: hostCookie },
+);
+if (
+  hostToken.status !== 200 ||
+  hostToken.body.liveKitUrl !== livekitUrl.replace(/^http/, "ws") ||
+  hostToken.body.roomName !== roomId ||
+  hostToken.body.participantId !== hostParticipantId ||
+  hostToken.body.participantIdentity !== hostParticipantId ||
+  hostToken.body.role !== "HOST" ||
+  hostToken.body.canPublish !== true ||
+  hostToken.body.canPublishData !== true
+) {
+  throw new Error("host LiveKit token response returned invalid grants");
+}
+
+const hostTokenPayload = decodeJwtPayload(hostToken.body.token);
+if (
+  hostTokenPayload.iss !== (process.env.LIVEKIT_API_KEY ?? "devkey") ||
+  hostTokenPayload.sub !== hostParticipantId ||
+  hostTokenPayload.video?.room !== roomId ||
+  hostTokenPayload.video?.roomJoin !== true ||
+  hostTokenPayload.video?.canSubscribe !== true ||
+  hostTokenPayload.video?.canPublish !== true ||
+  hostTokenPayload.video?.canPublishData !== true
+) {
+  throw new Error("host LiveKit token JWT returned invalid claims");
+}
+
+const guestToken = await postJson(
+  `${appUrl}/api/v1/rooms/${roomId}/livekit-token`,
+  undefined,
+  { Cookie: guestCookie },
+);
+if (
+  guestToken.status !== 200 ||
+  guestToken.body.roomName !== roomId ||
+  guestToken.body.participantId !== guestParticipantId ||
+  guestToken.body.participantIdentity !== guestParticipantId ||
+  guestToken.body.role !== "GUEST" ||
+  guestToken.body.canPublish !== false ||
+  guestToken.body.canPublishData !== false
+) {
+  throw new Error("guest LiveKit token response returned invalid grants");
+}
+
+const guestTokenPayload = decodeJwtPayload(guestToken.body.token);
+if (
+  guestTokenPayload.sub !== guestParticipantId ||
+  guestTokenPayload.video?.room !== roomId ||
+  guestTokenPayload.video?.roomJoin !== true ||
+  guestTokenPayload.video?.canSubscribe !== true ||
+  guestTokenPayload.video?.canPublish !== false ||
+  guestTokenPayload.video?.canPublishData !== false
+) {
+  throw new Error("guest LiveKit token JWT returned invalid claims");
+}
+
 const eventsUrl = new URL(`/api/v1/rooms/${roomId}/events`, appUrl);
 eventsUrl.protocol = eventsUrl.protocol === "https:" ? "wss:" : "ws:";
 
@@ -501,6 +574,7 @@ if (
 console.log("[ok] guest join through proxy: joined");
 console.log("[ok] guest join session replay: restored");
 console.log("[ok] room restore through proxy: restored");
+console.log("[ok] LiveKit token through proxy: minted");
 console.log("[ok] room WebSocket participant joined: broadcast");
 console.log("[ok] room capacity: enforced");
 console.log("[ok] unavailable room: hidden");

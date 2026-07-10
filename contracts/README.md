@@ -6,7 +6,7 @@
 
 ## Состав
 
-- `openapi.yaml`: OpenAPI 3.1 для system API и P2 room lifecycle.
+- `openapi.yaml`: OpenAPI 3.1 для system API, room lifecycle и product media-token boundary.
 - `schemas/common.schema.json`: общие room, participant и media models.
 - `schemas/problem-details.schema.json`: единая REST/WebSocket error model.
 - `schemas/websocket-client-event.schema.json`: допустимые команды browser -> backend.
@@ -25,6 +25,7 @@
 - Host secret передаётся отдельно и никогда не включается в invite path.
 - `POST /api/v1/rooms` требует `Idempotency-Key`.
 - `GET /api/v1/rooms/{roomId}` восстанавливает текущего participant и room snapshot по session cookie.
+- `POST /api/v1/rooms/{roomId}/livekit-token` выдаёт LiveKit JWT по session cookie и роли participant.
 - `POST /api/v1/rooms/{roomId}/leave` удаляет текущего guest participant по session cookie.
 - `POST /api/v1/rooms/{roomId}/close` требует host session cookie и `X-Host-Secret`.
 - Внешние ответы не содержат локальные пути, movie bytes, stack trace или инфраструктурные секреты.

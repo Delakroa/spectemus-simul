@@ -82,6 +82,6 @@ WT-209 добавил восстановление room session:
 - после restore frontend снова подключает WebSocket и продолжает heartbeat;
 - host secret сохраняется только в `sessionStorage` текущего browser session, чтобы host мог закрыть комнату после refresh.
 
-LiveKit, media lifecycle, чат и голос остаются вне текущего frontend product UI.
+WT-301 добавляет typed API client для `POST /api/v1/rooms/{roomId}/livekit-token`. Сам LiveKit client lifecycle, выбор локального файла, publish media tracks, playback controls, чат и голос остаются вне текущего frontend product UI.
 
 REST, WebSocket и error contracts находятся в [`../contracts`](../contracts/README.md). Все внешние payload должны проходить runtime validation до попадания в состояние приложения.

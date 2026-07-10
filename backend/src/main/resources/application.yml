@@ -20,6 +20,11 @@ watch-together:
     cleanup-grace: ${ROOM_CLEANUP_GRACE:5m}
   websocket:
     presence-ttl: ${WEBSOCKET_PRESENCE_TTL:30s}
+  livekit:
+    url: ${LIVEKIT_URL:ws://127.0.0.1:7880}
+    api-key: ${LIVEKIT_API_KEY:devkey}
+    api-secret: ${LIVEKIT_API_SECRET:devsecretdevsecretdevsecretdevsecret}
+    token-ttl: ${LIVEKIT_TOKEN_TTL:10m}
 
 management:
   endpoints:

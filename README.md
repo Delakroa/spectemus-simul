@@ -25,8 +25,9 @@ P0 технически подтверждён.
 - WT-207 реализовал `participant.joined` для активных WebSocket-сессий комнаты.
 - WT-208 подключил frontend к create/join flow и backend room WebSocket events.
 - WT-209 реализовал восстановление room session после refresh через `GET /api/v1/rooms/{roomId}`.
+- WT-301 добавляет выдачу LiveKit product tokens через backend room/access модель.
 
-P1 foundation завершён. Проект находится в P2 room lifecycle. Chat, voice и product-токены LiveKit намеренно оставлены для следующих тикетов.
+P1 foundation и P2 room lifecycle завершены. Проект находится в P3 media integration. Chat и voice остаются вне текущего product UI.
 
 ## Как читать репозиторий
 
@@ -140,6 +141,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-207 participant joined](docs/WT-207_PARTICIPANT_JOINED.md)
 - [WT-208 frontend room events](docs/WT-208_FRONTEND_ROOM_EVENTS.md)
 - [WT-209 room snapshot restore](docs/WT-209_ROOM_SNAPSHOT_RESTORE.md)
+- [WT-301 LiveKit product tokens](docs/WT-301_LIVEKIT_PRODUCT_TOKENS.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation
@@ -147,5 +149,5 @@ Media PoC остаётся референсной реализацией в [poc
 - Не загружать байты фильма в backend services.
 - LiveKit остаётся media plane.
 - Spring Boot отвечает за rooms, roles, access, state, tokens, presence, TTL, audit и telemetry.
-- Не переносить PoC token или room logic в product code без WT-301 и room lifecycle contracts.
+- PoC остаётся reference implementation; product token flow реализуется через backend room/access contracts.
 - Секреты хранить только в локальных `.env` файлах или secret storage. В git попадают только examples, а не реальные значения.

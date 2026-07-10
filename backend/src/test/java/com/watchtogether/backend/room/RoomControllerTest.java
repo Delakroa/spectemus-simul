@@ -65,6 +65,9 @@ class RoomControllerTest {
     private RoomLeaveService roomLeaveService;
 
     @MockitoBean
+    private LiveKitTokenService liveKitTokenService;
+
+    @MockitoBean
     private RoomProperties roomProperties;
 
     @BeforeEach
@@ -205,6 +208,30 @@ class RoomControllerTest {
         verify(roomLeaveService).leave(ROOM_ID, SESSION);
     }
 
+    @Test
+    void mintsLiveKitTokenAccordingToContract() throws Exception {
+        LiveKitTokenResponse response = liveKitTokenResponse();
+        when(liveKitTokenService.mint(ROOM_ID, SESSION)).thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/rooms/{roomId}/livekit-token", ROOM_ID)
+                        .cookie(new Cookie("wt_session", SESSION)))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(header().exists(CorrelationIdFilter.HEADER))
+                .andExpect(jsonPath("$.token").value(response.token()))
+                .andExpect(jsonPath("$.liveKitUrl").value("ws://127.0.0.1:7880"))
+                .andExpect(jsonPath("$.roomName").value(ROOM_ID))
+                .andExpect(jsonPath("$.participantId").value(response.participantId().toString()))
+                .andExpect(jsonPath("$.participantIdentity").value(
+                        response.participantIdentity()))
+                .andExpect(jsonPath("$.role").value("HOST"))
+                .andExpect(jsonPath("$.canPublish").value(true))
+                .andExpect(jsonPath("$.canPublishData").value(true))
+                .andExpect(jsonPath("$.expiresAt").value("2026-07-09T08:10:00Z"));
+
+        verify(liveKitTokenService).mint(ROOM_ID, SESSION);
+    }
+
     private CreationResult creationResult() {
         Instant now = Instant.parse("2026-07-09T08:00:00Z");
         UUID hostId = UUID.fromString("d0f8636f-e21e-4d7b-9fce-6fb0e6fb5678");
@@ -227,5 +254,19 @@ class RoomControllerTest {
     private GetRoomResponse restoreResponse() {
         CreateRoomResponse response = creationResult().response();
         return new GetRoomResponse(response.room().participants().getFirst(), response.room());
+    }
+
+    private LiveKitTokenResponse liveKitTokenResponse() {
+        UUID participantId = UUID.fromString("d0f8636f-e21e-4d7b-9fce-6fb0e6fb5678");
+        return new LiveKitTokenResponse(
+                "livekit.jwt.token",
+                "ws://127.0.0.1:7880",
+                ROOM_ID,
+                participantId,
+                participantId.toString(),
+                ParticipantRole.HOST,
+                true,
+                true,
+                Instant.parse("2026-07-09T08:10:00Z"));
     }
 }

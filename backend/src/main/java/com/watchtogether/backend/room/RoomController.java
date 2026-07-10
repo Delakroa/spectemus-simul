@@ -32,6 +32,7 @@ public class RoomController {
     private final RoomJoinService roomJoinService;
     private final RoomCloseService roomCloseService;
     private final RoomLeaveService roomLeaveService;
+    private final LiveKitTokenService liveKitTokenService;
     private final RoomProperties properties;
 
     RoomController(
@@ -40,12 +41,14 @@ public class RoomController {
             RoomJoinService roomJoinService,
             RoomCloseService roomCloseService,
             RoomLeaveService roomLeaveService,
+            LiveKitTokenService liveKitTokenService,
             RoomProperties properties) {
         this.roomCreationService = roomCreationService;
         this.roomRestoreService = roomRestoreService;
         this.roomJoinService = roomJoinService;
         this.roomCloseService = roomCloseService;
         this.roomLeaveService = roomLeaveService;
+        this.liveKitTokenService = liveKitTokenService;
         this.properties = properties;
     }
 
@@ -98,6 +101,15 @@ public class RoomController {
         return ResponseEntity.noContent()
                 .cacheControl(CacheControl.noStore())
                 .build();
+    }
+
+    @PostMapping("/{roomId}/livekit-token")
+    ResponseEntity<LiveKitTokenResponse> mintLiveKitToken(
+            @PathVariable String roomId,
+            @CookieValue(name = SESSION_COOKIE, required = false) String sessionCredential) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(liveKitTokenService.mint(roomId, sessionCredential));
     }
 
     @PostMapping("/{roomId}/close")

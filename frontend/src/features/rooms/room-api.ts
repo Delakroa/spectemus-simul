@@ -63,6 +63,18 @@ const getRoomResponseSchema = z.object({
   room: roomSnapshotSchema,
 });
 
+const liveKitTokenResponseSchema = z.object({
+  token: z.string().min(20),
+  liveKitUrl: z.string().regex(/^wss?:\/\//),
+  roomName: roomIdSchema,
+  participantId: participantIdSchema,
+  participantIdentity: z.string().min(1).max(128),
+  role: participantRoleSchema,
+  canPublish: z.boolean(),
+  canPublishData: z.boolean(),
+  expiresAt: dateTimeSchema,
+});
+
 type RequestOptions = {
   body?: unknown;
   headers?: HeadersInit;
@@ -75,6 +87,7 @@ export type RoomSnapshot = z.infer<typeof roomSnapshotSchema>;
 export type CreateRoomResponse = z.infer<typeof createRoomResponseSchema>;
 export type JoinRoomResponse = z.infer<typeof joinRoomResponseSchema>;
 export type GetRoomResponse = z.infer<typeof getRoomResponseSchema>;
+export type LiveKitTokenResponse = z.infer<typeof liveKitTokenResponseSchema>;
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
@@ -164,6 +177,17 @@ export function getRoom(roomId: string, signal?: AbortSignal) {
   return request(`/api/v1/rooms/${encodeURIComponent(roomId)}`, getRoomResponseSchema, {
     signal,
   });
+}
+
+export function mintLiveKitToken(roomId: string, signal?: AbortSignal) {
+  return request(
+    `/api/v1/rooms/${encodeURIComponent(roomId)}/livekit-token`,
+    liveKitTokenResponseSchema,
+    {
+      method: "POST",
+      signal,
+    },
+  );
 }
 
 export function leaveRoom(roomId: string, signal?: AbortSignal) {

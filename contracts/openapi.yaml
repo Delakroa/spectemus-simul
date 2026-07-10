@@ -186,6 +186,36 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/v1/rooms/{roomId}/livekit-token:
+    parameters:
+      - $ref: "#/components/parameters/RoomId"
+    post:
+      tags: [Rooms]
+      operationId: mintLiveKitToken
+      summary: Выдать LiveKit token для текущего participant
+      x-implementation-status: implemented
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: LiveKit token с grants, соответствующими роли текущего participant
+          headers:
+            Cache-Control:
+              description: Ответ содержит credential и не должен кэшироваться
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiveKitTokenResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/RoomUnavailable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /api/v1/rooms/{roomId}/close:
     parameters:
       - $ref: "#/components/parameters/RoomId"
@@ -343,6 +373,48 @@ components:
           $ref: "#/components/schemas/Participant"
         room:
           $ref: "#/components/schemas/RoomSnapshot"
+
+    LiveKitTokenResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - token
+        - liveKitUrl
+        - roomName
+        - participantId
+        - participantIdentity
+        - role
+        - canPublish
+        - canPublishData
+        - expiresAt
+      properties:
+        token:
+          type: string
+          minLength: 20
+          description: Signed LiveKit JWT. Нельзя логировать или кэшировать.
+        liveKitUrl:
+          type: string
+          pattern: ^wss?://
+          description: Browser-facing LiveKit URL.
+        roomName:
+          $ref: "./schemas/common.schema.json#/$defs/RoomId"
+        participantId:
+          type: string
+          format: uuid
+        participantIdentity:
+          type: string
+          minLength: 1
+          maxLength: 128
+        role:
+          type: string
+          enum: [HOST, GUEST]
+        canPublish:
+          type: boolean
+        canPublishData:
+          type: boolean
+        expiresAt:
+          type: string
+          format: date-time
 
     ProblemDetails:
       $ref: "./schemas/problem-details.schema.json"

@@ -31,7 +31,7 @@ pnpm infra:check
 pnpm infra:ps
 ```
 
-Начиная с WT-203 `infra:check` создаёт комнату через gateway, проверяет guest join и session replay, подключается к room WebSocket, получает snapshot и повторяет подключение.
+Начиная с WT-301 `infra:check` создаёт комнату через gateway, проверяет guest join, session replay, restore, LiveKit token grants для host/guest, room WebSocket snapshot, reconnect, heartbeat, leave и close.
 
 Открыть приложение:
 

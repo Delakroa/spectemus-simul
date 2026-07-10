@@ -38,6 +38,8 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/rooms/*/leave")
                         .permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/rooms/*/livekit-token")
+                        .permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/rooms/*/close")
                         .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/rooms/*/events")

@@ -1,4 +1,4 @@
-import { createRoom, getRoom, joinRoom, resolveRoomEventsUrl } from "./room-api";
+import { createRoom, getRoom, joinRoom, mintLiveKitToken, resolveRoomEventsUrl } from "./room-api";
 
 const roomId = "AbCdEfGhIjKlMnOpQrStUv";
 
@@ -93,6 +93,39 @@ describe("room api", () => {
       expect.objectContaining({
         credentials: "include",
         method: "GET",
+      }),
+    );
+  });
+
+  it("запрашивает LiveKit token по текущей session cookie", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          token: "header.payload.signature",
+          liveKitUrl: "ws://127.0.0.1:7880",
+          roomName: roomId,
+          participantId: room.participants[0].participantId,
+          participantIdentity: room.participants[0].participantId,
+          role: "HOST",
+          canPublish: true,
+          canPublishData: true,
+          expiresAt: "2026-07-09T07:30:00Z",
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await expect(mintLiveKitToken(roomId)).resolves.toMatchObject({
+      liveKitUrl: "ws://127.0.0.1:7880",
+      roomName: roomId,
+      role: "HOST",
+      canPublish: true,
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/v1/rooms/${roomId}/livekit-token`,
+      expect.objectContaining({
+        credentials: "include",
+        method: "POST",
       }),
     );
   });
