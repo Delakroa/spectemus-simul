@@ -56,8 +56,11 @@ const MAX_EVENT_LOG_ITEMS = 8;
 const MAX_CHAT_MESSAGES = 200;
 const MAX_CHAT_MESSAGE_LENGTH = 1000;
 const HOST_SECRET_STORAGE_PREFIX = "watch-together.host-secret.";
+const MAX_ROOM_RECONNECT_ATTEMPTS = 10;
+const ROOM_RECONNECT_DELAYS_MS = [1_000, 2_000, 5_000, 10_000, 15_000] as const;
 
-export type RoomConnectionStatus = "idle" | "connecting" | "open" | "closed" | "error";
+export type RoomConnectionStatus =
+  "idle" | "connecting" | "open" | "reconnecting" | "closed" | "error";
 export type RoomActionStatus = "create" | "join" | "restore" | "leave" | "close" | null;
 export type FileStatus = "idle" | "checking" | "ready" | "error";
 export type FilePublicationStatus = "idle" | "publishing" | "live" | "error";
@@ -79,6 +82,11 @@ export type ChatMessageEntry = {
   displayName: string | null;
   text: string;
   sentAt: string;
+};
+
+type ConnectRoomEventsOptions = {
+  preserveChat?: boolean;
+  reconnect?: boolean;
 };
 
 export type RoomSessionState = {
@@ -167,15 +175,21 @@ const initialState: RoomSessionState = {
 
 export function useRoomSession(routeRoomId?: string) {
   const [state, setState] = useState<RoomSessionState>(initialState);
+  const connectRoomEventsRef = useRef<
+    | ((room: RoomSnapshot, participant: Participant, options?: ConnectRoomEventsOptions) => void)
+    | null
+  >(null);
   const fileDiagnosticsRequestIdRef = useRef(0);
   const fileObjectUrlRef = useRef<string | null>(null);
   const hostPlaybackCleanupRef = useRef<(() => void) | null>(null);
+  const hostPublicationRecoveryRequestedRef = useRef(false);
   const filePublicationRef = useRef<FilePublication | null>(null);
   const filePublicationRequestIdRef = useRef(0);
   const heartbeatTimerRef = useRef<number | null>(null);
   const liveKitConnectionRef = useRef<LiveKitConnection | null>(null);
   const liveKitRequestIdRef = useRef(0);
   const participantRef = useRef<Participant | null>(null);
+  const pendingActionRef = useRef<RoomActionStatus>(null);
   const playbackStatePublisherRef = useRef<HostPlaybackStatePublisher | null>(null);
   const playbackStateReceiverRef = useRef<GuestPlaybackStateReceiver | null>(null);
   const remotePlaybackControllerRef = useRef<RemotePlaybackController | null>(null);
@@ -185,12 +199,15 @@ export function useRoomSession(routeRoomId?: string) {
   });
   const restoredRouteRoomIdRef = useRef<string | null>(null);
   const roomRef = useRef<RoomSnapshot | null>(null);
+  const socketReconnectAttemptRef = useRef(0);
+  const socketReconnectTimerRef = useRef<number | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     participantRef.current = state.participant;
+    pendingActionRef.current = state.pendingAction;
     roomRef.current = state.room;
-  }, [state.participant, state.room]);
+  }, [state.participant, state.pendingAction, state.room]);
 
   const stopHeartbeat = useCallback(() => {
     if (heartbeatTimerRef.current !== null) {
@@ -198,6 +215,18 @@ export function useRoomSession(routeRoomId?: string) {
       heartbeatTimerRef.current = null;
     }
   }, []);
+
+  const clearSocketReconnectTimer = useCallback(() => {
+    if (socketReconnectTimerRef.current !== null) {
+      window.clearTimeout(socketReconnectTimerRef.current);
+      socketReconnectTimerRef.current = null;
+    }
+  }, []);
+
+  const resetSocketReconnect = useCallback(() => {
+    clearSocketReconnectTimer();
+    socketReconnectAttemptRef.current = 0;
+  }, [clearSocketReconnectTimer]);
 
   const revokeFileUrl = useCallback(() => {
     if (fileObjectUrlRef.current) {
@@ -282,6 +311,7 @@ export function useRoomSession(routeRoomId?: string) {
   }, [stopHostPlaybackTracking, stopPlaybackStatePublisher]);
 
   const stopFilePublication = useCallback(() => {
+    hostPublicationRecoveryRequestedRef.current = false;
     filePublicationRequestIdRef.current += 1;
     stopCurrentFilePublication();
     setState((current) => ({
@@ -293,6 +323,7 @@ export function useRoomSession(routeRoomId?: string) {
   }, [stopCurrentFilePublication]);
 
   const clearFileState = useCallback(() => {
+    hostPublicationRecoveryRequestedRef.current = false;
     fileDiagnosticsRequestIdRef.current += 1;
     filePublicationRequestIdRef.current += 1;
     stopCurrentFilePublication();
@@ -310,6 +341,7 @@ export function useRoomSession(routeRoomId?: string) {
 
   const selectFile = useCallback(
     async (file: File) => {
+      hostPublicationRecoveryRequestedRef.current = false;
       const requestId = fileDiagnosticsRequestIdRef.current + 1;
       fileDiagnosticsRequestIdRef.current = requestId;
       filePublicationRequestIdRef.current += 1;
@@ -485,6 +517,7 @@ export function useRoomSession(routeRoomId?: string) {
     }
 
     const requestId = filePublicationRequestIdRef.current + 1;
+    hostPublicationRecoveryRequestedRef.current = false;
     filePublicationRequestIdRef.current = requestId;
     stopCurrentFilePublication();
     setState((current) => ({
@@ -565,7 +598,13 @@ export function useRoomSession(routeRoomId?: string) {
   );
 
   const disconnectSocket = useCallback(
-    (nextStatus: RoomConnectionStatus = "idle") => {
+    (nextStatus: RoomConnectionStatus = "idle", options: { resetReconnect?: boolean } = {}) => {
+      if (options.resetReconnect ?? true) {
+        resetSocketReconnect();
+      } else {
+        clearSocketReconnectTimer();
+      }
+
       const socket = socketRef.current;
       socketRef.current = null;
       stopHeartbeat();
@@ -579,7 +618,7 @@ export function useRoomSession(routeRoomId?: string) {
         connectionStatus: nextStatus,
       }));
     },
-    [stopHeartbeat],
+    [clearSocketReconnectTimer, resetSocketReconnect, stopHeartbeat],
   );
 
   const connectLiveKit = useCallback(
@@ -626,6 +665,8 @@ export function useRoomSession(routeRoomId?: string) {
             }
 
             if (status === "disconnected") {
+              hostPublicationRecoveryRequestedRef.current =
+                participantRef.current?.role === "HOST" && filePublicationRef.current !== null;
               filePublicationRequestIdRef.current += 1;
               stopCurrentFilePublication();
               disconnectRemotePlayback();
@@ -780,9 +821,63 @@ export function useRoomSession(routeRoomId?: string) {
     return true;
   }, []);
 
+  const scheduleRoomReconnect = useCallback(() => {
+    clearSocketReconnectTimer();
+
+    const room = roomRef.current;
+    const participant = participantRef.current;
+    if (!room || !participant || isTerminalRoomStatus(room.status)) {
+      setState((current) => ({
+        ...current,
+        connectionStatus: current.room ? "closed" : "idle",
+      }));
+      return;
+    }
+
+    const attempt = socketReconnectAttemptRef.current;
+    if (attempt >= MAX_ROOM_RECONNECT_ATTEMPTS) {
+      setState((current) => ({
+        ...current,
+        connectionStatus: "error",
+        error: "Не удалось восстановить WebSocket комнаты.",
+      }));
+      return;
+    }
+
+    const delay = ROOM_RECONNECT_DELAYS_MS[Math.min(attempt, ROOM_RECONNECT_DELAYS_MS.length - 1)];
+    socketReconnectAttemptRef.current = attempt + 1;
+    socketReconnectTimerRef.current = window.setTimeout(() => {
+      socketReconnectTimerRef.current = null;
+
+      const latestRoom = roomRef.current;
+      const latestParticipant = participantRef.current;
+      if (!latestRoom || !latestParticipant || isTerminalRoomStatus(latestRoom.status)) {
+        return;
+      }
+
+      connectRoomEventsRef.current?.(latestRoom, latestParticipant, {
+        preserveChat: true,
+        reconnect: true,
+      });
+    }, delay);
+
+    setState((current) => ({
+      ...current,
+      connectionStatus: "reconnecting",
+      error: null,
+      events:
+        attempt === 0
+          ? addLocalEvent(current.events, "Соединение потеряно, переподключаемся")
+          : current.events,
+    }));
+  }, [clearSocketReconnectTimer]);
+
   const connectRoomEvents = useCallback(
-    (room: RoomSnapshot, participant: Participant) => {
-      disconnectSocket("connecting");
+    (room: RoomSnapshot, participant: Participant, options: ConnectRoomEventsOptions = {}) => {
+      const reconnect = options.reconnect ?? false;
+      disconnectSocket(reconnect ? "reconnecting" : "connecting", {
+        resetReconnect: !reconnect,
+      });
 
       if (!("WebSocket" in window)) {
         setState((current) => ({
@@ -796,7 +891,11 @@ export function useRoomSession(routeRoomId?: string) {
       participantRef.current = participant;
       roomRef.current = room;
 
-      setState((current) => ({ ...current, chatError: null, chatMessages: [] }));
+      setState((current) => ({
+        ...current,
+        chatError: null,
+        chatMessages: options.preserveChat ? current.chatMessages : [],
+      }));
 
       const socket = new WebSocket(resolveRoomEventsUrl(room.roomId));
       socketRef.current = socket;
@@ -806,10 +905,14 @@ export function useRoomSession(routeRoomId?: string) {
           return;
         }
 
+        resetSocketReconnect();
         setState((current) => ({
           ...current,
           connectionStatus: "open",
           error: null,
+          events: reconnect
+            ? addLocalEvent(current.events, "Соединение с комнатой восстановлено")
+            : current.events,
         }));
         sendHeartbeat(socket);
         heartbeatTimerRef.current = window.setInterval(
@@ -845,8 +948,8 @@ export function useRoomSession(routeRoomId?: string) {
 
         setState((current) => ({
           ...current,
-          connectionStatus: "error",
-          error: "WebSocket комнаты недоступен.",
+          connectionStatus: reconnect || current.room ? "reconnecting" : "error",
+          error: reconnect || current.room ? null : "WebSocket комнаты недоступен.",
         }));
       };
 
@@ -857,6 +960,11 @@ export function useRoomSession(routeRoomId?: string) {
 
         socketRef.current = null;
         stopHeartbeat();
+        if (pendingActionRef.current !== "close") {
+          scheduleRoomReconnect();
+          return;
+        }
+
         setState((current) => ({
           ...current,
           connectionStatus: "closed",
@@ -872,8 +980,20 @@ export function useRoomSession(routeRoomId?: string) {
         }));
       };
     },
-    [clearFileState, disconnectLiveKit, disconnectSocket, sendHeartbeat, stopHeartbeat],
+    [
+      clearFileState,
+      disconnectLiveKit,
+      disconnectSocket,
+      resetSocketReconnect,
+      scheduleRoomReconnect,
+      sendHeartbeat,
+      stopHeartbeat,
+    ],
   );
+
+  useEffect(() => {
+    connectRoomEventsRef.current = connectRoomEvents;
+  }, [connectRoomEvents]);
 
   const create = useCallback(
     async (hostDisplayName: string) => {
@@ -1032,6 +1152,7 @@ export function useRoomSession(routeRoomId?: string) {
       return;
     }
 
+    pendingActionRef.current = "close";
     setState((current) => ({ ...current, error: null, pendingAction: "close" }));
 
     try {
@@ -1044,6 +1165,7 @@ export function useRoomSession(routeRoomId?: string) {
         events: addLocalEvent(current.events, "Комната закрывается"),
       }));
     } catch (error) {
+      pendingActionRef.current = null;
       setState((current) => ({
         ...current,
         error: getErrorMessage(error),
@@ -1075,6 +1197,47 @@ export function useRoomSession(routeRoomId?: string) {
     },
     [clearFileState, disconnectLiveKit, disconnectSocket],
   );
+
+  useEffect(() => {
+    if (!hostPublicationRecoveryRequestedRef.current) {
+      return;
+    }
+
+    if (state.participant?.role !== "HOST") {
+      hostPublicationRecoveryRequestedRef.current = false;
+      return;
+    }
+
+    if (state.liveKitStatus !== "connected") {
+      return;
+    }
+
+    if (state.filePublicationStatus === "live" || state.filePublicationStatus === "publishing") {
+      hostPublicationRecoveryRequestedRef.current = false;
+      return;
+    }
+
+    if (!state.fileResult) {
+      hostPublicationRecoveryRequestedRef.current = false;
+      setState((current) => ({
+        ...current,
+        filePublicationError:
+          "После переподключения выберите файл заново, чтобы возобновить показ.",
+        filePublicationStatus: "error",
+        filePublicationTrackCount: 0,
+      }));
+      return;
+    }
+
+    hostPublicationRecoveryRequestedRef.current = false;
+    void publishFile();
+  }, [
+    publishFile,
+    state.filePublicationStatus,
+    state.fileResult,
+    state.liveKitStatus,
+    state.participant?.role,
+  ]);
 
   const inviteUrl = useMemo(() => {
     const path = state.invitePath ?? (state.room ? `/rooms/${state.room.roomId}` : null);
@@ -1273,6 +1436,10 @@ function extractRoomId(value: string) {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Не удалось выполнить действие.";
+}
+
+function isTerminalRoomStatus(status: RoomSnapshot["status"]) {
+  return status === "CLOSED" || status === "EXPIRED";
 }
 
 function markRoomClosed(room: RoomSnapshot): RoomSnapshot {

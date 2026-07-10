@@ -2,11 +2,13 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { publishFileToLiveKit } from "./file-publication";
 import { useRoomSession } from "./use-room-session";
 
-const { mockVideoElement, mockRoomSnapshot } = vi.hoisted(() => {
+const { liveKitHandlers, mockVideoElement, mockRoomSnapshot } = vi.hoisted(() => {
   const ROOM_ID = "AbCdEfGhIjKlMnOpQrStUv";
   const HOST_ID = "d0f8636f-e21e-4d7b-9fce-6fb0e6fb5678";
+  const liveKitHandlers: Array<{ onStatusChange: (status: string) => void }> = [];
 
   const mockRoomSnapshot = {
     roomId: ROOM_ID,
@@ -56,7 +58,7 @@ const { mockVideoElement, mockRoomSnapshot } = vi.hoisted(() => {
     },
   };
 
-  return { mockVideoElement, mockRoomSnapshot };
+  return { liveKitHandlers, mockVideoElement, mockRoomSnapshot };
 });
 
 vi.mock("./room-api", async (importOriginal) => {
@@ -81,7 +83,9 @@ vi.mock("./livekit-connection", () => ({
   connectLiveKitRoom: vi
     .fn()
     .mockImplementation(
-      async (_token: unknown, { onStatusChange }: { onStatusChange: (status: string) => void }) => {
+      async (_token: unknown, handlers: { onStatusChange: (status: string) => void }) => {
+        liveKitHandlers.push(handlers);
+        const { onStatusChange } = handlers;
         onStatusChange("connected");
         return {
           disconnect: vi.fn(),
@@ -254,6 +258,8 @@ async function setupLivePublication(user: ReturnType<typeof userEvent.setup>) {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
+  liveKitHandlers.length = 0;
   mockVideoElement.reset();
 });
 
@@ -330,5 +336,25 @@ describe("useRoomSession host playback controls", () => {
 
     await user.click(screen.getByRole("button", { name: "Seek negative" }));
     expect(mockVideoElement.currentTime).toBe(0);
+  });
+
+  it("автоматически перепубликует выбранный файл после LiveKit reconnect", async () => {
+    const user = userEvent.setup();
+    await setupLivePublication(user);
+
+    const publishFileToLiveKitMock = vi.mocked(publishFileToLiveKit);
+    expect(publishFileToLiveKitMock).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      liveKitHandlers[0]?.onStatusChange("disconnected");
+    });
+    await waitFor(() => expect(screen.getByTestId("pub-status")).toHaveTextContent("idle"));
+
+    act(() => {
+      liveKitHandlers[0]?.onStatusChange("connected");
+    });
+
+    await waitFor(() => expect(publishFileToLiveKitMock).toHaveBeenCalledTimes(2));
+    expect(screen.getByTestId("pub-status")).toHaveTextContent("live");
   });
 });

@@ -886,6 +886,7 @@ function formatConnectionStatus(status: RoomConnectionStatus) {
     error: "ошибка",
     idle: "нет соединения",
     open: "live",
+    reconnecting: "переподключение",
   };
 
   return labels[status];
