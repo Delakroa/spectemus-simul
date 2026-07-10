@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
@@ -52,6 +53,9 @@ class RoomControllerTest {
     private RoomCreationService roomCreationService;
 
     @MockitoBean
+    private RoomRestoreService roomRestoreService;
+
+    @MockitoBean
     private RoomJoinService roomJoinService;
 
     @MockitoBean
@@ -94,6 +98,26 @@ class RoomControllerTest {
                 .andExpect(jsonPath("$.hostSecret").value(HOST_SECRET))
                 .andExpect(jsonPath("$.invitePath").value("/rooms/" + ROOM_ID))
                 .andExpect(content().string(not(containsString("/rooms/" + ROOM_ID + "?"))));
+    }
+
+    @Test
+    void restoresRoomAccordingToContract() throws Exception {
+        GetRoomResponse response = restoreResponse();
+        when(roomRestoreService.restore(ROOM_ID, SESSION)).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/rooms/{roomId}", ROOM_ID)
+                        .cookie(new Cookie("wt_session", SESSION)))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(header().exists(CorrelationIdFilter.HEADER))
+                .andExpect(jsonPath("$.participant.participantId").value(
+                        response.participant().participantId().toString()))
+                .andExpect(jsonPath("$.participant.role").value("HOST"))
+                .andExpect(jsonPath("$.room.roomId").value(ROOM_ID))
+                .andExpect(jsonPath("$.room.status").value("CREATED"))
+                .andExpect(jsonPath("$.room.participants[0].role").value("HOST"));
+
+        verify(roomRestoreService).restore(ROOM_ID, SESSION);
     }
 
     @Test
@@ -198,5 +222,10 @@ class RoomControllerTest {
         CreateRoomResponse response =
                 new CreateRoomResponse(room, HOST_SECRET, "/rooms/" + ROOM_ID);
         return new CreationResult(response, SESSION, Duration.ofHours(4));
+    }
+
+    private GetRoomResponse restoreResponse() {
+        CreateRoomResponse response = creationResult().response();
+        return new GetRoomResponse(response.room().participants().getFirst(), response.room());
     }
 }

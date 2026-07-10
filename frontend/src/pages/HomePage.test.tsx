@@ -1,7 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { createAppQueryClient } from "../app/query-client";
 import { HomePage } from "./HomePage";
@@ -10,7 +10,7 @@ const roomId = "AbCdEfGhIjKlMnOpQrStUv";
 const hostId = "d0f8636f-e21e-4d7b-9fce-6fb0e6fb5678";
 const guestId = "8e7d79a8-a49f-48cc-a409-f07890dd3218";
 
-function renderPage() {
+function renderPage(initialEntries = ["/"]) {
   const queryClient = createAppQueryClient();
   queryClient.setDefaultOptions({
     queries: {
@@ -20,8 +20,11 @@ function renderPage() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
-        <HomePage />
+      <MemoryRouter initialEntries={initialEntries}>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/rooms/:roomId" element={<HomePage />} />
+        </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -30,6 +33,7 @@ function renderPage() {
 describe("HomePage", () => {
   afterEach(() => {
     MockWebSocket.instances = [];
+    window.sessionStorage.clear();
     vi.unstubAllGlobals();
   });
 
@@ -168,6 +172,66 @@ describe("HomePage", () => {
 
     expect(await screen.findByText("Guest")).toBeInTheDocument();
     expect(screen.getByText("Guest вошёл в комнату")).toBeInTheDocument();
+  });
+
+  it("восстанавливает комнату при открытии invite route с активной session", async () => {
+    vi.stubGlobal("WebSocket", MockWebSocket);
+
+    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+      const url = String(input);
+
+      if (url.endsWith("/health")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              status: "UP",
+              checkedAt: "2026-07-08T16:30:00Z",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      if (url.endsWith("/version")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              name: "watch-together-backend",
+              version: "0.1.0",
+              buildTime: "2026-07-08T16:00:00Z",
+              apiVersion: "v1",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      if (url.endsWith(`/api/v1/rooms/${roomId}`)) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              participant: createRoomSnapshot().participants[0],
+              room: createRoomSnapshot(),
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response(null, { status: 404 }));
+    });
+
+    renderPage([`/rooms/${roomId}`]);
+
+    expect(await screen.findByText("Комната восстановлена")).toBeInTheDocument();
+    expect(screen.getByText(roomId)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Invite-ссылка или ID комнаты")).not.toBeInTheDocument();
+    expect(MockWebSocket.instances[0]?.url).toBe(
+      `ws://localhost:3000/api/v1/rooms/${roomId}/events`,
+    );
+
+    MockWebSocket.instances[0]?.open();
+    expect(await screen.findByText("live")).toBeInTheDocument();
   });
 });
 

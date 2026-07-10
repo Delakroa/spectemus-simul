@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   closeRoom,
   createRoom,
+  getRoom,
   joinRoom,
   leaveRoom,
   resolveRoomEventsUrl,
@@ -20,9 +21,10 @@ import {
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const MAX_EVENT_LOG_ITEMS = 8;
+const HOST_SECRET_STORAGE_PREFIX = "watch-together.host-secret.";
 
 export type RoomConnectionStatus = "idle" | "connecting" | "open" | "closed" | "error";
-export type RoomActionStatus = "create" | "join" | "leave" | "close" | null;
+export type RoomActionStatus = "create" | "join" | "restore" | "leave" | "close" | null;
 
 export type RoomEventLogEntry = {
   eventId: string;
@@ -57,6 +59,7 @@ export function useRoomSession(routeRoomId?: string) {
   const [state, setState] = useState<RoomSessionState>(initialState);
   const heartbeatTimerRef = useRef<number | null>(null);
   const participantRef = useRef<Participant | null>(null);
+  const restoredRouteRoomIdRef = useRef<string | null>(null);
   const roomRef = useRef<RoomSnapshot | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
 
@@ -217,6 +220,7 @@ export function useRoomSession(routeRoomId?: string) {
       try {
         const result = await createRoom(displayName);
         const participant = findCurrentParticipant(result.room);
+        saveHostSecret(result.room.roomId, result.hostSecret);
         setState((current) => ({
           ...current,
           error: null,
@@ -229,6 +233,50 @@ export function useRoomSession(routeRoomId?: string) {
         }));
         connectRoomEvents(result.room, participant);
       } catch (error) {
+        setState((current) => ({
+          ...current,
+          error: getErrorMessage(error),
+          pendingAction: null,
+        }));
+      }
+    },
+    [connectRoomEvents],
+  );
+
+  const restore = useCallback(
+    async (roomId: string, signal?: AbortSignal) => {
+      const normalizedRoomId = extractRoomId(roomId);
+      if (!roomIdSchema.safeParse(normalizedRoomId).success) {
+        setState((current) => ({ ...current, error: "Проверьте ID комнаты." }));
+        return;
+      }
+
+      setState((current) => ({ ...current, error: null, pendingAction: "restore" }));
+
+      try {
+        const result = await getRoom(normalizedRoomId, signal);
+        if (signal?.aborted) {
+          return;
+        }
+
+        const hostSecret =
+          result.participant.role === "HOST" ? readHostSecret(result.room.roomId) : null;
+        setState((current) => ({
+          ...current,
+          error: null,
+          events: addLocalEvent(current.events, "Комната восстановлена"),
+          hostSecret,
+          invitePath: `/rooms/${result.room.roomId}`,
+          participant: result.participant,
+          pendingAction: null,
+          room: result.room,
+        }));
+        connectRoomEvents(result.room, result.participant);
+      } catch (error) {
+        if (signal?.aborted) {
+          return;
+        }
+
         setState((current) => ({
           ...current,
           error: getErrorMessage(error),
@@ -315,6 +363,7 @@ export function useRoomSession(routeRoomId?: string) {
 
     try {
       await closeRoom(room.roomId, state.hostSecret);
+      removeHostSecret(room.roomId);
       setState((current) => ({
         ...current,
         events: addLocalEvent(current.events, "Комната закрывается"),
@@ -327,6 +376,21 @@ export function useRoomSession(routeRoomId?: string) {
       }));
     }
   }, [state.hostSecret]);
+
+  useEffect(() => {
+    if (
+      !routeRoomId ||
+      roomRef.current?.roomId === routeRoomId ||
+      restoredRouteRoomIdRef.current === routeRoomId
+    ) {
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    restoredRouteRoomIdRef.current = routeRoomId;
+    void restore(routeRoomId, controller.signal);
+    return () => controller.abort();
+  }, [restore, routeRoomId]);
 
   useEffect(() => () => disconnectSocket("idle"), [disconnectSocket]);
 
@@ -342,6 +406,7 @@ export function useRoomSession(routeRoomId?: string) {
     inviteUrl,
     join,
     leave,
+    restore,
     routeRoomId,
   };
 }
@@ -432,6 +497,34 @@ function markRoomClosed(room: RoomSnapshot): RoomSnapshot {
     })),
     updatedAt,
   };
+}
+
+function hostSecretStorageKey(roomId: string) {
+  return `${HOST_SECRET_STORAGE_PREFIX}${roomId}`;
+}
+
+function saveHostSecret(roomId: string, hostSecret: string) {
+  try {
+    window.sessionStorage.setItem(hostSecretStorageKey(roomId), hostSecret);
+  } catch {
+    // Host can still close the room until the current in-memory state is lost.
+  }
+}
+
+function readHostSecret(roomId: string) {
+  try {
+    return window.sessionStorage.getItem(hostSecretStorageKey(roomId));
+  } catch {
+    return null;
+  }
+}
+
+function removeHostSecret(roomId: string) {
+  try {
+    window.sessionStorage.removeItem(hostSecretStorageKey(roomId));
+  } catch {
+    // Nothing to clean up when browser storage is unavailable.
+  }
 }
 
 function createEventId() {

@@ -75,6 +75,13 @@ WT-208 добавил первый room lifecycle UI:
 - heartbeat `participant.heartbeat` для открытого WebSocket;
 - команды close для host и leave для guest.
 
+WT-209 добавил восстановление room session:
+
+- `GET /api/v1/rooms/{roomId}` возвращает текущего participant и room snapshot по `wt_session`;
+- открытие `/rooms/{roomId}` автоматически восстанавливает комнату без повторного join, если cookie ещё действительна;
+- после restore frontend снова подключает WebSocket и продолжает heartbeat;
+- host secret сохраняется только в `sessionStorage` текущего browser session, чтобы host мог закрыть комнату после refresh.
+
 LiveKit, media lifecycle, чат и голос остаются вне текущего frontend product UI.
 
 REST, WebSocket и error contracts находятся в [`../contracts`](../contracts/README.md). Все внешние payload должны проходить runtime validation до попадания в состояние приложения.

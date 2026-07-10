@@ -98,17 +98,17 @@ paths:
     get:
       tags: [Rooms]
       operationId: getRoom
-      summary: Получить authoritative room snapshot
-      x-implementation-status: planned
+      summary: Восстановить room session и authoritative snapshot
+      x-implementation-status: implemented
       security:
         - sessionCookie: []
       responses:
         "200":
-          description: Текущий snapshot комнаты
+          description: Текущий participant и snapshot комнаты для активной browser session
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/RoomSnapshot"
+                $ref: "#/components/schemas/GetRoomResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -325,6 +325,16 @@ components:
           $ref: "./schemas/common.schema.json#/$defs/DisplayName"
 
     JoinRoomResponse:
+      type: object
+      additionalProperties: false
+      required: [participant, room]
+      properties:
+        participant:
+          $ref: "#/components/schemas/Participant"
+        room:
+          $ref: "#/components/schemas/RoomSnapshot"
+
+    GetRoomResponse:
       type: object
       additionalProperties: false
       required: [participant, room]
