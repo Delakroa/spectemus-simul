@@ -355,6 +355,11 @@ a {
   color: var(--success);
 }
 
+.room-connection--connecting,
+.room-connection--reconnecting {
+  color: var(--warning);
+}
+
 .room-connection--error,
 .room-connection--closed,
 .room-connection--disconnected {

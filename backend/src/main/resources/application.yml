@@ -20,6 +20,9 @@ watch-together:
     cleanup-grace: ${ROOM_CLEANUP_GRACE:5m}
   websocket:
     presence-ttl: ${WEBSOCKET_PRESENCE_TTL:30s}
+    chat-rate-limit: ${WEBSOCKET_CHAT_RATE_LIMIT:5}
+    chat-rate-window: ${WEBSOCKET_CHAT_RATE_WINDOW:5s}
+    host-reconnect-grace: ${WEBSOCKET_HOST_RECONNECT_GRACE:60s}
   livekit:
     url: ${LIVEKIT_URL:ws://127.0.0.1:7880}
     api-key: ${LIVEKIT_API_KEY:devkey}

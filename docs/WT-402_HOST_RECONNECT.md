@@ -53,5 +53,5 @@ pnpm --filter @watch-together/frontend test
 ## Известные ограничения
 
 - Rate limiter и grace-таймеры — in-memory, per-instance. При горизонтальном масштабировании backend таймер живёт на узле, принявшем disconnect; для распределённого поведения понадобится общий планировщик или Redis.
-- У frontend нет авто-reconnect WebSocket: реконнект host на практике = перезагрузка вкладки (route → `restore`). После перезагрузки выбранный файл и его object URL теряются, поэтому автоматический republish дорожек невозможен — host должен заново выбрать файл, чтобы возобновить показ. In-place republish без перезагрузки (авто-reconnect WS + сохранение медиасессии) остаётся за WT-406 / будущими задачами.
+- WT-406 закрывает frontend auto-reconnect WebSocket без перезагрузки страницы и in-place republish выбранного файла после LiveKit reconnect. После refresh или закрытия вкладки выбранный файл и его object URL всё равно теряются — host должен заново выбрать файл.
 - Системные сообщения о host-событиях формируются на frontend и не имеют общего серверного `messageId`.

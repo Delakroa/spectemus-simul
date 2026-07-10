@@ -145,6 +145,7 @@ function ChatHarness() {
       <span data-testid="conn">{session.connectionStatus}</span>
       <span data-testid="chat-count">{session.chatMessages.length}</span>
       <span data-testid="chat-error">{session.chatError ?? ""}</span>
+      <span data-testid="room-version">{session.room?.roomVersion ?? ""}</span>
       <ul>
         {session.chatMessages.map((message) => (
           <li key={message.id} data-testid={`chat-${message.kind}`}>
@@ -205,6 +206,7 @@ async function openSession(user: ReturnType<typeof userEvent.setup>) {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   MockWebSocket.instances = [];
   window.sessionStorage.clear();
   vi.unstubAllGlobals();
@@ -231,6 +233,53 @@ describe("useRoomSession text chat", () => {
     deliver(socket, serverChat("Погнали смотреть"));
 
     await waitFor(() => expect(screen.getByTestId("chat-count")).toHaveTextContent("1"));
+    expect(screen.getByTestId("chat-user")).toHaveTextContent("Погнали смотреть");
+  });
+
+  it("переподключает WebSocket, применяет snapshot и сохраняет текущий чат", async () => {
+    const user = userEvent.setup();
+    const socket = await openSession(user);
+
+    deliver(socket, serverChat("Погнали смотреть"));
+    await waitFor(() => expect(screen.getByTestId("chat-count")).toHaveTextContent("1"));
+
+    vi.useFakeTimers();
+    act(() => {
+      socket.readyState = socket.CLOSED;
+      socket.onclose?.(new CloseEvent("close"));
+    });
+    expect(screen.getByTestId("conn")).toHaveTextContent("reconnecting");
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    vi.useRealTimers();
+
+    expect(MockWebSocket.instances).toHaveLength(2);
+    const reconnectSocket = MockWebSocket.instances[1]!;
+    act(() => {
+      reconnectSocket.readyState = reconnectSocket.OPEN;
+      reconnectSocket.onopen?.(new Event("open"));
+    });
+    await waitFor(() => expect(screen.getByTestId("conn")).toHaveTextContent("open"));
+
+    deliver(reconnectSocket, {
+      schemaVersion: 1,
+      eventId: "77777777-7777-4777-8777-777777777777",
+      type: "room.snapshot",
+      roomId: ROOM_ID,
+      participantId: null,
+      roomVersion: 3,
+      occurredAt: "2026-07-10T10:05:00Z",
+      payload: {
+        ...mockRoomSnapshot,
+        roomVersion: 3,
+        updatedAt: "2026-07-10T10:05:00Z",
+      },
+    });
+
+    await waitFor(() => expect(screen.getByTestId("room-version")).toHaveTextContent("3"));
+    expect(screen.getByTestId("chat-count")).toHaveTextContent("1");
     expect(screen.getByTestId("chat-user")).toHaveTextContent("Погнали смотреть");
   });
 
