@@ -45,6 +45,7 @@
 - [WT-302_LIVEKIT_CLIENT_CONNECTION.md](WT-302_LIVEKIT_CLIENT_CONNECTION.md) — подключение product frontend к LiveKit room через backend-issued token.
 - [WT-303_FILE_DIAGNOSTICS.md](WT-303_FILE_DIAGNOSTICS.md) — диагностика локального видеофайла host-а перед публикацией.
 - [WT-304_LIVEKIT_FILE_PUBLISH.md](WT-304_LIVEKIT_FILE_PUBLISH.md) — публикация выбранного локального файла host-а в LiveKit.
+- [WT-305_GUEST_LIVEKIT_PLAYBACK.md](WT-305_GUEST_LIVEKIT_PLAYBACK.md) — просмотр remote video/audio tracks гостем.
 
 ## Как обновлять документы
 
