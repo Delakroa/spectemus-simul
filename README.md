@@ -29,6 +29,7 @@ P0 технически подтверждён.
 - WT-302 подключает product frontend к LiveKit room через backend-issued token.
 - WT-303 добавляет диагностику локального видеофайла host-а: проверку формата, `captureStream` и metadata перед публикацией.
 - WT-304 публикует выбранный локальный файл host-а в LiveKit и добавляет stop/cleanup публикации.
+- WT-305 добавляет guest playback remote video/audio tracks из LiveKit.
 
 P1 foundation и P2 room lifecycle завершены. Проект находится в P3 media integration. Chat и voice остаются вне текущего product UI.
 
@@ -148,6 +149,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-302 LiveKit client connection](docs/WT-302_LIVEKIT_CLIENT_CONNECTION.md)
 - [WT-303 file diagnostics](docs/WT-303_FILE_DIAGNOSTICS.md)
 - [WT-304 публикация локального файла в LiveKit](docs/WT-304_LIVEKIT_FILE_PUBLISH.md)
+- [WT-305 просмотр LiveKit-потока гостем](docs/WT-305_GUEST_LIVEKIT_PLAYBACK.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation

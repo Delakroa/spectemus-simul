@@ -1,4 +1,4 @@
-import { type ChangeEvent, type FormEvent, useRef, useState } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import {
   CircleCheck,
   Clapperboard,
@@ -8,6 +8,7 @@ import {
   FolderOpen,
   Link as LinkIcon,
   LogIn,
+  MonitorPlay,
   Plus,
   Power,
   Radio,
@@ -24,6 +25,7 @@ import { type Participant, type RoomSnapshot } from "../features/rooms/room-api"
 import { type LiveKitConnectionStatus } from "../features/rooms/livekit-connection";
 import {
   type FilePublicationStatus,
+  type RemotePlaybackStatus,
   type RoomConnectionStatus,
   useRoomSession,
 } from "../features/rooms/use-room-session";
@@ -45,6 +47,7 @@ export function HomePage() {
   const { roomId: routeRoomId } = useParams();
   const { health, version, isPending, isError, refetch } = useSystemStatus();
   const roomSession = useRoomSession(routeRoomId);
+  const { setRemotePlaybackElements } = roomSession;
   const [hostDisplayName, setHostDisplayName] = useState("Host");
   const [guestDisplayName, setGuestDisplayName] = useState("Guest");
   const [joinRoomIdDraft, setJoinRoomIdDraft] = useState("");
@@ -66,6 +69,22 @@ export function HomePage() {
     roomSession.filePublicationStatus === "publishing" ||
     roomSession.filePublicationStatus === "live";
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    setRemotePlaybackElements({
+      audioElement: remoteAudioRef.current,
+      videoElement: remoteVideoRef.current,
+    });
+
+    return () => {
+      setRemotePlaybackElements({
+        audioElement: null,
+        videoElement: null,
+      });
+    };
+  }, [isHost, room?.roomId, roomClosed, setRemotePlaybackElements]);
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -389,6 +408,63 @@ export function HomePage() {
               </section>
             )}
 
+            {!isHost && !roomClosed && (
+              <section
+                className="room-card room-card--remote-playback"
+                aria-labelledby="remote-playback-title"
+                style={{ gridColumn: "1 / -1" }}
+              >
+                <div className="room-card__heading">
+                  <h3 id="remote-playback-title">Просмотр</h3>
+                  <span
+                    className={`room-pill room-pill--remote-${roomSession.remotePlaybackStatus}`}
+                  >
+                    <MonitorPlay size={15} aria-hidden="true" />
+                    {formatRemotePlaybackStatus(roomSession.remotePlaybackStatus)}
+                  </span>
+                </div>
+
+                <div className="remote-player">
+                  <video
+                    ref={remoteVideoRef}
+                    className="remote-player__video"
+                    autoPlay
+                    playsInline
+                  />
+                  <audio ref={remoteAudioRef} autoPlay />
+
+                  {roomSession.remotePlaybackStatus !== "receiving" && (
+                    <div className="remote-player__overlay">
+                      <MonitorPlay size={34} aria-hidden="true" />
+                      <strong>
+                        {formatRemotePlaybackStatus(roomSession.remotePlaybackStatus)}
+                      </strong>
+                      <span>{formatRemotePlaybackHint(roomSession.remotePlaybackStatus)}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="remote-player__meta">
+                  <span>{formatTrackCount(roomSession.remotePlaybackTrackCount)}</span>
+                  {roomSession.remotePlaybackParticipantIdentity && (
+                    <span>{roomSession.remotePlaybackParticipantIdentity}</span>
+                  )}
+                  {roomSession.remotePlaybackVideoTrackName && (
+                    <span>{roomSession.remotePlaybackVideoTrackName}</span>
+                  )}
+                  {roomSession.remotePlaybackAudioTrackName && (
+                    <span>{roomSession.remotePlaybackAudioTrackName}</span>
+                  )}
+                </div>
+
+                {roomSession.remotePlaybackError && (
+                  <p className="file-picker__error" role="alert">
+                    {roomSession.remotePlaybackError}
+                  </p>
+                )}
+              </section>
+            )}
+
             <section className="room-card" aria-labelledby="room-details-title">
               <div className="room-card__heading">
                 <h3 id="room-details-title">Состояние комнаты</h3>
@@ -640,6 +716,30 @@ function formatFilePublicationStatus(status: FilePublicationStatus, trackCount: 
     idle: "Не опубликовано",
     live: `Live · ${formatTrackCount(trackCount)}`,
     publishing: "Публикация",
+  };
+
+  return labels[status];
+}
+
+function formatRemotePlaybackStatus(status: RemotePlaybackStatus) {
+  const labels: Record<RemotePlaybackStatus, string> = {
+    error: "Ошибка",
+    idle: "Нет потока",
+    lost: "Поток потерян",
+    receiving: "Получаем видео",
+    waiting: "Ждём host",
+  };
+
+  return labels[status];
+}
+
+function formatRemotePlaybackHint(status: RemotePlaybackStatus) {
+  const labels: Record<RemotePlaybackStatus, string> = {
+    error: "Не удалось воспроизвести поток.",
+    idle: "LiveKit подключается.",
+    lost: "Host остановил публикацию или отключился.",
+    receiving: "",
+    waiting: "Host ещё не опубликовал видео.",
   };
 
   return labels[status];

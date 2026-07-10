@@ -35,6 +35,12 @@ import {
   stopFilePublication as stopLiveKitFilePublication,
   type FilePublication,
 } from "./file-publication";
+import {
+  createRemotePlaybackController,
+  type RemotePlaybackController,
+  type RemotePlaybackElements,
+  type RemotePlaybackStatus,
+} from "./remote-playback";
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const MAX_EVENT_LOG_ITEMS = 8;
@@ -45,7 +51,7 @@ export type RoomActionStatus = "create" | "join" | "restore" | "leave" | "close"
 export type FileStatus = "idle" | "checking" | "ready" | "error";
 export type FilePublicationStatus = "idle" | "publishing" | "live" | "error";
 
-export type { FileDiagnosticsResult };
+export type { FileDiagnosticsResult, RemotePlaybackElements, RemotePlaybackStatus };
 
 export type RoomEventLogEntry = {
   eventId: string;
@@ -70,6 +76,12 @@ export type RoomSessionState = {
   liveKitStatus: LiveKitConnectionStatus;
   participant: Participant | null;
   pendingAction: RoomActionStatus;
+  remotePlaybackAudioTrackName: string | null;
+  remotePlaybackError: string | null;
+  remotePlaybackParticipantIdentity: string | null;
+  remotePlaybackStatus: RemotePlaybackStatus;
+  remotePlaybackTrackCount: number;
+  remotePlaybackVideoTrackName: string | null;
   room: RoomSnapshot | null;
 };
 
@@ -89,6 +101,12 @@ const initialState: RoomSessionState = {
   liveKitStatus: "idle",
   participant: null,
   pendingAction: null,
+  remotePlaybackAudioTrackName: null,
+  remotePlaybackError: null,
+  remotePlaybackParticipantIdentity: null,
+  remotePlaybackStatus: "idle",
+  remotePlaybackTrackCount: 0,
+  remotePlaybackVideoTrackName: null,
   room: null,
 };
 
@@ -102,6 +120,11 @@ export function useRoomSession(routeRoomId?: string) {
   const liveKitConnectionRef = useRef<LiveKitConnection | null>(null);
   const liveKitRequestIdRef = useRef(0);
   const participantRef = useRef<Participant | null>(null);
+  const remotePlaybackControllerRef = useRef<RemotePlaybackController | null>(null);
+  const remotePlaybackElementsRef = useRef<RemotePlaybackElements>({
+    audioElement: null,
+    videoElement: null,
+  });
   const restoredRouteRoomIdRef = useRef<string | null>(null);
   const roomRef = useRef<RoomSnapshot | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
@@ -123,6 +146,27 @@ export function useRoomSession(routeRoomId?: string) {
       URL.revokeObjectURL(fileObjectUrlRef.current);
       fileObjectUrlRef.current = null;
     }
+  }, []);
+
+  const disconnectRemotePlayback = useCallback(() => {
+    const controller = remotePlaybackControllerRef.current;
+    remotePlaybackControllerRef.current = null;
+    controller?.disconnect();
+
+    setState((current) => ({
+      ...current,
+      remotePlaybackAudioTrackName: null,
+      remotePlaybackError: null,
+      remotePlaybackParticipantIdentity: null,
+      remotePlaybackStatus: "idle",
+      remotePlaybackTrackCount: 0,
+      remotePlaybackVideoTrackName: null,
+    }));
+  }, []);
+
+  const setRemotePlaybackElements = useCallback((elements: RemotePlaybackElements) => {
+    remotePlaybackElementsRef.current = elements;
+    remotePlaybackControllerRef.current?.setElements(elements);
   }, []);
 
   const stopCurrentFilePublication = useCallback(() => {
@@ -299,6 +343,7 @@ export function useRoomSession(routeRoomId?: string) {
       liveKitRequestIdRef.current += 1;
       filePublicationRequestIdRef.current += 1;
       stopCurrentFilePublication();
+      disconnectRemotePlayback();
       const connection = liveKitConnectionRef.current;
       liveKitConnectionRef.current = null;
 
@@ -315,7 +360,7 @@ export function useRoomSession(routeRoomId?: string) {
         liveKitStatus: nextStatus,
       }));
     },
-    [stopCurrentFilePublication],
+    [disconnectRemotePlayback, stopCurrentFilePublication],
   );
 
   const disconnectSocket = useCallback(
@@ -343,6 +388,7 @@ export function useRoomSession(routeRoomId?: string) {
       const existingConnection = liveKitConnectionRef.current;
       liveKitConnectionRef.current = null;
       stopCurrentFilePublication();
+      disconnectRemotePlayback();
 
       if (existingConnection) {
         existingConnection.disconnect();
@@ -380,6 +426,7 @@ export function useRoomSession(routeRoomId?: string) {
             if (status === "disconnected") {
               filePublicationRequestIdRef.current += 1;
               stopCurrentFilePublication();
+              disconnectRemotePlayback();
             }
 
             setState((current) => ({
@@ -400,6 +447,27 @@ export function useRoomSession(routeRoomId?: string) {
         }
 
         liveKitConnectionRef.current = connection;
+        if (participantRef.current?.role === "GUEST") {
+          const playbackController = createRemotePlaybackController(connection.room, {
+            onStateChange: (remotePlayback) => {
+              if (liveKitRequestIdRef.current !== requestId) {
+                return;
+              }
+
+              setState((current) => ({
+                ...current,
+                remotePlaybackAudioTrackName: remotePlayback.audioTrackName,
+                remotePlaybackError: remotePlayback.error,
+                remotePlaybackParticipantIdentity: remotePlayback.participantIdentity,
+                remotePlaybackStatus: remotePlayback.status,
+                remotePlaybackTrackCount: remotePlayback.trackCount,
+                remotePlaybackVideoTrackName: remotePlayback.videoTrackName,
+              }));
+            },
+          });
+          remotePlaybackControllerRef.current = playbackController;
+          playbackController.setElements(remotePlaybackElementsRef.current);
+        }
       } catch (error) {
         if (liveKitRequestIdRef.current !== requestId) {
           return;
@@ -412,7 +480,7 @@ export function useRoomSession(routeRoomId?: string) {
         }));
       }
     },
-    [stopCurrentFilePublication],
+    [disconnectRemotePlayback, stopCurrentFilePublication],
   );
 
   const sendHeartbeat = useCallback((socket: WebSocket) => {
@@ -750,6 +818,7 @@ export function useRoomSession(routeRoomId?: string) {
     restore,
     routeRoomId,
     selectFile,
+    setRemotePlaybackElements,
     stopFilePublication,
   };
 }

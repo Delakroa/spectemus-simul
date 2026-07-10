@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
@@ -8,17 +8,26 @@ import { HomePage } from "./HomePage";
 
 const liveKitMock = vi.hoisted(() => {
   class MockLiveKitRoom {
-    handlers = new Map<string, Array<(value?: unknown) => void>>();
+    handlers = new Map<string, Array<(...values: unknown[]) => void>>();
     localParticipant = {
       publishTrack: vi.fn().mockResolvedValue({}),
       trackPublications: new Map(),
       unpublishTrack: vi.fn().mockResolvedValue(undefined),
     };
+    remoteParticipants = new Map();
     token: string | null = null;
     url: string | null = null;
 
-    on(event: string, handler: (value?: unknown) => void) {
+    on(event: string, handler: (...values: unknown[]) => void) {
       this.handlers.set(event, [...(this.handlers.get(event) ?? []), handler]);
+      return this;
+    }
+
+    off(event: string, handler: (...values: unknown[]) => void) {
+      this.handlers.set(
+        event,
+        (this.handlers.get(event) ?? []).filter((item) => item !== handler),
+      );
       return this;
     }
 
@@ -32,9 +41,9 @@ const liveKitMock = vi.hoisted(() => {
       this.emit("disconnected");
     });
 
-    emit(event: string, value?: unknown) {
+    emit(event: string, ...values: unknown[]) {
       for (const handler of this.handlers.get(event) ?? []) {
-        handler(value);
+        handler(...values);
       }
     }
   }
@@ -55,8 +64,11 @@ vi.mock("livekit-client", () => ({
     ConnectionStateChanged: "connectionStateChanged",
     Disconnected: "disconnected",
     LocalTrackPublished: "localTrackPublished",
+    ParticipantDisconnected: "participantDisconnected",
     Reconnected: "reconnected",
     Reconnecting: "reconnecting",
+    TrackSubscribed: "trackSubscribed",
+    TrackUnsubscribed: "trackUnsubscribed",
   },
   Track: {
     Source: {
@@ -507,6 +519,132 @@ describe("HomePage", () => {
     expect(screen.queryByRole("button", { name: "Выбрать файл" })).not.toBeInTheDocument();
   });
 
+  it("guest воспроизводит remote tracks из LiveKit", async () => {
+    vi.stubGlobal("WebSocket", MockWebSocket);
+    const user = userEvent.setup();
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const url = String(input);
+
+      if (url.endsWith("/health")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ status: "UP", checkedAt: "2026-07-10T10:00:00Z" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url.endsWith("/version")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              name: "watch-together-backend",
+              version: "0.1.0",
+              buildTime: "2026-07-10T10:00:00Z",
+              apiVersion: "v1",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      if (url.endsWith(`/api/v1/rooms/${roomId}/join`) && init?.method === "POST") {
+        const guestSnapshot = {
+          ...createRoomSnapshot(),
+          participants: [
+            createRoomSnapshot().participants[0],
+            {
+              participantId: guestId,
+              displayName: "Guest",
+              role: "GUEST",
+              online: true,
+              joinedAt: "2026-07-10T10:01:00Z",
+            },
+          ],
+        };
+
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              room: guestSnapshot,
+              participant: {
+                participantId: guestId,
+                displayName: "Guest",
+                role: "GUEST",
+                online: true,
+                joinedAt: "2026-07-10T10:01:00Z",
+              },
+            }),
+            { status: 201 },
+          ),
+        );
+      }
+
+      if (url.endsWith(`/api/v1/rooms/${roomId}/livekit-token`) && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              token: "header.payload.signature",
+              liveKitUrl: "ws://127.0.0.1:7880",
+              roomName: roomId,
+              participantId: guestId,
+              participantIdentity: guestId,
+              role: "GUEST",
+              canPublish: false,
+              canPublishData: true,
+              expiresAt: "2026-07-10T11:00:00Z",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response(null, { status: 404 }));
+    });
+
+    renderPage();
+
+    await screen.findByText("Сервис готов");
+    await user.type(screen.getByLabelText("Invite-ссылка или ID комнаты"), roomId);
+    await user.type(screen.getByLabelText("Имя гостя"), "GuestUser");
+    await user.click(screen.getByRole("button", { name: "Войти" }));
+
+    expect(await screen.findByText("Просмотр")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getAllByText("Ждём host").length).toBeGreaterThan(0);
+    });
+
+    const videoTrack = createRemoteTrack("video");
+    const audioTrack = createRemoteTrack("audio");
+    const participant = { identity: "host-participant", trackPublications: new Map() };
+    const videoPublication = { trackName: "movie-video" };
+    const audioPublication = { trackName: "movie-audio" };
+
+    await act(async () => {
+      liveKitMock.rooms[0]?.emit("trackSubscribed", videoTrack, videoPublication, participant);
+      liveKitMock.rooms[0]?.emit("trackSubscribed", audioTrack, audioPublication, participant);
+    });
+
+    expect(await screen.findByText("Получаем видео")).toBeInTheDocument();
+    expect(screen.getByText("2 дорожки")).toBeInTheDocument();
+    expect(screen.getByText("movie-video")).toBeInTheDocument();
+    expect(screen.getByText("movie-audio")).toBeInTheDocument();
+    expect(videoTrack.attach).toHaveBeenCalledWith(expect.any(HTMLVideoElement));
+    expect(audioTrack.attach).toHaveBeenCalledWith(expect.any(HTMLAudioElement));
+
+    await act(async () => {
+      liveKitMock.rooms[0]?.emit("trackUnsubscribed", videoTrack, videoPublication, participant);
+      liveKitMock.rooms[0]?.emit("trackUnsubscribed", audioTrack, audioPublication, participant);
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Поток потерян").length).toBeGreaterThan(0);
+    });
+    expect(videoTrack.detach).toHaveBeenCalledWith(expect.any(HTMLVideoElement));
+    expect(audioTrack.detach).toHaveBeenCalledWith(expect.any(HTMLAudioElement));
+  });
+
   it("успешный выбор файла показывает имя файла и длительность", async () => {
     vi.stubGlobal("WebSocket", MockWebSocket);
     const user = userEvent.setup();
@@ -855,6 +993,14 @@ function createTrack(kind: MediaStreamTrack["kind"]) {
     kind,
     stop: vi.fn(),
   } as unknown as MediaStreamTrack;
+}
+
+function createRemoteTrack(kind: "audio" | "video") {
+  return {
+    attach: vi.fn(),
+    detach: vi.fn(),
+    kind,
+  };
 }
 
 function createStream(videoTracks: MediaStreamTrack[], audioTracks: MediaStreamTrack[] = []) {

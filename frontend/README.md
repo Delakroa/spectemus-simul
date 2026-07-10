@@ -106,6 +106,13 @@ WT-304 добавляет публикацию выбранного файла h
 - UI показывает состояния `Публикация`, `Live` и ошибку публикации;
 - cleanup выполняется при выборе нового файла, leave, close, `room.closed`, LiveKit disconnect и unmount.
 
-Remote playback, playback controls, чат и голос остаются вне текущего frontend product UI.
+WT-305 добавляет guest playback:
+
+- guest видит карточку «Просмотр» после входа в комнату;
+- remote video track attach-ится к `HTMLVideoElement`, remote audio track — к `HTMLAudioElement`;
+- UI показывает состояния `Ждём host`, `Получаем видео`, `Поток потерян` и `Ошибка`;
+- cleanup выполняется при leave, close, `room.closed`, LiveKit disconnect и unmount.
+
+Playback controls, синхронизация play/pause/seek, чат и голос остаются вне текущего frontend product UI.
 
 REST, WebSocket и error contracts находятся в [`../contracts`](../contracts/README.md). Все внешние payload должны проходить runtime validation до попадания в состояние приложения.

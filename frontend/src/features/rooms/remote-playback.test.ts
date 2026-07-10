@@ -1,0 +1,111 @@
+import { describe, expect, it, vi } from "vitest";
+
+import { createRemotePlaybackController } from "./remote-playback";
+
+function createTrack(kind: "audio" | "video", name: string) {
+  return {
+    attach: vi.fn(),
+    detach: vi.fn(),
+    kind,
+    name,
+  };
+}
+
+function createPublication(track: ReturnType<typeof createTrack>, trackName: string) {
+  return {
+    track,
+    trackName,
+  };
+}
+
+function createParticipant(publications: Array<ReturnType<typeof createPublication>> = []) {
+  return {
+    identity: "host-participant",
+    trackPublications: new Map(
+      publications.map((publication) => [publication.trackName, publication]),
+    ),
+  };
+}
+
+function createRoom(participant = createParticipant()) {
+  const handlers = new Map<string, Set<(...args: unknown[]) => void>>();
+
+  return {
+    emit: (event: string, ...args: unknown[]) => {
+      for (const handler of handlers.get(event) ?? []) {
+        handler(...args);
+      }
+    },
+    off: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+      handlers.get(event)?.delete(handler);
+    }),
+    on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+      handlers.set(event, new Set([...(handlers.get(event) ?? []), handler]));
+    }),
+    remoteParticipants: new Map([[participant.identity, participant]]),
+  };
+}
+
+describe("createRemotePlaybackController", () => {
+  it("attach-ит существующие remote video/audio tracks к переданным media elements", async () => {
+    const videoTrack = createTrack("video", "movie-video-track");
+    const audioTrack = createTrack("audio", "movie-audio-track");
+    const videoPublication = createPublication(videoTrack, "movie-video");
+    const audioPublication = createPublication(audioTrack, "movie-audio");
+    const participant = createParticipant([videoPublication, audioPublication]);
+    const room = createRoom(participant);
+    const onStateChange = vi.fn();
+    const videoElement = document.createElement("video");
+    const audioElement = document.createElement("audio");
+    vi.spyOn(videoElement, "play").mockResolvedValue(undefined);
+    vi.spyOn(audioElement, "play").mockResolvedValue(undefined);
+
+    const controller = createRemotePlaybackController(room as never, { onStateChange });
+    controller.setElements({ audioElement, videoElement });
+
+    expect(videoTrack.attach).toHaveBeenCalledWith(videoElement);
+    expect(audioTrack.attach).toHaveBeenCalledWith(audioElement);
+    expect(onStateChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        audioTrackName: "movie-audio",
+        participantIdentity: "host-participant",
+        status: "receiving",
+        trackCount: 2,
+        videoTrackName: "movie-video",
+      }),
+    );
+
+    controller.disconnect();
+
+    expect(videoTrack.detach).toHaveBeenCalledWith(videoElement);
+    expect(audioTrack.detach).toHaveBeenCalledWith(audioElement);
+    expect(room.off).toHaveBeenCalledWith("trackSubscribed", expect.any(Function));
+    expect(room.off).toHaveBeenCalledWith("trackUnsubscribed", expect.any(Function));
+  });
+
+  it("переходит в lost когда remote track отписан", () => {
+    const videoTrack = createTrack("video", "movie-video-track");
+    const videoPublication = createPublication(videoTrack, "movie-video");
+    const participant = createParticipant();
+    const room = createRoom(participant);
+    const onStateChange = vi.fn();
+    const videoElement = document.createElement("video");
+    vi.spyOn(videoElement, "play").mockResolvedValue(undefined);
+
+    const controller = createRemotePlaybackController(room as never, { onStateChange });
+    controller.setElements({ audioElement: null, videoElement });
+
+    room.emit("trackSubscribed", videoTrack, videoPublication, participant);
+    room.emit("trackUnsubscribed", videoTrack, videoPublication, participant);
+
+    expect(videoTrack.detach).toHaveBeenCalledWith(videoElement);
+    expect(onStateChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        status: "lost",
+        trackCount: 0,
+      }),
+    );
+
+    controller.disconnect();
+  });
+});
