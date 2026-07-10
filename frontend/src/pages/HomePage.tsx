@@ -17,6 +17,7 @@ import {
 import { useParams } from "react-router-dom";
 
 import { type Participant, type RoomSnapshot } from "../features/rooms/room-api";
+import { type LiveKitConnectionStatus } from "../features/rooms/livekit-connection";
 import { type RoomConnectionStatus, useRoomSession } from "../features/rooms/use-room-session";
 import { useSystemStatus } from "../features/system/use-system-status";
 
@@ -161,17 +162,30 @@ export function HomePage() {
             <h2 id="room-workspace-title">Управление сеансом</h2>
           </div>
           {room && (
-            <span
-              className={`room-connection room-connection--${roomSession.connectionStatus}`}
-              role="status"
-            >
-              {roomSession.connectionStatus === "open" ? (
-                <Wifi size={17} aria-hidden="true" />
-              ) : (
-                <WifiOff size={17} aria-hidden="true" />
-              )}
-              {formatConnectionStatus(roomSession.connectionStatus)}
-            </span>
+            <div className="room-connection-group">
+              <span
+                className={`room-connection room-connection--${roomSession.connectionStatus}`}
+                role="status"
+              >
+                {roomSession.connectionStatus === "open" ? (
+                  <Wifi size={17} aria-hidden="true" />
+                ) : (
+                  <WifiOff size={17} aria-hidden="true" />
+                )}
+                {formatConnectionStatus(roomSession.connectionStatus)}
+              </span>
+              <span
+                className={`room-connection room-connection--${roomSession.liveKitStatus}`}
+                role="status"
+              >
+                {roomSession.liveKitStatus === "connected" ? (
+                  <Wifi size={17} aria-hidden="true" />
+                ) : (
+                  <WifiOff size={17} aria-hidden="true" />
+                )}
+                LiveKit: {formatLiveKitStatus(roomSession.liveKitStatus)}
+              </span>
+            </div>
           )}
         </div>
 
@@ -241,6 +255,16 @@ export function HomePage() {
             <div>
               <strong>Действие не выполнено</strong>
               <span>{roomSession.error}</span>
+            </div>
+          </div>
+        )}
+
+        {roomSession.liveKitError && (
+          <div className="system-message system-message--error" role="alert">
+            <WifiOff size={22} aria-hidden="true" />
+            <div>
+              <strong>LiveKit не подключён</strong>
+              <span>{roomSession.liveKitError}</span>
             </div>
           </div>
         )}
@@ -474,6 +498,19 @@ function formatConnectionStatus(status: RoomConnectionStatus) {
     error: "ошибка",
     idle: "нет соединения",
     open: "live",
+  };
+
+  return labels[status];
+}
+
+function formatLiveKitStatus(status: LiveKitConnectionStatus) {
+  const labels: Record<LiveKitConnectionStatus, string> = {
+    connected: "подключён",
+    connecting: "подключение",
+    disconnected: "отключён",
+    error: "ошибка",
+    idle: "ожидает",
+    reconnecting: "переподключение",
   };
 
   return labels[status];

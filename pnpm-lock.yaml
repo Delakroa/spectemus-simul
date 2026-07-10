@@ -29,6 +29,9 @@ importers:
       '@tanstack/react-query':
         specifier: 5.101.2
         version: 5.101.2(react@19.2.7)
+      livekit-client:
+        specifier: 2.20.0
+        version: 2.20.0(@types/dom-mediacapture-record@1.0.22)
       lucide-react:
         specifier: 1.23.0
         version: 1.23.0(react@19.2.7)

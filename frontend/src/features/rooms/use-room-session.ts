@@ -6,11 +6,17 @@ import {
   getRoom,
   joinRoom,
   leaveRoom,
+  mintLiveKitToken,
   resolveRoomEventsUrl,
   roomIdSchema,
   type Participant,
   type RoomSnapshot,
 } from "./room-api";
+import {
+  connectLiveKitRoom,
+  type LiveKitConnection,
+  type LiveKitConnectionStatus,
+} from "./livekit-connection";
 import {
   applyRoomServerEvent,
   describeRoomServerEvent,
@@ -39,6 +45,8 @@ export type RoomSessionState = {
   events: RoomEventLogEntry[];
   hostSecret: string | null;
   invitePath: string | null;
+  liveKitError: string | null;
+  liveKitStatus: LiveKitConnectionStatus;
   participant: Participant | null;
   pendingAction: RoomActionStatus;
   room: RoomSnapshot | null;
@@ -50,6 +58,8 @@ const initialState: RoomSessionState = {
   events: [],
   hostSecret: null,
   invitePath: null,
+  liveKitError: null,
+  liveKitStatus: "idle",
   participant: null,
   pendingAction: null,
   room: null,
@@ -58,6 +68,8 @@ const initialState: RoomSessionState = {
 export function useRoomSession(routeRoomId?: string) {
   const [state, setState] = useState<RoomSessionState>(initialState);
   const heartbeatTimerRef = useRef<number | null>(null);
+  const liveKitConnectionRef = useRef<LiveKitConnection | null>(null);
+  const liveKitRequestIdRef = useRef(0);
   const participantRef = useRef<Participant | null>(null);
   const restoredRouteRoomIdRef = useRef<string | null>(null);
   const roomRef = useRef<RoomSnapshot | null>(null);
@@ -73,6 +85,22 @@ export function useRoomSession(routeRoomId?: string) {
       window.clearInterval(heartbeatTimerRef.current);
       heartbeatTimerRef.current = null;
     }
+  }, []);
+
+  const disconnectLiveKit = useCallback((nextStatus: LiveKitConnectionStatus = "idle") => {
+    liveKitRequestIdRef.current += 1;
+    const connection = liveKitConnectionRef.current;
+    liveKitConnectionRef.current = null;
+
+    if (connection) {
+      connection.disconnect();
+    }
+
+    setState((current) => ({
+      ...current,
+      liveKitError: null,
+      liveKitStatus: nextStatus,
+    }));
   }, []);
 
   const disconnectSocket = useCallback(
@@ -92,6 +120,71 @@ export function useRoomSession(routeRoomId?: string) {
     },
     [stopHeartbeat],
   );
+
+  const connectLiveKit = useCallback(async (room: RoomSnapshot) => {
+    const requestId = liveKitRequestIdRef.current + 1;
+    liveKitRequestIdRef.current = requestId;
+    const existingConnection = liveKitConnectionRef.current;
+    liveKitConnectionRef.current = null;
+
+    if (existingConnection) {
+      existingConnection.disconnect();
+    }
+
+    setState((current) => ({
+      ...current,
+      liveKitError: null,
+      liveKitStatus: "connecting",
+    }));
+
+    try {
+      const token = await mintLiveKitToken(room.roomId);
+      if (liveKitRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      const connection = await connectLiveKitRoom(token, {
+        onError: (message) => {
+          if (liveKitRequestIdRef.current !== requestId) {
+            return;
+          }
+
+          setState((current) => ({
+            ...current,
+            liveKitError: message,
+            liveKitStatus: "error",
+          }));
+        },
+        onStatusChange: (status) => {
+          if (liveKitRequestIdRef.current !== requestId) {
+            return;
+          }
+
+          setState((current) => ({
+            ...current,
+            liveKitError: status === "error" ? current.liveKitError : null,
+            liveKitStatus: status,
+          }));
+        },
+      });
+      if (liveKitRequestIdRef.current !== requestId) {
+        connection.disconnect();
+        return;
+      }
+
+      liveKitConnectionRef.current = connection;
+    } catch (error) {
+      if (liveKitRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      setState((current) => ({
+        ...current,
+        liveKitError: getErrorMessage(error),
+        liveKitStatus: "error",
+      }));
+    }
+  }, []);
 
   const sendHeartbeat = useCallback((socket: WebSocket) => {
     const participant = participantRef.current;
@@ -162,6 +255,9 @@ export function useRoomSession(routeRoomId?: string) {
         try {
           const event = parseRoomServerEvent(JSON.parse(message.data));
           setState((current) => applyEventToState(current, event));
+          if (event.type === "room.closed") {
+            disconnectLiveKit("disconnected");
+          }
         } catch {
           setState((current) => ({
             ...current,
@@ -204,7 +300,7 @@ export function useRoomSession(routeRoomId?: string) {
         }));
       };
     },
-    [disconnectSocket, sendHeartbeat, stopHeartbeat],
+    [disconnectLiveKit, disconnectSocket, sendHeartbeat, stopHeartbeat],
   );
 
   const create = useCallback(
@@ -232,6 +328,7 @@ export function useRoomSession(routeRoomId?: string) {
           room: result.room,
         }));
         connectRoomEvents(result.room, participant);
+        void connectLiveKit(result.room);
       } catch (error) {
         setState((current) => ({
           ...current,
@@ -240,7 +337,7 @@ export function useRoomSession(routeRoomId?: string) {
         }));
       }
     },
-    [connectRoomEvents],
+    [connectLiveKit, connectRoomEvents],
   );
 
   const restore = useCallback(
@@ -272,6 +369,7 @@ export function useRoomSession(routeRoomId?: string) {
           room: result.room,
         }));
         connectRoomEvents(result.room, result.participant);
+        void connectLiveKit(result.room);
       } catch (error) {
         if (signal?.aborted) {
           return;
@@ -284,7 +382,7 @@ export function useRoomSession(routeRoomId?: string) {
         }));
       }
     },
-    [connectRoomEvents],
+    [connectLiveKit, connectRoomEvents],
   );
 
   const join = useCallback(
@@ -317,6 +415,7 @@ export function useRoomSession(routeRoomId?: string) {
           room: result.room,
         }));
         connectRoomEvents(result.room, result.participant);
+        void connectLiveKit(result.room);
       } catch (error) {
         setState((current) => ({
           ...current,
@@ -325,7 +424,7 @@ export function useRoomSession(routeRoomId?: string) {
         }));
       }
     },
-    [connectRoomEvents],
+    [connectLiveKit, connectRoomEvents],
   );
 
   const leave = useCallback(async () => {
@@ -338,6 +437,7 @@ export function useRoomSession(routeRoomId?: string) {
 
     try {
       await leaveRoom(room.roomId);
+      disconnectLiveKit("idle");
       disconnectSocket("idle");
       setState((current) => ({
         ...initialState,
@@ -350,7 +450,7 @@ export function useRoomSession(routeRoomId?: string) {
         pendingAction: null,
       }));
     }
-  }, [disconnectSocket]);
+  }, [disconnectLiveKit, disconnectSocket]);
 
   const close = useCallback(async () => {
     const room = roomRef.current;
@@ -364,6 +464,7 @@ export function useRoomSession(routeRoomId?: string) {
     try {
       await closeRoom(room.roomId, state.hostSecret);
       removeHostSecret(room.roomId);
+      disconnectLiveKit("disconnected");
       setState((current) => ({
         ...current,
         events: addLocalEvent(current.events, "Комната закрывается"),
@@ -375,7 +476,7 @@ export function useRoomSession(routeRoomId?: string) {
         pendingAction: null,
       }));
     }
-  }, [state.hostSecret]);
+  }, [disconnectLiveKit, state.hostSecret]);
 
   useEffect(() => {
     if (
@@ -392,7 +493,13 @@ export function useRoomSession(routeRoomId?: string) {
     return () => controller.abort();
   }, [restore, routeRoomId]);
 
-  useEffect(() => () => disconnectSocket("idle"), [disconnectSocket]);
+  useEffect(
+    () => () => {
+      disconnectLiveKit("idle");
+      disconnectSocket("idle");
+    },
+    [disconnectLiveKit, disconnectSocket],
+  );
 
   const inviteUrl = useMemo(() => {
     const path = state.invitePath ?? (state.room ? `/rooms/${state.room.roomId}` : null);
