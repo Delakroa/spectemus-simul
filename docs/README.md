@@ -8,7 +8,7 @@
 2. [DEFINITION_OF_DONE.md](DEFINITION_OF_DONE.md) — критерии закрытия тикета.
 3. [WT-004_MEDIA_PIPELINE_ADR.md](WT-004_MEDIA_PIPELINE_ADR.md) — ключевое решение по media pipeline.
 4. [WT-106_CONTRACTS.md](WT-106_CONTRACTS.md) — contract-first граница REST, WebSocket и ошибок.
-5. Текущие P2-документы `WT-201`-`WT-207` — реализованный room lifecycle.
+5. Текущие P2-документы `WT-201`-`WT-208` — реализованный room lifecycle и первый product UI для него.
 
 ## P0: media proof of concept
 
@@ -35,6 +35,7 @@
 - [WT-205_ROOM_CLOSE_EXPIRY.md](WT-205_ROOM_CLOSE_EXPIRY.md) — закрытие комнаты host-ом и expiry.
 - [WT-206_PARTICIPANT_LEAVE.md](WT-206_PARTICIPANT_LEAVE.md) — явный выход guest participant и `participant.left`.
 - [WT-207_PARTICIPANT_JOINED.md](WT-207_PARTICIPANT_JOINED.md) — событие `participant.joined` для активных WebSocket-сессий.
+- [WT-208_FRONTEND_ROOM_EVENTS.md](WT-208_FRONTEND_ROOM_EVENTS.md) — frontend create/join UI и применение room WebSocket events.
 
 ## Как обновлять документы
 

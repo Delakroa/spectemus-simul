@@ -230,6 +230,33 @@ a {
   font-weight: 650;
 }
 
+.watch-stage__room {
+  display: grid;
+  min-width: 0;
+  align-content: center;
+  justify-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.watch-stage__room strong {
+  display: block;
+  max-width: min(460px, 100%);
+  overflow: hidden;
+  font-size: 19px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watch-stage__room span:not(.watch-stage__icon, .watch-stage__participant) {
+  display: block;
+  margin-top: 7px;
+  color: #b8c0c7;
+  font-size: 13px;
+  font-weight: 650;
+}
+
 .watch-stage__icon {
   display: grid;
   width: 68px;
@@ -239,6 +266,32 @@ a {
   border-radius: 50%;
   color: var(--accent);
   background: #25292d;
+}
+
+.watch-stage__participants {
+  display: flex;
+  max-width: 100%;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.watch-stage__participant {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid #4d5359;
+  border-radius: 50%;
+  color: #dce2e6;
+  background: #2a2f34;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.watch-stage__participant--online {
+  border-color: rgb(38 179 121 / 70%);
+  box-shadow: 0 0 0 3px rgb(38 179 121 / 16%);
 }
 
 .watch-stage__timeline {
@@ -254,6 +307,335 @@ a {
   height: 100%;
   border-radius: inherit;
   background: var(--accent);
+}
+
+.room-workspace {
+  margin-top: 52px;
+  padding-top: 34px;
+  border-top: 1px solid var(--line);
+}
+
+.room-workspace__heading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.room-workspace h2 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+.room-connection {
+  display: inline-flex;
+  min-height: 34px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.room-connection--open {
+  color: var(--success);
+}
+
+.room-connection--error,
+.room-connection--closed {
+  color: var(--danger);
+}
+
+.room-actions {
+  display: grid;
+  margin-top: 24px;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(360px, 1.1fr);
+  gap: 18px;
+}
+
+.room-form {
+  display: grid;
+  min-width: 0;
+  gap: 9px;
+}
+
+.room-form label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.room-form__row,
+.room-form__grid {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+.room-form__row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.room-form__grid {
+  grid-template-columns: minmax(170px, 1fr) minmax(130px, 0.75fr) auto;
+}
+
+.room-form input {
+  min-width: 0;
+  height: 44px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.room-form input:focus {
+  border-color: #f08a72;
+  outline: 3px solid rgb(255 107 74 / 18%);
+}
+
+.room-dashboard {
+  display: grid;
+  margin-top: 26px;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(300px, 1fr) minmax(280px, 0.9fr);
+  gap: 18px;
+}
+
+.room-card {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.room-card__heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.room-card h3 {
+  overflow: hidden;
+  margin: 0;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-pill,
+.room-count {
+  display: inline-flex;
+  min-height: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.room-pill--playing,
+.room-pill--ready,
+.room-pill--created {
+  color: var(--success);
+}
+
+.room-pill--closed,
+.room-pill--expired {
+  color: var(--danger);
+}
+
+.room-metrics {
+  display: grid;
+  margin: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.room-metrics div {
+  min-width: 0;
+}
+
+.room-metrics dt {
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.room-metrics dd {
+  overflow: hidden;
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-copy-list {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+.room-copy-field {
+  display: grid;
+  min-width: 0;
+  min-height: 46px;
+  grid-template-columns: 88px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 0 0 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--muted);
+  background: #f8fafb;
+}
+
+.room-copy-field > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.room-copy-field a,
+.room-copy-field code {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-copy-field code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.room-copy-field .icon-button {
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 0 7px 7px 0;
+}
+
+.room-card__commands {
+  display: flex;
+  gap: 10px;
+}
+
+.participant-list,
+.event-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  gap: 10px;
+  list-style: none;
+}
+
+.participant-row {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.participant-row__avatar {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 50%;
+  color: #ffffff;
+  background: var(--ink);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.participant-row strong,
+.participant-row span {
+  display: block;
+  min-width: 0;
+}
+
+.participant-row strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.participant-row div > span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.participant-row__state {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.participant-row__state--online {
+  color: var(--success);
+}
+
+.event-list {
+  gap: 12px;
+}
+
+.event-list li {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 10px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.event-list time {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.event-list span {
+  min-width: 0;
+}
+
+.room-card__empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .system-panel {
@@ -443,6 +825,20 @@ a {
   background: #30343a;
 }
 
+.button--danger {
+  color: #ffffff;
+  background: var(--danger);
+}
+
+.button--danger:hover:not(:disabled) {
+  background: #a52f2a;
+}
+
+.button:disabled {
+  cursor: wait;
+  opacity: 0.56;
+}
+
 @media (max-width: 920px) {
   .hero {
     min-height: 0;
@@ -472,6 +868,15 @@ a {
 
   .system-details > div:nth-child(3) {
     padding-left: 0;
+  }
+
+  .room-actions,
+  .room-dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .room-form__grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -518,6 +923,41 @@ a {
   .watch-stage__icon {
     width: 58px;
     height: 58px;
+  }
+
+  .room-workspace__heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .room-workspace h2 {
+    font-size: 24px;
+  }
+
+  .room-form__row {
+    grid-template-columns: 1fr;
+  }
+
+  .room-form .button {
+    width: 100%;
+  }
+
+  .room-card {
+    padding: 17px;
+  }
+
+  .room-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .room-copy-field {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding-top: 8px;
+  }
+
+  .room-copy-field > span {
+    grid-column: 1 / -1;
   }
 
   .system-panel {

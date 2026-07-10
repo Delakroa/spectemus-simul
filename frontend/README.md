@@ -34,7 +34,7 @@ pnpm backend:bootRun
 pnpm dev:frontend
 ```
 
-Фронтенд будет доступен на `http://127.0.0.1:5173`. Vite проксирует запросы `/api` на `http://127.0.0.1:8080`.
+Фронтенд будет доступен на `http://127.0.0.1:5173`. Vite проксирует REST и WebSocket запросы `/api` на `http://127.0.0.1:8080`.
 
 Другой адрес бэкенда для локальной разработки можно задать через `VITE_BACKEND_PROXY_TARGET`. Для отдельного production API используется `VITE_API_BASE_URL`. Пример находится в `.env.example`.
 
@@ -61,10 +61,20 @@ pnpm --filter @watch-together/frontend test
 pnpm --filter @watch-together/frontend build
 ```
 
-## Границы WT-103
+## Текущий product UI
 
-Реализованы стартовая страница, маршрутизация, Error Boundary, адаптивная оболочка и вызовы `/api/v1/health` и `/api/v1/version`.
+WT-103 реализовал стартовую страницу, маршрутизацию, Error Boundary, адаптивную оболочку и вызовы `/api/v1/health` и `/api/v1/version`.
 
-Комнаты, аутентификация, LiveKit, media lifecycle, чат и голос находятся вне области WT-103.
+WT-208 добавил первый room lifecycle UI:
+
+- создание комнаты через `POST /api/v1/rooms`;
+- вход гостя через `/rooms/{roomId}` или форму с room ID;
+- WebSocket `/api/v1/rooms/{roomId}/events`;
+- runtime validation REST/WebSocket payload через Zod;
+- применение `room.snapshot`, `participant.joined`, `participant.left`, `participant.online`, `participant.offline` и `room.closed`;
+- heartbeat `participant.heartbeat` для открытого WebSocket;
+- команды close для host и leave для guest.
+
+LiveKit, media lifecycle, чат и голос остаются вне текущего frontend product UI.
 
 REST, WebSocket и error contracts находятся в [`../contracts`](../contracts/README.md). Все внешние payload должны проходить runtime validation до попадания в состояние приложения.

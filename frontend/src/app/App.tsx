@@ -9,6 +9,7 @@ export function App() {
     <Routes>
       <Route element={<AppShell />}>
         <Route index element={<HomePage />} />
+        <Route path="rooms/:roomId" element={<HomePage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

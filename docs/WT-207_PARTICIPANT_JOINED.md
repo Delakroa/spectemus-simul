@@ -64,5 +64,5 @@ pnpm security:audit
 ## Известные ограничения
 
 - `participant.joined` описывает вход в room membership, а не WebSocket connect. Online/offline presence остаётся областью WT-204.
-- Frontend-обработка `participant.joined` будет подключаться отдельным UI-тикетом.
+- Frontend-обработка `participant.joined` подключена в WT-208.
 - Replay по существующей session cookie намеренно не создаёт повторный `participant.joined`.

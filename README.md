@@ -23,6 +23,7 @@ P0 технически подтверждён.
 - WT-205 реализовал host close, `room.closed` и cleanup room lifecycle.
 - WT-206 реализовал явный выход guest participant, `participant.left` и освобождение места в комнате.
 - WT-207 реализовал `participant.joined` для активных WebSocket-сессий комнаты.
+- WT-208 подключил frontend к create/join flow и backend room WebSocket events.
 
 P1 foundation завершён. Проект находится в P2 room lifecycle. Chat, voice и product-токены LiveKit намеренно оставлены для следующих тикетов.
 
@@ -136,6 +137,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-205 room close и expiry](docs/WT-205_ROOM_CLOSE_EXPIRY.md)
 - [WT-206 participant leave](docs/WT-206_PARTICIPANT_LEAVE.md)
 - [WT-207 participant joined](docs/WT-207_PARTICIPANT_JOINED.md)
+- [WT-208 frontend room events](docs/WT-208_FRONTEND_ROOM_EVENTS.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation
