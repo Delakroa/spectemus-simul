@@ -34,6 +34,7 @@ P0 технически подтверждён.
 - WT-401 добавляет управление воспроизведением для host: play/pause/seek, rollback при ошибке.
 - WT-402 добавляет reconnect host: `HOST_DISCONNECTED`, grace period, восстановление роли и закрытие комнаты по таймауту.
 - WT-403 добавляет текстовый чат комнаты: лимит длины, серверный rate limit, XSS-защита, системные сообщения, эфемерная история.
+- WT-404 добавляет voice chat: явное включение микрофона, mute/unmute, отдельные microphone tracks и cleanup при disconnect.
 - WT-406 добавляет frontend auto-reconnect room WebSocket и восстановление host-публикации выбранного файла после LiveKit reconnect.
 
 P1 foundation, P2 room lifecycle и P3 media integration завершены. Проект находится в P4 host UX. Voice остаётся вне текущего product UI.
@@ -159,6 +160,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-401 host controls](docs/WT-401_HOST_CONTROLS.md)
 - [WT-402 host reconnect](docs/WT-402_HOST_RECONNECT.md)
 - [WT-403 текстовый чат](docs/WT-403_TEXT_CHAT.md)
+- [WT-404 voice chat](docs/WT-404_VOICE_CHAT.md)
 - [WT-406 frontend WebSocket reconnect](docs/WT-406_FRONTEND_WEBSOCKET_RECONNECT.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 

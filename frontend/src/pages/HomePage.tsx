@@ -9,6 +9,8 @@ import {
   Link as LinkIcon,
   LogIn,
   MessageSquare,
+  Mic,
+  MicOff,
   MonitorPlay,
   Pause,
   Play,
@@ -32,6 +34,7 @@ import {
   type PlaybackStatus,
   type RemotePlaybackStatus,
   type RoomConnectionStatus,
+  type VoiceChatStatus,
   useRoomSession,
 } from "../features/rooms/use-room-session";
 import { useSystemStatus } from "../features/system/use-system-status";
@@ -75,6 +78,11 @@ export function HomePage() {
   const canStopFilePublication =
     roomSession.filePublicationStatus === "publishing" ||
     roomSession.filePublicationStatus === "live";
+  const canUseVoice = roomSession.liveKitStatus === "connected" && !roomClosed;
+  const isVoiceActive =
+    roomSession.voiceStatus === "live" ||
+    roomSession.voiceStatus === "muted" ||
+    roomSession.voiceStatus === "requesting";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -583,6 +591,82 @@ export function HomePage() {
               </section>
             )}
 
+            {!roomClosed && (
+              <section className="room-card room-card--voice" aria-labelledby="voice-chat-title">
+                <div className="room-card__heading">
+                  <h3 id="voice-chat-title">Голос</h3>
+                  <span className={`room-pill room-pill--voice-${roomSession.voiceStatus}`}>
+                    {roomSession.voiceStatus === "live" ? (
+                      <Mic size={15} aria-hidden="true" />
+                    ) : (
+                      <MicOff size={15} aria-hidden="true" />
+                    )}
+                    {formatVoiceStatus(roomSession.voiceStatus)}
+                  </span>
+                </div>
+
+                <div className="voice-controls">
+                  {roomSession.voiceStatus === "live" ? (
+                    <button
+                      className="button"
+                      type="button"
+                      disabled={!canUseVoice}
+                      onClick={() => void roomSession.muteVoiceChat()}
+                    >
+                      <MicOff size={17} aria-hidden="true" />
+                      Выключить звук
+                    </button>
+                  ) : roomSession.voiceStatus === "muted" ? (
+                    <button
+                      className="button button--primary"
+                      type="button"
+                      disabled={!canUseVoice}
+                      onClick={() => void roomSession.unmuteVoiceChat()}
+                    >
+                      <Mic size={17} aria-hidden="true" />
+                      Включить звук
+                    </button>
+                  ) : (
+                    <button
+                      className="button button--primary"
+                      type="button"
+                      disabled={!canUseVoice || roomSession.voiceStatus === "requesting"}
+                      onClick={() => void roomSession.startVoiceChat()}
+                    >
+                      <Mic size={17} aria-hidden="true" />
+                      {roomSession.voiceStatus === "requesting"
+                        ? "Запрашиваем…"
+                        : "Включить микрофон"}
+                    </button>
+                  )}
+
+                  <button
+                    className="button"
+                    type="button"
+                    aria-label="Остановить голос"
+                    disabled={!isVoiceActive}
+                    onClick={() => roomSession.stopVoiceChat()}
+                  >
+                    <Square size={16} aria-hidden="true" />
+                    Остановить
+                  </button>
+                </div>
+
+                <div className="voice-meta">
+                  <span>{formatVoiceRemoteCount(roomSession.voiceRemoteParticipantCount)}</span>
+                  {roomSession.voiceRemoteParticipantIdentities.slice(0, 2).map((identity) => (
+                    <span key={identity}>{identity}</span>
+                  ))}
+                </div>
+
+                {(roomSession.voiceError || roomSession.voiceRemoteError) && (
+                  <p className="file-picker__error" role="alert">
+                    {roomSession.voiceError ?? roomSession.voiceRemoteError}
+                  </p>
+                )}
+              </section>
+            )}
+
             <section className="room-card" aria-labelledby="room-details-title">
               <div className="room-card__heading">
                 <h3 id="room-details-title">Состояние комнаты</h3>
@@ -938,6 +1022,28 @@ function formatRemotePlaybackHint(status: RemotePlaybackStatus) {
   };
 
   return labels[status];
+}
+
+function formatVoiceStatus(status: VoiceChatStatus) {
+  const labels: Record<VoiceChatStatus, string> = {
+    error: "Ошибка",
+    idle: "Микрофон выключен",
+    live: "Голос включён",
+    muted: "Без звука",
+    requesting: "Запрос микрофона",
+  };
+
+  return labels[status];
+}
+
+function formatVoiceRemoteCount(count: number) {
+  if (count === 0) {
+    return "Собеседников не слышно";
+  }
+  if (count === 1) {
+    return "1 голосовая дорожка";
+  }
+  return `${count} голосовые дорожки`;
 }
 
 function formatPlaybackSyncStatus(status: PlaybackStatus) {

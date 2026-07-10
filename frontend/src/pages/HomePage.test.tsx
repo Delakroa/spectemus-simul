@@ -8,6 +8,12 @@ import { PLAYBACK_STATE_TOPIC } from "../features/rooms/playback-state";
 import { HomePage } from "./HomePage";
 
 const liveKitMock = vi.hoisted(() => {
+  const localAudioTrack = {
+    mute: vi.fn().mockResolvedValue(undefined),
+    stop: vi.fn(),
+    unmute: vi.fn().mockResolvedValue(undefined),
+  };
+
   class MockLiveKitRoom {
     handlers = new Map<string, Array<(...values: unknown[]) => void>>();
     localParticipant = {
@@ -52,10 +58,11 @@ const liveKitMock = vi.hoisted(() => {
 
   const rooms: MockLiveKitRoom[] = [];
 
-  return { MockLiveKitRoom, rooms };
+  return { MockLiveKitRoom, localAudioTrack, rooms };
 });
 
 vi.mock("livekit-client", () => ({
+  createLocalAudioTrack: vi.fn().mockResolvedValue(liveKitMock.localAudioTrack),
   Room: class extends liveKitMock.MockLiveKitRoom {
     constructor() {
       super();
@@ -76,6 +83,7 @@ vi.mock("livekit-client", () => ({
   Track: {
     Source: {
       Camera: "camera",
+      Microphone: "microphone",
       ScreenShareAudio: "screen_share_audio",
     },
   },
@@ -498,7 +506,7 @@ describe("HomePage", () => {
               participantId: guestId,
               participantIdentity: guestId,
               role: "GUEST",
-              canPublish: false,
+              canPublish: true,
               canPublishData: true,
               expiresAt: "2026-07-10T11:00:00Z",
             }),
@@ -597,7 +605,7 @@ describe("HomePage", () => {
               participantId: guestId,
               participantIdentity: guestId,
               role: "GUEST",
-              canPublish: false,
+              canPublish: true,
               canPublishData: true,
               expiresAt: "2026-07-10T11:00:00Z",
             }),

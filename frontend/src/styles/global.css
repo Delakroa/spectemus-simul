@@ -470,17 +470,21 @@ a {
 .room-pill--playing,
 .room-pill--ready,
 .room-pill--created,
-.room-pill--file-live {
+.room-pill--file-live,
+.room-pill--voice-live {
   color: var(--success);
 }
 
 .room-pill--closed,
 .room-pill--expired,
-.room-pill--file-error {
+.room-pill--file-error,
+.room-pill--voice-error {
   color: var(--danger);
 }
 
-.room-pill--file-publishing {
+.room-pill--file-publishing,
+.room-pill--voice-muted,
+.room-pill--voice-requesting {
   color: #b15d10;
 }
 
@@ -494,7 +498,8 @@ a {
 }
 
 .room-pill--remote-waiting,
-.room-pill--remote-idle {
+.room-pill--remote-idle,
+.room-pill--voice-idle {
   color: var(--muted);
 }
 
@@ -896,6 +901,30 @@ a {
 }
 
 .remote-player__meta span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-controls {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.voice-meta {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.voice-meta span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

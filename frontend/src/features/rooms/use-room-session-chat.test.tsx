@@ -59,6 +59,7 @@ vi.mock("./livekit-connection", () => ({
             localParticipant: { publishData: vi.fn() },
             on: vi.fn().mockReturnThis(),
             off: vi.fn(),
+            remoteParticipants: new Map(),
           },
         };
       },
