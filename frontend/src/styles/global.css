@@ -785,6 +785,42 @@ a {
   white-space: nowrap;
 }
 
+.playback-sync {
+  display: flex;
+  min-width: 0;
+  min-height: 42px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #f8fafb;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.playback-sync span,
+.playback-sync strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playback-sync > span:first-child {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.playback-sync strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
 .system-panel {
   margin-top: 52px;
   padding: 28px 0 0;

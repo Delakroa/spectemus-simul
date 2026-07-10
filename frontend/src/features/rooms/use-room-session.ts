@@ -41,6 +41,14 @@ import {
   type RemotePlaybackElements,
   type RemotePlaybackStatus,
 } from "./remote-playback";
+import {
+  createGuestPlaybackStateReceiver,
+  createHostPlaybackStatePublisher,
+  type GuestPlaybackStateReceiver,
+  type HostPlaybackStatePublisher,
+  type PlaybackEvent,
+  type PlaybackStatus,
+} from "./playback-state";
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const MAX_EVENT_LOG_ITEMS = 8;
@@ -51,7 +59,7 @@ export type RoomActionStatus = "create" | "join" | "restore" | "leave" | "close"
 export type FileStatus = "idle" | "checking" | "ready" | "error";
 export type FilePublicationStatus = "idle" | "publishing" | "live" | "error";
 
-export type { FileDiagnosticsResult, RemotePlaybackElements, RemotePlaybackStatus };
+export type { FileDiagnosticsResult, PlaybackStatus, RemotePlaybackElements, RemotePlaybackStatus };
 
 export type RoomEventLogEntry = {
   eventId: string;
@@ -76,6 +84,16 @@ export type RoomSessionState = {
   liveKitStatus: LiveKitConnectionStatus;
   participant: Participant | null;
   pendingAction: RoomActionStatus;
+  playbackSyncCurrentTime: number;
+  playbackSyncDuration: number | null;
+  playbackSyncError: string | null;
+  playbackSyncEvent: PlaybackEvent | null;
+  playbackSyncFileName: string | null;
+  playbackSyncParticipantIdentity: string | null;
+  playbackSyncReceivedAt: string | null;
+  playbackSyncRevision: number;
+  playbackSyncSentAt: string | null;
+  playbackSyncStatus: PlaybackStatus;
   remotePlaybackAudioTrackName: string | null;
   remotePlaybackError: string | null;
   remotePlaybackParticipantIdentity: string | null;
@@ -101,6 +119,16 @@ const initialState: RoomSessionState = {
   liveKitStatus: "idle",
   participant: null,
   pendingAction: null,
+  playbackSyncCurrentTime: 0,
+  playbackSyncDuration: null,
+  playbackSyncError: null,
+  playbackSyncEvent: null,
+  playbackSyncFileName: null,
+  playbackSyncParticipantIdentity: null,
+  playbackSyncReceivedAt: null,
+  playbackSyncRevision: 0,
+  playbackSyncSentAt: null,
+  playbackSyncStatus: "idle",
   remotePlaybackAudioTrackName: null,
   remotePlaybackError: null,
   remotePlaybackParticipantIdentity: null,
@@ -120,6 +148,8 @@ export function useRoomSession(routeRoomId?: string) {
   const liveKitConnectionRef = useRef<LiveKitConnection | null>(null);
   const liveKitRequestIdRef = useRef(0);
   const participantRef = useRef<Participant | null>(null);
+  const playbackStatePublisherRef = useRef<HostPlaybackStatePublisher | null>(null);
+  const playbackStateReceiverRef = useRef<GuestPlaybackStateReceiver | null>(null);
   const remotePlaybackControllerRef = useRef<RemotePlaybackController | null>(null);
   const remotePlaybackElementsRef = useRef<RemotePlaybackElements>({
     audioElement: null,
@@ -164,19 +194,50 @@ export function useRoomSession(routeRoomId?: string) {
     }));
   }, []);
 
+  const resetPlaybackSyncState = useCallback(() => {
+    setState((current) => ({
+      ...current,
+      playbackSyncCurrentTime: 0,
+      playbackSyncDuration: null,
+      playbackSyncError: null,
+      playbackSyncEvent: null,
+      playbackSyncFileName: null,
+      playbackSyncParticipantIdentity: null,
+      playbackSyncReceivedAt: null,
+      playbackSyncRevision: 0,
+      playbackSyncSentAt: null,
+      playbackSyncStatus: "idle",
+    }));
+  }, []);
+
+  const stopPlaybackStatePublisher = useCallback((event: PlaybackEvent = "stop") => {
+    const publisher = playbackStatePublisherRef.current;
+    playbackStatePublisherRef.current = null;
+    publisher?.disconnect(event);
+  }, []);
+
+  const disconnectPlaybackStateReceiver = useCallback(() => {
+    const receiver = playbackStateReceiverRef.current;
+    playbackStateReceiverRef.current = null;
+    receiver?.disconnect();
+    resetPlaybackSyncState();
+  }, [resetPlaybackSyncState]);
+
   const setRemotePlaybackElements = useCallback((elements: RemotePlaybackElements) => {
     remotePlaybackElementsRef.current = elements;
     remotePlaybackControllerRef.current?.setElements(elements);
+    playbackStateReceiverRef.current?.setVideoElement(elements.videoElement);
   }, []);
 
   const stopCurrentFilePublication = useCallback(() => {
     const publication = filePublicationRef.current;
     filePublicationRef.current = null;
+    stopPlaybackStatePublisher();
 
     if (publication) {
       stopLiveKitFilePublication(liveKitConnectionRef.current?.room ?? null, publication);
     }
-  }, []);
+  }, [stopPlaybackStatePublisher]);
 
   const stopFilePublication = useCallback(() => {
     filePublicationRequestIdRef.current += 1;
@@ -313,6 +374,11 @@ export function useRoomSession(routeRoomId?: string) {
       }
 
       filePublicationRef.current = publication;
+      playbackStatePublisherRef.current = createHostPlaybackStatePublisher(
+        connection.room,
+        publication.videoElement,
+        file.displayName,
+      );
       setState((current) => ({
         ...current,
         filePublicationError: null,
@@ -344,6 +410,7 @@ export function useRoomSession(routeRoomId?: string) {
       filePublicationRequestIdRef.current += 1;
       stopCurrentFilePublication();
       disconnectRemotePlayback();
+      disconnectPlaybackStateReceiver();
       const connection = liveKitConnectionRef.current;
       liveKitConnectionRef.current = null;
 
@@ -360,7 +427,7 @@ export function useRoomSession(routeRoomId?: string) {
         liveKitStatus: nextStatus,
       }));
     },
-    [disconnectRemotePlayback, stopCurrentFilePublication],
+    [disconnectPlaybackStateReceiver, disconnectRemotePlayback, stopCurrentFilePublication],
   );
 
   const disconnectSocket = useCallback(
@@ -389,6 +456,7 @@ export function useRoomSession(routeRoomId?: string) {
       liveKitConnectionRef.current = null;
       stopCurrentFilePublication();
       disconnectRemotePlayback();
+      disconnectPlaybackStateReceiver();
 
       if (existingConnection) {
         existingConnection.disconnect();
@@ -427,6 +495,7 @@ export function useRoomSession(routeRoomId?: string) {
               filePublicationRequestIdRef.current += 1;
               stopCurrentFilePublication();
               disconnectRemotePlayback();
+              disconnectPlaybackStateReceiver();
             }
 
             setState((current) => ({
@@ -467,6 +536,34 @@ export function useRoomSession(routeRoomId?: string) {
           });
           remotePlaybackControllerRef.current = playbackController;
           playbackController.setElements(remotePlaybackElementsRef.current);
+
+          const playbackStateReceiver = createGuestPlaybackStateReceiver(
+            connection.room,
+            room.hostParticipantId,
+            {
+              onStateChange: (playbackState) => {
+                if (liveKitRequestIdRef.current !== requestId) {
+                  return;
+                }
+
+                setState((current) => ({
+                  ...current,
+                  playbackSyncCurrentTime: playbackState.currentTime,
+                  playbackSyncDuration: playbackState.duration,
+                  playbackSyncError: playbackState.error,
+                  playbackSyncEvent: playbackState.event,
+                  playbackSyncFileName: playbackState.fileName,
+                  playbackSyncParticipantIdentity: playbackState.participantIdentity,
+                  playbackSyncReceivedAt: playbackState.receivedAt,
+                  playbackSyncRevision: playbackState.revision,
+                  playbackSyncSentAt: playbackState.sentAt,
+                  playbackSyncStatus: playbackState.status,
+                }));
+              },
+            },
+          );
+          playbackStateReceiverRef.current = playbackStateReceiver;
+          playbackStateReceiver.setVideoElement(remotePlaybackElementsRef.current.videoElement);
         }
       } catch (error) {
         if (liveKitRequestIdRef.current !== requestId) {
@@ -480,7 +577,7 @@ export function useRoomSession(routeRoomId?: string) {
         }));
       }
     },
-    [disconnectRemotePlayback, stopCurrentFilePublication],
+    [disconnectPlaybackStateReceiver, disconnectRemotePlayback, stopCurrentFilePublication],
   );
 
   const sendHeartbeat = useCallback((socket: WebSocket) => {

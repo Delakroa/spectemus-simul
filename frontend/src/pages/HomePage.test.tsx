@@ -4,12 +4,14 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { createAppQueryClient } from "../app/query-client";
+import { PLAYBACK_STATE_TOPIC } from "../features/rooms/playback-state";
 import { HomePage } from "./HomePage";
 
 const liveKitMock = vi.hoisted(() => {
   class MockLiveKitRoom {
     handlers = new Map<string, Array<(...values: unknown[]) => void>>();
     localParticipant = {
+      publishData: vi.fn().mockResolvedValue(undefined),
       publishTrack: vi.fn().mockResolvedValue({}),
       trackPublications: new Map(),
       unpublishTrack: vi.fn().mockResolvedValue(undefined),
@@ -64,6 +66,7 @@ vi.mock("livekit-client", () => ({
     ConnectionStateChanged: "connectionStateChanged",
     Disconnected: "disconnected",
     LocalTrackPublished: "localTrackPublished",
+    DataReceived: "dataReceived",
     ParticipantDisconnected: "participantDisconnected",
     Reconnected: "reconnected",
     Reconnecting: "reconnecting",
@@ -522,7 +525,10 @@ describe("HomePage", () => {
   it("guest воспроизводит remote tracks из LiveKit", async () => {
     vi.stubGlobal("WebSocket", MockWebSocket);
     const user = userEvent.setup();
-    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    const mediaPlay = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    const mediaPause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {
+      // jsdom does not implement media playback.
+    });
 
     vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
       const url = String(input);
@@ -617,7 +623,7 @@ describe("HomePage", () => {
 
     const videoTrack = createRemoteTrack("video");
     const audioTrack = createRemoteTrack("audio");
-    const participant = { identity: "host-participant", trackPublications: new Map() };
+    const participant = { identity: hostId, trackPublications: new Map() };
     const videoPublication = { trackName: "movie-video" };
     const audioPublication = { trackName: "movie-audio" };
 
@@ -632,6 +638,37 @@ describe("HomePage", () => {
     expect(screen.getByText("movie-audio")).toBeInTheDocument();
     expect(videoTrack.attach).toHaveBeenCalledWith(expect.any(HTMLVideoElement));
     expect(audioTrack.attach).toHaveBeenCalledWith(expect.any(HTMLAudioElement));
+
+    await act(async () => {
+      liveKitMock.rooms[0]?.emit(
+        "dataReceived",
+        createPlaybackPayload({ event: "play", revision: 1, status: "playing" }),
+        participant,
+        undefined,
+        PLAYBACK_STATE_TOPIC,
+      );
+    });
+
+    expect(await screen.findByText("Host playback")).toBeInTheDocument();
+    expect(screen.getByText("Воспроизведение")).toBeInTheDocument();
+    expect(screen.getByText("0:12 / 1:00")).toBeInTheDocument();
+    expect(screen.getByText("rev 1")).toBeInTheDocument();
+    expect(screen.getByText("movie.mp4")).toBeInTheDocument();
+    expect(mediaPlay).toHaveBeenCalled();
+
+    await act(async () => {
+      liveKitMock.rooms[0]?.emit(
+        "dataReceived",
+        createPlaybackPayload({ event: "pause", revision: 2, status: "paused" }),
+        participant,
+        undefined,
+        PLAYBACK_STATE_TOPIC,
+      );
+    });
+
+    expect(await screen.findByText("Пауза")).toBeInTheDocument();
+    expect(screen.getByText("rev 2")).toBeInTheDocument();
+    expect(mediaPause).toHaveBeenCalled();
 
     await act(async () => {
       liveKitMock.rooms[0]?.emit("trackUnsubscribed", videoTrack, videoPublication, participant);
@@ -1015,6 +1052,9 @@ function createVideoStub(stream = createStream([createTrack("video")])) {
   const listeners = new Map<string, Set<() => void>>();
   const stub: Record<string, unknown> = {
     duration: 5400,
+    currentTime: 0,
+    ended: false,
+    paused: false,
     videoWidth: 1920,
     readyState: 0,
     preload: "",
@@ -1048,6 +1088,31 @@ function createVideoStub(stream = createStream([createTrack("video")])) {
   });
 
   return stub;
+}
+
+function createPlaybackPayload(
+  overrides: Partial<{
+    currentTime: number;
+    duration: number | null;
+    event: string;
+    fileName: string | null;
+    revision: number;
+    status: string;
+  }> = {},
+) {
+  return new TextEncoder().encode(
+    JSON.stringify({
+      schemaVersion: 1,
+      revision: 1,
+      event: "play",
+      status: "playing",
+      currentTime: 12,
+      duration: 60,
+      sentAt: "2026-07-10T10:30:00.000Z",
+      fileName: "movie.mp4",
+      ...overrides,
+    }),
+  );
 }
 
 function createRoomSnapshot() {

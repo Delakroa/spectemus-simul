@@ -113,6 +113,13 @@ WT-305 добавляет guest playback:
 - UI показывает состояния `Ждём host`, `Получаем видео`, `Поток потерян` и `Ошибка`;
 - cleanup выполняется при leave, close, `room.closed`, LiveKit disconnect и unmount.
 
-Playback controls, синхронизация play/pause/seek, чат и голос остаются вне текущего frontend product UI.
+WT-306 добавляет playback state sync:
+
+- host публикует reliable data messages в LiveKit topic `wt.playback-state.v1`;
+- guest принимает только host messages с монотонной `revision`;
+- `playing` вызывает `play()` на guest remote video, `paused`, `ended` и `idle` вызывают `pause()`;
+- guest UI показывает `Host playback`, время, revision и имя файла.
+
+Точная VOD-синхронизация seek, чат и голос остаются вне текущего frontend product UI.
 
 REST, WebSocket и error contracts находятся в [`../contracts`](../contracts/README.md). Все внешние payload должны проходить runtime validation до попадания в состояние приложения.

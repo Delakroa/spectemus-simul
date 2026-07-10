@@ -25,6 +25,7 @@ import { type Participant, type RoomSnapshot } from "../features/rooms/room-api"
 import { type LiveKitConnectionStatus } from "../features/rooms/livekit-connection";
 import {
   type FilePublicationStatus,
+  type PlaybackStatus,
   type RemotePlaybackStatus,
   type RoomConnectionStatus,
   useRoomSession,
@@ -457,9 +458,30 @@ export function HomePage() {
                   )}
                 </div>
 
+                <div className="playback-sync" aria-label="Host playback">
+                  <span>Host playback</span>
+                  <strong>{formatPlaybackSyncStatus(roomSession.playbackSyncStatus)}</strong>
+                  <span>
+                    {formatPlaybackSyncTime(
+                      roomSession.playbackSyncCurrentTime,
+                      roomSession.playbackSyncDuration,
+                    )}
+                  </span>
+                  <span>rev {roomSession.playbackSyncRevision}</span>
+                  {roomSession.playbackSyncFileName && (
+                    <span>{roomSession.playbackSyncFileName}</span>
+                  )}
+                </div>
+
                 {roomSession.remotePlaybackError && (
                   <p className="file-picker__error" role="alert">
                     {roomSession.remotePlaybackError}
+                  </p>
+                )}
+
+                {roomSession.playbackSyncError && (
+                  <p className="file-picker__error" role="alert">
+                    {roomSession.playbackSyncError}
                   </p>
                 )}
               </section>
@@ -743,6 +765,28 @@ function formatRemotePlaybackHint(status: RemotePlaybackStatus) {
   };
 
   return labels[status];
+}
+
+function formatPlaybackSyncStatus(status: PlaybackStatus) {
+  const labels: Record<PlaybackStatus, string> = {
+    ended: "Завершено",
+    idle: "Нет состояния",
+    paused: "Пауза",
+    playing: "Воспроизведение",
+    ready: "Готов",
+  };
+
+  return labels[status];
+}
+
+function formatPlaybackSyncTime(currentTime: number, duration: number | null) {
+  const current = formatDurationMs(currentTime * 1000);
+
+  if (duration === null || duration === 0) {
+    return current;
+  }
+
+  return `${current} / ${formatDurationMs(duration * 1000)}`;
 }
 
 function formatTrackCount(count: number) {
