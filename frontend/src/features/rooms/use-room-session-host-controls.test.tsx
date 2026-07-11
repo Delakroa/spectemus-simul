@@ -2,64 +2,81 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { publishFileToLiveKit } from "./file-publication";
+import { publishFileToLiveKit, stopFilePublication } from "./file-publication";
 import { useRoomSession } from "./use-room-session";
 
-const { liveKitHandlers, mockVideoElement, mockRoomSnapshot } = vi.hoisted(() => {
-  const ROOM_ID = "AbCdEfGhIjKlMnOpQrStUv";
-  const HOST_ID = "d0f8636f-e21e-4d7b-9fce-6fb0e6fb5678";
-  const liveKitHandlers: Array<{ onStatusChange: (status: string) => void }> = [];
+const { liveKitHandlers, mockGuestSnapshot, mockVideoElement, mockRoomSnapshot } = vi.hoisted(
+  () => {
+    const ROOM_ID = "AbCdEfGhIjKlMnOpQrStUv";
+    const HOST_ID = "d0f8636f-e21e-4d7b-9fce-6fb0e6fb5678";
+    const GUEST_ID = "8e7d79a8-a49f-48cc-a409-f07890dd3218";
+    const liveKitHandlers: Array<{ onStatusChange: (status: string) => void }> = [];
 
-  const mockRoomSnapshot = {
-    roomId: ROOM_ID,
-    status: "READY" as const,
-    hostParticipantId: HOST_ID,
-    participants: [
-      {
-        participantId: HOST_ID,
-        displayName: "Host",
-        role: "HOST" as const,
-        online: true,
-        joinedAt: "2026-07-10T10:00:00Z",
+    const mockRoomSnapshot = {
+      roomId: ROOM_ID,
+      status: "READY" as const,
+      hostParticipantId: HOST_ID,
+      participants: [
+        {
+          participantId: HOST_ID,
+          displayName: "Host",
+          role: "HOST" as const,
+          online: true,
+          joinedAt: "2026-07-10T10:00:00Z",
+        },
+      ],
+      media: null,
+      roomVersion: 1,
+      expiresAt: "2026-07-10T14:00:00Z",
+      updatedAt: "2026-07-10T10:00:00Z",
+    };
+    const listeners = new Map<string, Set<EventListener>>();
+
+    const mockVideoElement = {
+      currentTime: 0,
+      duration: 120,
+      ended: false,
+      paused: true,
+      play: vi.fn().mockResolvedValue(undefined),
+      pause: vi.fn(),
+      addEventListener: vi.fn((type: string, listener: EventListener) => {
+        listeners.set(type, new Set([...(listeners.get(type) ?? []), listener]));
+      }),
+      removeEventListener: vi.fn((type: string, listener: EventListener) => {
+        listeners.get(type)?.delete(listener);
+      }),
+      emit(type: string) {
+        for (const listener of listeners.get(type) ?? []) {
+          listener(new Event(type));
+        }
       },
-    ],
-    media: null,
-    roomVersion: 1,
-    expiresAt: "2026-07-10T14:00:00Z",
-    updatedAt: "2026-07-10T10:00:00Z",
-  };
-  const listeners = new Map<string, Set<EventListener>>();
+      reset() {
+        listeners.clear();
+        this.currentTime = 0;
+        this.duration = 120;
+        this.ended = false;
+        this.paused = true;
+        this.play.mockResolvedValue(undefined);
+      },
+    };
 
-  const mockVideoElement = {
-    currentTime: 0,
-    duration: 120,
-    ended: false,
-    paused: true,
-    play: vi.fn().mockResolvedValue(undefined),
-    pause: vi.fn(),
-    addEventListener: vi.fn((type: string, listener: EventListener) => {
-      listeners.set(type, new Set([...(listeners.get(type) ?? []), listener]));
-    }),
-    removeEventListener: vi.fn((type: string, listener: EventListener) => {
-      listeners.get(type)?.delete(listener);
-    }),
-    emit(type: string) {
-      for (const listener of listeners.get(type) ?? []) {
-        listener(new Event(type));
-      }
-    },
-    reset() {
-      listeners.clear();
-      this.currentTime = 0;
-      this.duration = 120;
-      this.ended = false;
-      this.paused = true;
-      this.play.mockResolvedValue(undefined);
-    },
-  };
+    const mockGuestSnapshot = {
+      ...mockRoomSnapshot,
+      participants: [
+        ...mockRoomSnapshot.participants,
+        {
+          participantId: GUEST_ID,
+          displayName: "Guest",
+          role: "GUEST" as const,
+          online: true,
+          joinedAt: "2026-07-10T10:01:00Z",
+        },
+      ],
+    };
 
-  return { liveKitHandlers, mockVideoElement, mockRoomSnapshot };
-});
+    return { liveKitHandlers, mockGuestSnapshot, mockVideoElement, mockRoomSnapshot };
+  },
+);
 
 vi.mock("./room-api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./room-api")>();
@@ -69,6 +86,10 @@ vi.mock("./room-api", async (importOriginal) => {
       room: mockRoomSnapshot,
       hostSecret: "a".repeat(43),
       invitePath: `/rooms/${mockRoomSnapshot.roomId}`,
+    }),
+    joinRoom: vi.fn().mockResolvedValue({
+      room: mockGuestSnapshot,
+      participant: mockGuestSnapshot.participants[1],
     }),
     mintLiveKitToken: vi.fn().mockResolvedValue({
       token: "header.payload.sig",
@@ -208,6 +229,9 @@ function HostControlsHarness() {
       <button type="button" onClick={() => void session.create("Host")}>
         Создать
       </button>
+      <button type="button" onClick={() => void session.join(mockRoomSnapshot.roomId, "Guest")}>
+        Войти
+      </button>
       <button
         type="button"
         onClick={() => void session.selectFile(new File([""], "movie.mp4", { type: "video/mp4" }))}
@@ -231,6 +255,7 @@ function HostControlsHarness() {
       </button>
 
       <span data-testid="pub-status">{session.filePublicationStatus}</span>
+      <span data-testid="pub-error">{session.filePublicationError ?? ""}</span>
       <span data-testid="pb-status">{session.hostPlaybackStatus}</span>
       <span data-testid="pb-time">{session.hostPlaybackCurrentTime}</span>
       <span data-testid="pb-duration">{String(session.hostPlaybackDuration)}</span>
@@ -240,7 +265,7 @@ function HostControlsHarness() {
 }
 
 async function setupLivePublication(user: ReturnType<typeof userEvent.setup>) {
-  render(<HostControlsHarness />);
+  const renderResult = render(<HostControlsHarness />);
 
   vi.stubGlobal("WebSocket", MockWebSocket);
   vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:movie-url");
@@ -256,6 +281,8 @@ async function setupLivePublication(user: ReturnType<typeof userEvent.setup>) {
 
   await user.click(screen.getByRole("button", { name: "Опубликовать" }));
   await waitFor(() => expect(screen.getByTestId("pub-status")).toHaveTextContent("live"));
+
+  return renderResult;
 }
 
 beforeEach(() => {
@@ -370,5 +397,47 @@ describe("useRoomSession host playback controls", () => {
 
     await waitFor(() => expect(publishFileToLiveKitMock).toHaveBeenCalledTimes(2));
     expect(screen.getByTestId("pub-status")).toHaveTextContent("live");
+  });
+
+  it("останавливает публикацию и playback tracking при unmount", async () => {
+    const user = userEvent.setup();
+    const { unmount } = await setupLivePublication(user);
+
+    unmount();
+
+    expect(stopFilePublication).toHaveBeenCalledWith(expect.anything(), expect.anything());
+    expect(mockVideoElement.removeEventListener).toHaveBeenCalledWith("play", expect.any(Function));
+    expect(mockVideoElement.removeEventListener).toHaveBeenCalledWith(
+      "pause",
+      expect.any(Function),
+    );
+    expect(mockVideoElement.removeEventListener).toHaveBeenCalledWith(
+      "timeupdate",
+      expect.any(Function),
+    );
+  });
+
+  it("не публикует файл из guest session даже если action вызван напрямую", async () => {
+    const user = userEvent.setup();
+    render(<HostControlsHarness />);
+
+    vi.stubGlobal("WebSocket", MockWebSocket);
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:movie-url");
+    vi.spyOn(URL, "revokeObjectURL").mockReturnValue(undefined);
+
+    await user.click(screen.getByRole("button", { name: "Войти" }));
+    await waitFor(() => expect(screen.getByTestId("pub-status")).toHaveTextContent("idle"));
+    MockWebSocket.instances[0]?.onopen?.(new Event("open"));
+
+    await user.click(screen.getByRole("button", { name: "Выбрать" }));
+    await waitFor(() => expect(screen.getByTestId("pub-status")).toHaveTextContent("idle"));
+
+    await user.click(screen.getByRole("button", { name: "Опубликовать" }));
+
+    expect(screen.getByTestId("pub-status")).toHaveTextContent("error");
+    expect(screen.getByTestId("pub-error")).toHaveTextContent(
+      "Публиковать файл может только host.",
+    );
+    expect(publishFileToLiveKit).not.toHaveBeenCalled();
   });
 });

@@ -1,8 +1,10 @@
 import {
   ApiProblemError,
+  closeRoom,
   createRoom,
   getRoom,
   joinRoom,
+  leaveRoom,
   mintLiveKitToken,
   resolveRoomEventsUrl,
 } from "./room-api";
@@ -163,6 +165,43 @@ describe("room api", () => {
         method: "POST",
       }),
     );
+  });
+
+  it("отправляет leave как authenticated command без тела", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 204 }));
+
+    await expect(leaveRoom(roomId)).resolves.toBeUndefined();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/v1/rooms/${roomId}/leave`,
+      expect.objectContaining({
+        credentials: "include",
+        method: "POST",
+      }),
+    );
+    expect(fetchMock.mock.calls[0]?.[1]).not.toHaveProperty("body");
+  });
+
+  it("отправляет close с host secret только в заголовке", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 204 }));
+
+    await expect(closeRoom(roomId, "host-secret")).resolves.toBeUndefined();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/v1/rooms/${roomId}/close`,
+      expect.objectContaining({
+        credentials: "include",
+        headers: expect.objectContaining({
+          "X-Host-Secret": "host-secret",
+        }),
+        method: "POST",
+      }),
+    );
+    expect(fetchMock.mock.calls[0]?.[1]).not.toHaveProperty("body");
   });
 
   it("строит WebSocket URL от текущего origin", () => {
