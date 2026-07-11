@@ -1,4 +1,11 @@
-import { createRoom, getRoom, joinRoom, mintLiveKitToken, resolveRoomEventsUrl } from "./room-api";
+import {
+  ApiProblemError,
+  createRoom,
+  getRoom,
+  joinRoom,
+  mintLiveKitToken,
+  resolveRoomEventsUrl,
+} from "./room-api";
 
 const roomId = "AbCdEfGhIjKlMnOpQrStUv";
 
@@ -67,6 +74,34 @@ describe("room api", () => {
     );
 
     await expect(joinRoom(roomId, "Guest")).rejects.toThrow();
+  });
+
+  it("сохраняет problem details из HTTP-ошибки", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          title: "Комната недоступна",
+          status: 404,
+          code: "ROOM_NOT_FOUND",
+          detail: "Комната не найдена или уже закрыта.",
+          instance: `/api/v1/rooms/${roomId}/join`,
+          correlationId: "11111111-1111-4111-8111-111111111111",
+          retryable: false,
+        }),
+        { status: 404 },
+      ),
+    );
+
+    await expect(joinRoom(roomId, "Guest")).rejects.toMatchObject({
+      message: "Комната не найдена или уже закрыта.",
+      name: "ApiProblemError",
+      problem: {
+        code: "ROOM_NOT_FOUND",
+        correlationId: "11111111-1111-4111-8111-111111111111",
+        retryable: false,
+        status: 404,
+      },
+    } satisfies Partial<ApiProblemError>);
   });
 
   it("восстанавливает комнату по текущей session cookie", async () => {

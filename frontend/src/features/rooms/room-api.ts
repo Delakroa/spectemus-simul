@@ -82,6 +82,23 @@ type RequestOptions = {
   signal?: AbortSignal;
 };
 
+export type ApiProblem = {
+  code?: string;
+  correlationId?: string;
+  detail?: string;
+  instance?: string;
+  retryable?: boolean;
+  status: number;
+  title?: string;
+};
+
+export class ApiProblemError extends Error {
+  constructor(public readonly problem: ApiProblem) {
+    super(problem.detail ?? problem.title ?? `Backend вернул HTTP ${problem.status}`);
+    this.name = "ApiProblemError";
+  }
+}
+
 export type Participant = z.infer<typeof participantSchema>;
 export type RoomSnapshot = z.infer<typeof roomSnapshotSchema>;
 export type CreateRoomResponse = z.infer<typeof createRoomResponseSchema>;
@@ -132,18 +149,31 @@ async function command(path: string, options: RequestOptions = {}) {
 }
 
 async function createResponseError(response: Response) {
-  let message = `Backend вернул HTTP ${response.status}`;
+  let problem: ApiProblem = {
+    retryable: response.status === 429 || response.status >= 500,
+    status: response.status,
+    title: response.statusText || undefined,
+  };
 
   try {
-    const body = (await response.json()) as { detail?: unknown; title?: unknown };
-    const detail = typeof body.detail === "string" ? body.detail : undefined;
-    const title = typeof body.title === "string" ? body.title : undefined;
-    message = detail ?? title ?? message;
+    const body = (await response.json()) as Record<string, unknown>;
+    problem = {
+      code: typeof body.code === "string" ? body.code : undefined,
+      correlationId: typeof body.correlationId === "string" ? body.correlationId : undefined,
+      detail: typeof body.detail === "string" ? body.detail : undefined,
+      instance: typeof body.instance === "string" ? body.instance : undefined,
+      retryable:
+        typeof body.retryable === "boolean"
+          ? body.retryable
+          : response.status === 429 || response.status >= 500,
+      status: typeof body.status === "number" ? body.status : response.status,
+      title: typeof body.title === "string" ? body.title : problem.title,
+    };
   } catch {
     // Plain HTTP status is enough when backend returns an empty body.
   }
 
-  return new Error(message);
+  return new ApiProblemError(problem);
 }
 
 function createIdempotencyKey() {
