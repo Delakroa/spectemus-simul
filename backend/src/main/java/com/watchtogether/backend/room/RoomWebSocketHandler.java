@@ -287,6 +287,9 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
         unregister(roomId, participantId, connectionId, session);
         PresenceResult presence =
                 store.disconnect(roomId, sessionHash, participantId, connectionId, Instant.now(clock));
+        if (presence == null) {
+            return;
+        }
         broadcastPresenceChange(roomId, presence, session);
         handleHostDisconnect(roomId, participantId, presence);
     }
