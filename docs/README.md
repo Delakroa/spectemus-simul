@@ -59,6 +59,7 @@
 
 ## P5: stabilization
 
+- [WT-501_BACKEND_TESTS.md](WT-501_BACKEND_TESTS.md) — backend tests: аудит покрытия по 7 областям и закрытие WebSocket-пробелов (duplicate/stale connection, identity mismatch).
 - [WT-502_FRONTEND_TESTS.md](WT-502_FRONTEND_TESTS.md) — frontend tests: player state, cleanup, errors/reconnect, permissions и API contracts.
 
 ## Как обновлять документы

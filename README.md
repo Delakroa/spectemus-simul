@@ -37,6 +37,7 @@ P0 технически подтверждён.
 - WT-404 добавляет voice chat: явное включение микрофона, mute/unmute, отдельные microphone tracks и cleanup при disconnect.
 - WT-405 добавляет privacy-safe индикаторы качества LiveKit: upload/download bitrate, packet loss, jitter, RTT и warning states.
 - WT-406 добавляет frontend auto-reconnect room WebSocket, восстановление host-публикации после LiveKit reconnect и Error UX с recovery-действиями.
+- WT-501 усиливает backend test suite: аудит покрытия по 7 областям и закрытие WebSocket-пробелов (duplicate/stale connection, identity mismatch).
 - WT-502 усиливает frontend test suite вокруг player state, cleanup, errors/reconnect, permissions и API contracts.
 
 P1 foundation, P2 room lifecycle, P3 media integration и P4 host UX завершены. Проект находится в P5 stabilization.
@@ -165,6 +166,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-404 voice chat](docs/WT-404_VOICE_CHAT.md)
 - [WT-405 quality indicators](docs/WT-405_QUALITY_INDICATORS.md)
 - [WT-406 frontend reconnect и Error UX](docs/WT-406_FRONTEND_WEBSOCKET_RECONNECT.md)
+- [WT-501 backend tests](docs/WT-501_BACKEND_TESTS.md)
 - [WT-502 frontend tests](docs/WT-502_FRONTEND_TESTS.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
