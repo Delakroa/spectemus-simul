@@ -715,9 +715,15 @@ describe("HomePage", () => {
     await user.click(screen.getByRole("button", { name: "Войти" }));
 
     expect(await screen.findByText("Просмотр")).toBeInTheDocument();
+    expect(await screen.findByText("Качество")).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getAllByText("Ждём host").length).toBeGreaterThan(0);
     });
+    await act(async () => {
+      liveKitMock.rooms[0]?.emit("connectionQualityChanged", "poor", { identity: guestId });
+    });
+    expect(await screen.findByText("Плохая связь")).toBeInTheDocument();
+    expect(screen.getByText("LiveKit сообщает о плохом качестве соединения.")).toBeInTheDocument();
     const player = document.querySelector(".remote-player") as HTMLDivElement;
     const requestFullscreen = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(player, "requestFullscreen", {

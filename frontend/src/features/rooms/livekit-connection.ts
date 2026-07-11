@@ -1,9 +1,16 @@
-import type { ConnectionState, Room as LiveKitRoom } from "livekit-client";
+import type {
+  ConnectionQuality,
+  ConnectionState,
+  Participant,
+  Room as LiveKitRoom,
+} from "livekit-client";
 
 import type { LiveKitTokenResponse } from "./room-api";
 
 export type LiveKitConnectionStatus =
   "idle" | "connecting" | "connected" | "reconnecting" | "disconnected" | "error";
+
+export type LiveKitConnectionQuality = "excellent" | "good" | "poor" | "lost" | "unknown";
 
 export type LiveKitConnection = {
   disconnect: () => void;
@@ -13,6 +20,7 @@ export type LiveKitConnection = {
 export type LiveKitConnectionHandlers = {
   onError: (message: string) => void;
   onStatusChange: (status: LiveKitConnectionStatus) => void;
+  onQualityChange?: (quality: LiveKitConnectionQuality) => void;
 };
 
 export async function connectLiveKitRoom(
@@ -28,7 +36,15 @@ export async function connectLiveKitRoom(
     })
     .on(RoomEvent.Reconnecting, () => handlers.onStatusChange("reconnecting"))
     .on(RoomEvent.Reconnected, () => handlers.onStatusChange("connected"))
-    .on(RoomEvent.Disconnected, () => handlers.onStatusChange("disconnected"));
+    .on(RoomEvent.Disconnected, () => handlers.onStatusChange("disconnected"))
+    .on(
+      RoomEvent.ConnectionQualityChanged,
+      (quality: ConnectionQuality, participant: Participant) => {
+        if (participant.isLocal) {
+          handlers.onQualityChange?.(toQuality(quality));
+        }
+      },
+    );
 
   try {
     await room.connect(token.liveKitUrl, token.token);
@@ -60,5 +76,20 @@ function toStatus(state: ConnectionState): LiveKitConnectionStatus {
       return "disconnected";
     default:
       return "idle";
+  }
+}
+
+function toQuality(quality: ConnectionQuality): LiveKitConnectionQuality {
+  switch (String(quality)) {
+    case "excellent":
+      return "excellent";
+    case "good":
+      return "good";
+    case "poor":
+      return "poor";
+    case "lost":
+      return "lost";
+    default:
+      return "unknown";
   }
 }

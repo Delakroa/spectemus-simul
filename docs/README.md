@@ -54,6 +54,7 @@
 - [WT-402_HOST_RECONNECT.md](WT-402_HOST_RECONNECT.md) — reconnect host: `HOST_DISCONNECTED`, grace period, восстановление роли, закрытие по таймауту (`HOST_TIMEOUT`).
 - [WT-403_TEXT_CHAT.md](WT-403_TEXT_CHAT.md) — текстовый чат комнаты: лимит длины, серверный rate limit, XSS-защита, системные сообщения, эфемерная история.
 - [WT-404_VOICE_CHAT.md](WT-404_VOICE_CHAT.md) — voice chat: явное включение микрофона, mute/unmute, отдельные microphone tracks и cleanup.
+- [WT-405_QUALITY_INDICATORS.md](WT-405_QUALITY_INDICATORS.md) — privacy-safe индикаторы качества LiveKit: bitrate, packet loss, jitter, RTT и warning states.
 - [WT-406_FRONTEND_WEBSOCKET_RECONNECT.md](WT-406_FRONTEND_WEBSOCKET_RECONNECT.md) — frontend auto-reconnect room WebSocket, сохранение локального чата и восстановление host-публикации после LiveKit reconnect.
 
 ## Как обновлять документы
