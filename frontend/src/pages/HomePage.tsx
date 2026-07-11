@@ -1,6 +1,7 @@
 import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import {
   Activity,
+  AlertTriangle,
   CircleCheck,
   Clapperboard,
   Copy,
@@ -26,6 +27,7 @@ import {
   Users,
   Wifi,
   WifiOff,
+  X,
 } from "lucide-react";
 import { useParams } from "react-router-dom";
 
@@ -37,6 +39,8 @@ import {
   type QualityIndicatorsState,
   type RemotePlaybackStatus,
   type RoomConnectionStatus,
+  type RoomUserError,
+  type RoomUserErrorAction,
   type VoiceChatStatus,
   useRoomSession,
 } from "../features/rooms/use-room-session";
@@ -208,6 +212,20 @@ export function HomePage() {
 
   function handleToggleWatchFullscreen() {
     void toggleFullscreen(watchPlayerRef.current);
+  }
+
+  function handleUserErrorAction(action: RoomUserErrorAction) {
+    switch (action) {
+      case "retry-room-action":
+        roomSession.retryLastRoomAction();
+        break;
+      case "retry-websocket":
+        roomSession.retryRoomConnection();
+        break;
+      case "retry-livekit":
+        roomSession.retryLiveKitConnection();
+        break;
+    }
   }
 
   function handleSendChat(event: FormEvent<HTMLFormElement>) {
@@ -406,24 +424,34 @@ export function HomePage() {
           </div>
         )}
 
-        {roomSession.error && (
-          <div className="system-message system-message--error" role="alert">
-            <WifiOff size={22} aria-hidden="true" />
-            <div>
-              <strong>Действие не выполнено</strong>
-              <span>{roomSession.error}</span>
-            </div>
-          </div>
-        )}
+        {roomSession.userError ? (
+          <UserErrorBanner
+            error={roomSession.userError}
+            onAction={handleUserErrorAction}
+            onDismiss={roomSession.clearUserError}
+          />
+        ) : (
+          <>
+            {roomSession.error && (
+              <div className="system-message system-message--error" role="alert">
+                <WifiOff size={22} aria-hidden="true" />
+                <div>
+                  <strong>Действие не выполнено</strong>
+                  <span>{roomSession.error}</span>
+                </div>
+              </div>
+            )}
 
-        {roomSession.liveKitError && (
-          <div className="system-message system-message--error" role="alert">
-            <WifiOff size={22} aria-hidden="true" />
-            <div>
-              <strong>LiveKit не подключён</strong>
-              <span>{roomSession.liveKitError}</span>
-            </div>
-          </div>
+            {roomSession.liveKitError && (
+              <div className="system-message system-message--error" role="alert">
+                <WifiOff size={22} aria-hidden="true" />
+                <div>
+                  <strong>LiveKit не подключён</strong>
+                  <span>{roomSession.liveKitError}</span>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {room?.status === "HOST_DISCONNECTED" && (
@@ -523,15 +551,34 @@ export function HomePage() {
                   )}
 
                   {roomSession.filePublicationError && (
-                    <p className="file-picker__error" role="alert">
-                      {roomSession.filePublicationError}
-                    </p>
+                    <div className="inline-error" role="alert">
+                      <p>{roomSession.filePublicationError}</p>
+                      {roomSession.filePublicationStatus === "error" && (
+                        <button
+                          className="button"
+                          type="button"
+                          disabled={!canPublishFile}
+                          onClick={() => void roomSession.publishFile()}
+                        >
+                          <RefreshCw size={16} aria-hidden="true" />
+                          Повторить
+                        </button>
+                      )}
+                    </div>
                   )}
 
                   {roomSession.fileStatus === "error" && roomSession.fileError && (
-                    <p className="file-picker__error" role="alert">
-                      {roomSession.fileError}
-                    </p>
+                    <div className="inline-error" role="alert">
+                      <p>{roomSession.fileError}</p>
+                      <button
+                        className="button"
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <FolderOpen size={16} aria-hidden="true" />
+                        Другой файл
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -781,9 +828,20 @@ export function HomePage() {
                 </div>
 
                 {(roomSession.voiceError || roomSession.voiceRemoteError) && (
-                  <p className="file-picker__error" role="alert">
-                    {roomSession.voiceError ?? roomSession.voiceRemoteError}
-                  </p>
+                  <div className="inline-error" role="alert">
+                    <p>{roomSession.voiceError ?? roomSession.voiceRemoteError}</p>
+                    {roomSession.voiceError && (
+                      <button
+                        className="button"
+                        type="button"
+                        disabled={!canUseVoice || roomSession.voiceStatus === "requesting"}
+                        onClick={() => void roomSession.startVoiceChat()}
+                      >
+                        <RefreshCw size={16} aria-hidden="true" />
+                        Повторить
+                      </button>
+                    )}
+                  </div>
                 )}
               </section>
             )}
@@ -1089,6 +1147,47 @@ export function HomePage() {
   );
 }
 
+function UserErrorBanner({
+  error,
+  onAction,
+  onDismiss,
+}: {
+  error: RoomUserError;
+  onAction: (action: RoomUserErrorAction) => void;
+  onDismiss: () => void;
+}) {
+  const meta = formatUserErrorMeta(error);
+  const action = error.action;
+
+  return (
+    <div className="system-message system-message--error system-message--actionable" role="alert">
+      <AlertTriangle size={22} aria-hidden="true" />
+      <div>
+        <strong>{error.title}</strong>
+        <span>{error.message}</span>
+        {meta && <span className="system-message__meta">{meta}</span>}
+        <div className="system-message__actions">
+          {action && (
+            <button className="button" type="button" onClick={() => onAction(action)}>
+              <RefreshCw size={16} aria-hidden="true" />
+              {formatUserErrorAction(action)}
+            </button>
+          )}
+          <button
+            className="icon-button"
+            type="button"
+            aria-label="Скрыть ошибку"
+            title="Скрыть"
+            onClick={onDismiss}
+          >
+            <X size={17} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ParticipantListItem({ participant }: { participant: Participant }) {
   return (
     <li className="participant-row">
@@ -1110,6 +1209,26 @@ function ParticipantListItem({ participant }: { participant: Participant }) {
       </span>
     </li>
   );
+}
+
+function formatUserErrorAction(action: RoomUserErrorAction) {
+  const labels: Record<RoomUserErrorAction, string> = {
+    "retry-livekit": "Повторить LiveKit",
+    "retry-room-action": "Повторить",
+    "retry-websocket": "Переподключить",
+  };
+
+  return labels[action];
+}
+
+function formatUserErrorMeta(error: RoomUserError) {
+  const values = [
+    error.status ? `HTTP ${error.status}` : null,
+    error.code ? `Код ${error.code}` : null,
+    error.correlationId ? `ID ${error.correlationId}` : null,
+  ].filter(Boolean);
+
+  return values.length > 0 ? values.join(" · ") : null;
 }
 
 function formatRoomStatus(status: RoomSnapshot["status"]) {

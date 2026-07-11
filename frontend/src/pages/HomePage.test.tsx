@@ -169,6 +169,68 @@ describe("HomePage", () => {
     expect(screen.getByText("Сервис временно недоступен")).toBeInTheDocument();
   });
 
+  it("показывает problem details и recovery-действие для ошибки создания комнаты", async () => {
+    const user = userEvent.setup();
+
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const url = String(input);
+
+      if (url.endsWith("/health")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ status: "UP", checkedAt: "2026-07-10T10:00:00Z" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url.endsWith("/version")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              name: "watch-together-backend",
+              version: "0.1.0",
+              buildTime: "2026-07-10T10:00:00Z",
+              apiVersion: "v1",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      if (url.endsWith("/api/v1/rooms") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              title: "Backend перегружен",
+              status: 503,
+              code: "BACKEND_UNAVAILABLE",
+              detail: "Попробуйте создать комнату ещё раз.",
+              correlationId: "11111111-1111-4111-8111-111111111111",
+              retryable: true,
+            }),
+            { status: 503 },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response(null, { status: 404 }));
+    });
+
+    renderPage();
+
+    await screen.findByText("Сервис готов");
+    await user.click(screen.getByRole("button", { name: "Создать" }));
+
+    expect(await screen.findByText("Backend перегружен")).toBeInTheDocument();
+    expect(screen.getByText("Попробуйте создать комнату ещё раз.")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "HTTP 503 · Код BACKEND_UNAVAILABLE · ID 11111111-1111-4111-8111-111111111111",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Повторить" })).toBeInTheDocument();
+  });
+
   it("создаёт комнату и применяет participant.joined из WebSocket", async () => {
     vi.stubGlobal("WebSocket", MockWebSocket);
     const user = userEvent.setup();
@@ -278,6 +340,101 @@ describe("HomePage", () => {
 
     expect(await screen.findByText("Guest")).toBeInTheDocument();
     expect(screen.getByText("Guest вошёл в комнату")).toBeInTheDocument();
+  });
+
+  it("позволяет повторить LiveKit после ошибки media-plane", async () => {
+    vi.stubGlobal("WebSocket", MockWebSocket);
+    const user = userEvent.setup();
+    let tokenCalls = 0;
+
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const url = String(input);
+
+      if (url.endsWith("/health")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ status: "UP", checkedAt: "2026-07-10T10:00:00Z" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url.endsWith("/version")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              name: "watch-together-backend",
+              version: "0.1.0",
+              buildTime: "2026-07-10T10:00:00Z",
+              apiVersion: "v1",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      if (url.endsWith("/api/v1/rooms") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              room: createRoomSnapshot(),
+              hostSecret: "a".repeat(43),
+              invitePath: `/rooms/${roomId}`,
+            }),
+            { status: 201 },
+          ),
+        );
+      }
+
+      if (url.endsWith(`/api/v1/rooms/${roomId}/livekit-token`) && init?.method === "POST") {
+        tokenCalls += 1;
+        if (tokenCalls === 1) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                title: "LiveKit token недоступен",
+                status: 503,
+                code: "LIVEKIT_TOKEN_UNAVAILABLE",
+                detail: "Media server временно недоступен.",
+                retryable: true,
+              }),
+              { status: 503 },
+            ),
+          );
+        }
+
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              token: "header.payload.signature",
+              liveKitUrl: "ws://127.0.0.1:7880",
+              roomName: roomId,
+              participantId: hostId,
+              participantIdentity: hostId,
+              role: "HOST",
+              canPublish: true,
+              canPublishData: true,
+              expiresAt: "2026-07-10T11:00:00Z",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response(null, { status: 404 }));
+    });
+
+    renderPage();
+
+    await screen.findByText("Сервис готов");
+    await user.click(screen.getByRole("button", { name: "Создать" }));
+
+    expect(await screen.findByText("LiveKit не подключён")).toBeInTheDocument();
+    expect(screen.getByText("Media server временно недоступен.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Повторить LiveKit" }));
+
+    expect(await screen.findByText("LiveKit: подключён")).toBeInTheDocument();
+    expect(tokenCalls).toBe(2);
   });
 
   it("после закрытия комнаты снова показывает формы для новой комнаты", async () => {

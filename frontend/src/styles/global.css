@@ -851,6 +851,26 @@ a {
   font-size: 13px;
 }
 
+.inline-error {
+  display: inline-flex;
+  min-width: 240px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--danger);
+}
+
+.inline-error p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.inline-error .button {
+  min-height: 34px;
+  padding: 8px 11px;
+  font-size: 13px;
+}
+
 .remote-player {
   position: relative;
   overflow: hidden;
@@ -1235,6 +1255,34 @@ a {
 .system-message span {
   color: #7a5350;
   font-size: 13px;
+}
+
+.system-message--actionable {
+  align-items: flex-start;
+}
+
+.system-message--actionable > div {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.system-message__meta {
+  color: #9b6a66;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.system-message__actions {
+  display: flex;
+  margin-top: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.system-message__actions .button {
+  min-height: 36px;
+  padding: 9px 12px;
 }
 
 .system-message--warning {

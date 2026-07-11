@@ -9,6 +9,7 @@ import {
   mintLiveKitToken,
   resolveRoomEventsUrl,
   roomIdSchema,
+  ApiProblemError,
   type Participant,
   type RoomSnapshot,
 } from "./room-api";
@@ -85,6 +86,20 @@ export type RoomActionStatus = "create" | "join" | "restore" | "leave" | "close"
 export type FileStatus = "idle" | "checking" | "ready" | "error";
 export type FilePublicationStatus = "idle" | "publishing" | "live" | "error";
 export type HostPlaybackStatus = "idle" | "playing" | "paused" | "ended";
+export type RoomUserErrorArea = "room" | "websocket" | "livekit";
+export type RoomUserErrorAction = "retry-room-action" | "retry-websocket" | "retry-livekit";
+
+export type RoomUserError = {
+  action: RoomUserErrorAction | null;
+  area: RoomUserErrorArea;
+  code?: string;
+  correlationId?: string;
+  instance?: string;
+  message: string;
+  retryable: boolean;
+  status?: number;
+  title: string;
+};
 
 export type {
   FileDiagnosticsResult,
@@ -115,6 +130,13 @@ type ConnectRoomEventsOptions = {
   preserveChat?: boolean;
   reconnect?: boolean;
 };
+
+type LastRoomAction =
+  | { type: "create"; hostDisplayName: string }
+  | { type: "join"; displayName: string; roomId: string }
+  | { type: "restore"; roomId: string }
+  | { type: "leave" }
+  | { type: "close" };
 
 export type RoomSessionState = {
   chatError: string | null;
@@ -157,6 +179,7 @@ export type RoomSessionState = {
   remotePlaybackTrackCount: number;
   remotePlaybackVideoTrackName: string | null;
   room: RoomSnapshot | null;
+  userError: RoomUserError | null;
   voiceError: string | null;
   voiceRemoteError: string | null;
   voiceRemoteParticipantCount: number;
@@ -205,6 +228,7 @@ const initialState: RoomSessionState = {
   remotePlaybackTrackCount: 0,
   remotePlaybackVideoTrackName: null,
   room: null,
+  userError: null,
   voiceError: null,
   voiceRemoteError: null,
   voiceRemoteParticipantCount: 0,
@@ -228,6 +252,7 @@ export function useRoomSession(routeRoomId?: string) {
   const heartbeatTimerRef = useRef<number | null>(null);
   const liveKitConnectionRef = useRef<LiveKitConnection | null>(null);
   const liveKitRequestIdRef = useRef(0);
+  const lastRoomActionRef = useRef<LastRoomAction | null>(null);
   const participantRef = useRef<Participant | null>(null);
   const pendingActionRef = useRef<RoomActionStatus>(null);
   const playbackStatePublisherRef = useRef<HostPlaybackStatePublisher | null>(null);
@@ -735,6 +760,7 @@ export function useRoomSession(routeRoomId?: string) {
         liveKitError: null,
         liveKitStatus: nextStatus,
         qualityIndicators: idleQualityIndicatorsState,
+        userError: current.userError?.area === "livekit" ? null : current.userError,
         voiceError: null,
         voiceStatus: "idle",
       }));
@@ -768,6 +794,7 @@ export function useRoomSession(routeRoomId?: string) {
       setState((current) => ({
         ...current,
         connectionStatus: nextStatus,
+        userError: current.userError?.area === "websocket" ? null : current.userError,
       }));
     },
     [clearSocketReconnectTimer, resetSocketReconnect, stopHeartbeat],
@@ -795,6 +822,7 @@ export function useRoomSession(routeRoomId?: string) {
         ...current,
         liveKitError: null,
         liveKitStatus: "connecting",
+        ...clearUserErrorFor(current, "livekit"),
       }));
 
       try {
@@ -813,6 +841,7 @@ export function useRoomSession(routeRoomId?: string) {
               ...current,
               liveKitError: message,
               liveKitStatus: "error",
+              userError: createLiveKitMessageUserError(message),
             }));
           },
           onStatusChange: (status) => {
@@ -844,6 +873,10 @@ export function useRoomSession(routeRoomId?: string) {
               liveKitStatus: status,
               qualityIndicators:
                 status === "disconnected" ? idleQualityIndicatorsState : current.qualityIndicators,
+              userError:
+                status === "connected" && current.userError?.area === "livekit"
+                  ? null
+                  : current.userError,
               voiceError: status === "disconnected" ? null : current.voiceError,
               voiceStatus: status === "disconnected" ? "idle" : current.voiceStatus,
             }));
@@ -941,6 +974,7 @@ export function useRoomSession(routeRoomId?: string) {
           ...current,
           liveKitError: getErrorMessage(error),
           liveKitStatus: "error",
+          userError: createLiveKitUserError(error),
         }));
       }
     },
@@ -1141,10 +1175,15 @@ export function useRoomSession(routeRoomId?: string) {
 
     const attempt = socketReconnectAttemptRef.current;
     if (attempt >= MAX_ROOM_RECONNECT_ATTEMPTS) {
+      const userError = createWebSocketUserError(
+        "Не удалось восстановить WebSocket комнаты. Проверьте сеть или попробуйте переподключиться вручную.",
+        true,
+      );
       setState((current) => ({
         ...current,
         connectionStatus: "error",
-        error: "Не удалось восстановить WebSocket комнаты.",
+        error: userError.message,
+        userError,
       }));
       return;
     }
@@ -1178,6 +1217,7 @@ export function useRoomSession(routeRoomId?: string) {
         attempt === 0
           ? addLocalEvent(current.events, "Соединение потеряно, переподключаемся")
           : current.events,
+      ...clearUserErrorFor(current, "websocket"),
     }));
   }, [clearSocketReconnectTimer]);
 
@@ -1189,10 +1229,15 @@ export function useRoomSession(routeRoomId?: string) {
       });
 
       if (!("WebSocket" in window)) {
+        const userError = createWebSocketUserError(
+          "Браузер не поддерживает WebSocket. Откройте комнату в актуальном Chrome, Edge, Firefox или Safari.",
+          false,
+        );
         setState((current) => ({
           ...current,
           connectionStatus: "error",
-          error: "Браузер не поддерживает WebSocket.",
+          error: userError.message,
+          userError,
         }));
         return;
       }
@@ -1222,6 +1267,7 @@ export function useRoomSession(routeRoomId?: string) {
           events: reconnect
             ? addLocalEvent(current.events, "Соединение с комнатой восстановлено")
             : current.events,
+          ...clearUserErrorFor(current, "websocket"),
         }));
         sendHeartbeat(socket);
         heartbeatTimerRef.current = window.setInterval(
@@ -1243,9 +1289,14 @@ export function useRoomSession(routeRoomId?: string) {
             disconnectLiveKit("disconnected");
           }
         } catch {
+          const userError = createWebSocketUserError(
+            "Сервер прислал событие комнаты в неожиданном формате. Переподключение запросит свежий snapshot комнаты.",
+            true,
+          );
           setState((current) => ({
             ...current,
-            error: "Получено некорректное событие комнаты.",
+            error: userError.message,
+            userError,
           }));
         }
       };
@@ -1259,6 +1310,10 @@ export function useRoomSession(routeRoomId?: string) {
           ...current,
           connectionStatus: reconnect || current.room ? "reconnecting" : "error",
           error: reconnect || current.room ? null : "WebSocket комнаты недоступен.",
+          userError:
+            reconnect || current.room
+              ? current.userError
+              : createWebSocketUserError("WebSocket комнаты недоступен.", true),
         }));
       };
 
@@ -1319,11 +1374,27 @@ export function useRoomSession(routeRoomId?: string) {
     async (hostDisplayName: string) => {
       const displayName = hostDisplayName.trim();
       if (!displayName) {
-        setState((current) => ({ ...current, error: "Укажите имя host." }));
+        setState((current) => ({
+          ...current,
+          error: "Укажите имя host.",
+          userError: {
+            action: null,
+            area: "room",
+            message: "Укажите имя host.",
+            retryable: false,
+            title: "Проверьте форму",
+          },
+        }));
         return;
       }
 
-      setState((current) => ({ ...current, error: null, pendingAction: "create" }));
+      lastRoomActionRef.current = { type: "create", hostDisplayName };
+      setState((current) => ({
+        ...current,
+        error: null,
+        pendingAction: "create",
+        userError: null,
+      }));
 
       try {
         const result = await createRoom(displayName);
@@ -1338,14 +1409,17 @@ export function useRoomSession(routeRoomId?: string) {
           participant,
           pendingAction: null,
           room: result.room,
+          userError: null,
         }));
         connectRoomEvents(result.room, participant);
         void connectLiveKit(result.room);
       } catch (error) {
+        const userError = createRoomActionUserError(error);
         setState((current) => ({
           ...current,
-          error: getErrorMessage(error),
+          error: userError.message,
           pendingAction: null,
+          userError,
         }));
       }
     },
@@ -1356,11 +1430,27 @@ export function useRoomSession(routeRoomId?: string) {
     async (roomId: string, signal?: AbortSignal) => {
       const normalizedRoomId = extractRoomId(roomId);
       if (!roomIdSchema.safeParse(normalizedRoomId).success) {
-        setState((current) => ({ ...current, error: "Проверьте ID комнаты." }));
+        setState((current) => ({
+          ...current,
+          error: "Проверьте ID комнаты.",
+          userError: {
+            action: null,
+            area: "room",
+            message: "Проверьте ID комнаты.",
+            retryable: false,
+            title: "Проверьте форму",
+          },
+        }));
         return;
       }
 
-      setState((current) => ({ ...current, error: null, pendingAction: "restore" }));
+      lastRoomActionRef.current = { type: "restore", roomId: normalizedRoomId };
+      setState((current) => ({
+        ...current,
+        error: null,
+        pendingAction: "restore",
+        userError: null,
+      }));
 
       try {
         const result = await getRoom(normalizedRoomId, signal);
@@ -1379,6 +1469,7 @@ export function useRoomSession(routeRoomId?: string) {
           participant: result.participant,
           pendingAction: null,
           room: result.room,
+          userError: null,
         }));
         connectRoomEvents(result.room, result.participant);
         void connectLiveKit(result.room);
@@ -1387,10 +1478,12 @@ export function useRoomSession(routeRoomId?: string) {
           return;
         }
 
+        const userError = createRoomActionUserError(error);
         setState((current) => ({
           ...current,
-          error: getErrorMessage(error),
+          error: userError.message,
           pendingAction: null,
+          userError,
         }));
       }
     },
@@ -1403,16 +1496,42 @@ export function useRoomSession(routeRoomId?: string) {
       const displayName = displayNameValue.trim();
 
       if (!roomIdSchema.safeParse(normalizedRoomId).success) {
-        setState((current) => ({ ...current, error: "Проверьте ID комнаты." }));
+        setState((current) => ({
+          ...current,
+          error: "Проверьте ID комнаты.",
+          userError: {
+            action: null,
+            area: "room",
+            message: "Проверьте ID комнаты.",
+            retryable: false,
+            title: "Проверьте форму",
+          },
+        }));
         return;
       }
 
       if (!displayName) {
-        setState((current) => ({ ...current, error: "Укажите имя участника." }));
+        setState((current) => ({
+          ...current,
+          error: "Укажите имя участника.",
+          userError: {
+            action: null,
+            area: "room",
+            message: "Укажите имя участника.",
+            retryable: false,
+            title: "Проверьте форму",
+          },
+        }));
         return;
       }
 
-      setState((current) => ({ ...current, error: null, pendingAction: "join" }));
+      lastRoomActionRef.current = { type: "join", displayName, roomId: normalizedRoomId };
+      setState((current) => ({
+        ...current,
+        error: null,
+        pendingAction: "join",
+        userError: null,
+      }));
 
       try {
         const result = await joinRoom(normalizedRoomId, displayName);
@@ -1425,14 +1544,17 @@ export function useRoomSession(routeRoomId?: string) {
           participant: result.participant,
           pendingAction: null,
           room: result.room,
+          userError: null,
         }));
         connectRoomEvents(result.room, result.participant);
         void connectLiveKit(result.room);
       } catch (error) {
+        const userError = createRoomActionUserError(error);
         setState((current) => ({
           ...current,
-          error: getErrorMessage(error),
+          error: userError.message,
           pendingAction: null,
+          userError,
         }));
       }
     },
@@ -1445,7 +1567,13 @@ export function useRoomSession(routeRoomId?: string) {
       return;
     }
 
-    setState((current) => ({ ...current, error: null, pendingAction: "leave" }));
+    lastRoomActionRef.current = { type: "leave" };
+    setState((current) => ({
+      ...current,
+      error: null,
+      pendingAction: "leave",
+      userError: null,
+    }));
 
     try {
       await leaveRoom(room.roomId);
@@ -1457,10 +1585,12 @@ export function useRoomSession(routeRoomId?: string) {
         events: addLocalEvent(current.events, "Вы покинули комнату"),
       }));
     } catch (error) {
+      const userError = createRoomActionUserError(error);
       setState((current) => ({
         ...current,
-        error: getErrorMessage(error),
+        error: userError.message,
         pendingAction: null,
+        userError,
       }));
     }
   }, [clearFileState, disconnectLiveKit, disconnectSocket]);
@@ -1468,12 +1598,28 @@ export function useRoomSession(routeRoomId?: string) {
   const close = useCallback(async () => {
     const room = roomRef.current;
     if (!room || !state.hostSecret) {
-      setState((current) => ({ ...current, error: "Закрыть комнату может только host." }));
+      setState((current) => ({
+        ...current,
+        error: "Закрыть комнату может только host.",
+        userError: {
+          action: null,
+          area: "room",
+          message: "Закрыть комнату может только host.",
+          retryable: false,
+          title: "Нет доступа к комнате",
+        },
+      }));
       return;
     }
 
+    lastRoomActionRef.current = { type: "close" };
     pendingActionRef.current = "close";
-    setState((current) => ({ ...current, error: null, pendingAction: "close" }));
+    setState((current) => ({
+      ...current,
+      error: null,
+      pendingAction: "close",
+      userError: null,
+    }));
 
     try {
       await closeRoom(room.roomId, state.hostSecret);
@@ -1486,13 +1632,94 @@ export function useRoomSession(routeRoomId?: string) {
       }));
     } catch (error) {
       pendingActionRef.current = null;
+      const userError = createRoomActionUserError(error);
       setState((current) => ({
         ...current,
-        error: getErrorMessage(error),
+        error: userError.message,
         pendingAction: null,
+        userError,
       }));
     }
   }, [clearFileState, disconnectLiveKit, state.hostSecret]);
+
+  const retryLastRoomAction = useCallback(() => {
+    const action = lastRoomActionRef.current;
+    if (!action) {
+      return;
+    }
+
+    switch (action.type) {
+      case "create":
+        void create(action.hostDisplayName);
+        break;
+      case "join":
+        void join(action.roomId, action.displayName);
+        break;
+      case "restore":
+        void restore(action.roomId);
+        break;
+      case "leave":
+        void leave();
+        break;
+      case "close":
+        void close();
+        break;
+    }
+  }, [close, create, join, leave, restore]);
+
+  const retryLiveKitConnection = useCallback(() => {
+    const room = roomRef.current;
+    if (!room || isTerminalRoomStatus(room.status)) {
+      setState((current) => ({
+        ...current,
+        liveKitError: "Комната закрыта, LiveKit больше не подключается.",
+        liveKitStatus: "error",
+        userError: createLiveKitMessageUserError(
+          "Комната закрыта, LiveKit больше не подключается.",
+        ),
+      }));
+      return;
+    }
+
+    void connectLiveKit(room);
+  }, [connectLiveKit]);
+
+  const retryRoomConnection = useCallback(() => {
+    const room = roomRef.current;
+    const participant = participantRef.current;
+    if (!room || !participant || isTerminalRoomStatus(room.status)) {
+      const userError = createWebSocketUserError(
+        "Комната уже закрыта или не восстановлена в текущей вкладке.",
+        false,
+      );
+      setState((current) => ({
+        ...current,
+        connectionStatus: current.room ? "closed" : "idle",
+        error: userError.message,
+        userError,
+      }));
+      return;
+    }
+
+    resetSocketReconnect();
+    setState((current) => ({
+      ...current,
+      error: null,
+      userError: current.userError?.area === "websocket" ? null : current.userError,
+    }));
+    connectRoomEventsRef.current?.(room, participant, {
+      preserveChat: true,
+      reconnect: true,
+    });
+  }, [resetSocketReconnect]);
+
+  const clearUserError = useCallback(() => {
+    setState((current) => ({
+      ...current,
+      error: current.userError?.message === current.error ? null : current.error,
+      userError: null,
+    }));
+  }, []);
 
   useEffect(() => {
     if (
@@ -1568,6 +1795,7 @@ export function useRoomSession(routeRoomId?: string) {
     ...state,
     close,
     create,
+    clearUserError,
     hostPause,
     hostPlay,
     hostSeek,
@@ -1576,6 +1804,9 @@ export function useRoomSession(routeRoomId?: string) {
     leave,
     muteVoiceChat,
     publishFile,
+    retryLastRoomAction,
+    retryLiveKitConnection,
+    retryRoomConnection,
     restore,
     routeRoomId,
     selectFile,
@@ -1597,7 +1828,11 @@ function applyEventToState(current: RoomSessionState, event: RoomServerEvent): R
       if (problem.code === "RATE_LIMITED" || problem.code === "VALIDATION_FAILED") {
         return { ...current, chatError: message };
       }
-      return { ...current, error: message };
+      return {
+        ...current,
+        error: message,
+        userError: createServerEventUserError(event.payload),
+      };
     }
 
     return {
@@ -1654,6 +1889,7 @@ function applyEventToState(current: RoomSessionState, event: RoomServerEvent): R
     participant: nextParticipant,
     pendingAction: event.type === "room.closed" ? null : current.pendingAction,
     room: nextRoom,
+    userError: event.type === "room.closed" ? null : current.userError,
   };
 }
 
@@ -1691,7 +1927,11 @@ function appendChatMessage(messages: ChatMessageEntry[], entry: ChatMessageEntry
 
 function extractProblem(payload: unknown): {
   code?: string;
+  correlationId?: string;
   detail?: string;
+  instance?: string;
+  retryable?: boolean;
+  status?: number;
   title?: string;
 } {
   if (!payload || typeof payload !== "object") {
@@ -1701,7 +1941,11 @@ function extractProblem(payload: unknown): {
   const record = payload as Record<string, unknown>;
   return {
     code: typeof record.code === "string" ? record.code : undefined,
+    correlationId: typeof record.correlationId === "string" ? record.correlationId : undefined,
     detail: typeof record.detail === "string" ? record.detail : undefined,
+    instance: typeof record.instance === "string" ? record.instance : undefined,
+    retryable: typeof record.retryable === "boolean" ? record.retryable : undefined,
+    status: typeof record.status === "number" ? record.status : undefined,
     title: typeof record.title === "string" ? record.title : undefined,
   };
 }
@@ -1761,6 +2005,127 @@ function extractRoomId(value: string) {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Не удалось выполнить действие.";
+}
+
+function createRoomActionUserError(error: unknown): RoomUserError {
+  if (error instanceof ApiProblemError) {
+    return {
+      action: error.problem.retryable ? "retry-room-action" : null,
+      area: "room",
+      code: error.problem.code,
+      correlationId: error.problem.correlationId,
+      instance: error.problem.instance,
+      message: getProblemMessage(error.problem.detail, error.problem.title, error.message),
+      retryable: error.problem.retryable ?? false,
+      status: error.problem.status,
+      title: getRoomActionErrorTitle(error.problem.status, error.problem.title),
+    };
+  }
+
+  return {
+    action: "retry-room-action",
+    area: "room",
+    message: getErrorMessage(error),
+    retryable: true,
+    title: "Действие не выполнено",
+  };
+}
+
+function createWebSocketUserError(message: string, retryable: boolean): RoomUserError {
+  return {
+    action: retryable ? "retry-websocket" : null,
+    area: "websocket",
+    code: retryable ? "ROOM_WS_RECONNECT_FAILED" : "ROOM_WS_UNAVAILABLE",
+    message,
+    retryable,
+    title: retryable ? "Связь с комнатой не восстановилась" : "WebSocket недоступен",
+  };
+}
+
+function createLiveKitUserError(error: unknown): RoomUserError {
+  if (error instanceof ApiProblemError) {
+    return {
+      action: error.problem.retryable ? "retry-livekit" : null,
+      area: "livekit",
+      code: error.problem.code,
+      correlationId: error.problem.correlationId,
+      instance: error.problem.instance,
+      message: getProblemMessage(error.problem.detail, error.problem.title, error.message),
+      retryable: error.problem.retryable ?? false,
+      status: error.problem.status,
+      title: "LiveKit не подключён",
+    };
+  }
+
+  return {
+    action: "retry-livekit",
+    area: "livekit",
+    message: getErrorMessage(error),
+    retryable: true,
+    title: "LiveKit не подключён",
+  };
+}
+
+function createLiveKitMessageUserError(message: string): RoomUserError {
+  return {
+    action: "retry-livekit",
+    area: "livekit",
+    message,
+    retryable: true,
+    title: "LiveKit не подключён",
+  };
+}
+
+function createServerEventUserError(payload: unknown): RoomUserError {
+  const problem = extractProblem(payload);
+  return {
+    action: problem.retryable ? "retry-room-action" : null,
+    area: "room",
+    code: problem.code,
+    correlationId: problem.correlationId,
+    instance: problem.instance,
+    message: getProblemMessage(problem.detail, problem.title, "Действие отклонено сервером."),
+    retryable: problem.retryable ?? false,
+    status: problem.status,
+    title: getRoomActionErrorTitle(problem.status, problem.title),
+  };
+}
+
+function clearUserErrorFor(
+  current: RoomSessionState,
+  area: RoomUserErrorArea,
+): Pick<RoomSessionState, "userError"> {
+  return {
+    userError: current.userError?.area === area ? null : current.userError,
+  };
+}
+
+function getProblemMessage(
+  detail?: string,
+  title?: string,
+  fallback = "Не удалось выполнить действие.",
+) {
+  return detail ?? title ?? fallback;
+}
+
+function getRoomActionErrorTitle(status?: number, title?: string) {
+  if (status === 401 || status === 403) {
+    return "Нет доступа к комнате";
+  }
+
+  if (status === 404) {
+    return "Комната недоступна";
+  }
+
+  if (status === 409 || status === 410) {
+    return "Комната уже изменилась";
+  }
+
+  if (status === 429) {
+    return "Слишком много действий";
+  }
+
+  return title ?? "Действие не выполнено";
 }
 
 function isBenignPlayInterruption(error: unknown) {

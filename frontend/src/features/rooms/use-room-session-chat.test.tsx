@@ -142,11 +142,18 @@ function ChatHarness() {
       <button type="button" onClick={() => session.sendChatMessage("a".repeat(1001))}>
         Отправить длинное
       </button>
+      <button type="button" onClick={() => session.retryRoomConnection()}>
+        Переподключить
+      </button>
 
       <span data-testid="conn">{session.connectionStatus}</span>
       <span data-testid="chat-count">{session.chatMessages.length}</span>
       <span data-testid="chat-error">{session.chatError ?? ""}</span>
       <span data-testid="room-version">{session.room?.roomVersion ?? ""}</span>
+      <span data-testid="user-error-title">{session.userError?.title ?? ""}</span>
+      <span data-testid="user-error-message">{session.userError?.message ?? ""}</span>
+      <span data-testid="user-error-action">{session.userError?.action ?? ""}</span>
+      <span data-testid="user-error-code">{session.userError?.code ?? ""}</span>
       <ul>
         {session.chatMessages.map((message) => (
           <li key={message.id} data-testid={`chat-${message.kind}`}>
@@ -363,6 +370,39 @@ describe("useRoomSession text chat", () => {
     );
   });
 
+  it("показывает userError при серверной error-проблеме вне чата", async () => {
+    const user = userEvent.setup();
+    const socket = await openSession(user);
+
+    deliver(socket, {
+      schemaVersion: 1,
+      eventId: "55555555-5555-4555-8555-555555555555",
+      type: "error",
+      roomId: ROOM_ID,
+      participantId: HOST_ID,
+      roomVersion: 1,
+      occurredAt: "2026-07-10T10:03:30Z",
+      payload: {
+        title: "Нет доступа",
+        status: 403,
+        code: "FORBIDDEN",
+        detail: "Закрыть комнату может только host.",
+        instance: `/api/v1/rooms/${ROOM_ID}/events`,
+        correlationId: "99999999-9999-4999-8999-999999999999",
+        retryable: false,
+      },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("user-error-title")).toHaveTextContent("Нет доступа к комнате"),
+    );
+    expect(screen.getByTestId("user-error-message")).toHaveTextContent(
+      "Закрыть комнату может только host.",
+    );
+    expect(screen.getByTestId("user-error-action")).toHaveTextContent("");
+    expect(screen.getByTestId("user-error-code")).toHaveTextContent("FORBIDDEN");
+  });
+
   it("не отправляет пустое сообщение и показывает ошибку для слишком длинного", async () => {
     const user = userEvent.setup();
     const socket = await openSession(user);
@@ -415,5 +455,38 @@ describe("useRoomSession room reconnect", () => {
     });
 
     await waitFor(() => expect(screen.getByTestId("conn")).toHaveTextContent("reconnecting"));
+  });
+
+  it("после исчерпания reconnect показывает ручное переподключение", async () => {
+    const user = userEvent.setup();
+    const socket = await openSession(user);
+
+    vi.useFakeTimers();
+
+    act(() => {
+      socket.onclose?.(new CloseEvent("close", { code: 1006 }));
+    });
+
+    for (let index = 1; index <= 10; index += 1) {
+      act(() => {
+        vi.advanceTimersByTime(15_000);
+      });
+
+      const latestSocket = MockWebSocket.instances[index];
+      expect(latestSocket).toBeDefined();
+      act(() => {
+        latestSocket?.onclose?.(new CloseEvent("close", { code: 1006 }));
+      });
+    }
+
+    expect(screen.getByTestId("conn")).toHaveTextContent("error");
+    expect(screen.getByTestId("user-error-action")).toHaveTextContent("retry-websocket");
+
+    act(() => {
+      screen.getByRole("button", { name: "Переподключить" }).click();
+    });
+    expect(MockWebSocket.instances).toHaveLength(12);
+
+    vi.useRealTimers();
   });
 });

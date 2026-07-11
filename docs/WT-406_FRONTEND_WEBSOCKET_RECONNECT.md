@@ -1,4 +1,4 @@
-# WT-406 Frontend WebSocket reconnect
+# WT-406 Frontend reconnect и Error UX
 
 ## Статус
 
@@ -6,7 +6,7 @@
 
 ## Цель
 
-Сделать frontend устойчивым к кратковременному разрыву room WebSocket без перезагрузки страницы: клиент должен переподключиться, получить свежий `room.snapshot`, сохранить локальную эфемерную историю чата и помочь host восстановить показ выбранного файла.
+Сделать frontend устойчивым к кратковременному разрыву room WebSocket без перезагрузки страницы и привести ошибки комнаты/media-plane к понятному UX: клиент должен переподключиться, получить свежий `room.snapshot`, сохранить локальную эфемерную историю чата, помочь host восстановить показ выбранного файла и дать пользователю явное действие восстановления вместо “сырых” ошибок или бесконечного ожидания.
 
 Backend-семантика WT-402 остаётся source of truth: room state, presence, `HOST_DISCONNECTED`, `host.reconnected` и `room.closed(HOST_TIMEOUT)` определяются сервером.
 
@@ -19,14 +19,22 @@ Backend-семантика WT-402 остаётся source of truth: room state, 
 - Ручной `leave`, host `close`, `room.closed`, `CLOSED` и `EXPIRED` не запускают auto-reconnect.
 - Если LiveKit разорвал соединение во время активной публикации host-файла, frontend останавливает старые tracks, запоминает необходимость восстановления и после возврата LiveKit в `connected` автоматически вызывает повторную публикацию выбранного локального файла.
 - Если выбранный файл уже потерян из памяти страницы, frontend показывает host-у ошибку с просьбой выбрать файл заново. Байты файла по-прежнему не сохраняются на backend.
+- HTTP problem details из backend теперь сохраняются в `ApiProblemError`: `status`, `code`, `retryable`, `instance` и `correlationId` не теряются при отображении.
+- Глобальные ошибки комнаты, room WebSocket и LiveKit превращаются в `userError`: понятный заголовок, сообщение, metadata для дебага и recovery-действие, если ошибка retryable.
+- После исчерпания WebSocket auto-reconnect UI показывает кнопку «Переподключить» и не оставляет пользователя в бесконечном `reconnecting`.
+- Ошибка LiveKit token/connect показывает кнопку «Повторить LiveKit» без пересоздания комнаты.
+- Ошибки выбора файла, публикации файла и микрофона остаются рядом с соответствующим контролом и получают локальные действия «Другой файл» или «Повторить».
 
 ## Реализация
 
-- `frontend/src/features/rooms/use-room-session.ts` — новый статус `reconnecting`, reconnect timer/backoff, сохранение чата при повторном WebSocket, сброс таймеров при ручном disconnect, recovery-флаг для host publication после LiveKit `disconnected -> connected`.
-- `frontend/src/pages/HomePage.tsx` — label «переподключение» для room WebSocket.
-- `frontend/src/styles/global.css` — warning-цвет для `connecting` / `reconnecting`.
+- `frontend/src/features/rooms/room-api.ts` — `ApiProblemError` сохраняет problem details вместо потери backend metadata.
+- `frontend/src/features/rooms/use-room-session.ts` — статус `reconnecting`, reconnect timer/backoff, сохранение чата при повторном WebSocket, сброс таймеров при ручном disconnect, recovery-флаг для host publication после LiveKit `disconnected -> connected`, `userError` и команды `retryLastRoomAction`, `retryRoomConnection`, `retryLiveKitConnection`.
+- `frontend/src/pages/HomePage.tsx` — label «переподключение» для room WebSocket, общий error banner с recovery-действиями, локальные recovery-кнопки для файла и голоса.
+- `frontend/src/styles/global.css` — warning-цвет для `connecting` / `reconnecting`, стили actionable error banner и inline recovery errors.
+- `frontend/src/features/rooms/room-api.test.ts` — problem details сохраняются в `ApiProblemError`.
 - `frontend/src/features/rooms/use-room-session-chat.test.tsx` — сценарий unexpected WebSocket close → reconnect → fresh `room.snapshot` + сохранённый чат.
 - `frontend/src/features/rooms/use-room-session-host-controls.test.tsx` — сценарий LiveKit `disconnected -> connected` после live-публикации → автоматический republish выбранного файла.
+- `frontend/src/pages/HomePage.test.tsx` — problem details в UI и retry LiveKit без пересоздания комнаты.
 
 ## Проверка
 
@@ -39,7 +47,8 @@ pnpm format:check
 
 Локально в этой задаче проверено:
 
-- `./node_modules/.bin/vitest run src/features/rooms/use-room-session-chat.test.tsx src/features/rooms/use-room-session-host-controls.test.tsx` из `frontend/` прошёл: 2 test files, 12 tests.
+- `./node_modules/.bin/vitest run src/features/rooms/room-api.test.ts src/features/rooms/use-room-session-chat.test.tsx src/pages/HomePage.test.tsx` из `frontend/` прошёл: 3 test files, 30 tests.
+- `./node_modules/.bin/tsc -b --pretty false` из `frontend/` прошёл.
 
 ## Известные ограничения
 
