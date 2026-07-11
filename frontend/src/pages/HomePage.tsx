@@ -1,5 +1,6 @@
 import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import {
+  Activity,
   CircleCheck,
   Clapperboard,
   Copy,
@@ -33,6 +34,7 @@ import { type LiveKitConnectionStatus } from "../features/rooms/livekit-connecti
 import {
   type FilePublicationStatus,
   type PlaybackStatus,
+  type QualityIndicatorsState,
   type RemotePlaybackStatus,
   type RoomConnectionStatus,
   type VoiceChatStatus,
@@ -64,6 +66,8 @@ type FullscreenDocument = Document & {
   webkitExitFullscreen?: () => Promise<void> | void;
   webkitFullscreenElement?: Element | null;
 };
+
+type QualityDisplayStatus = QualityIndicatorsState["status"] | "reconnecting";
 
 async function toggleFullscreen(element: HTMLElement | null) {
   if (!element) {
@@ -134,6 +138,10 @@ export function HomePage() {
     roomSession.voiceStatus === "live" ||
     roomSession.voiceStatus === "muted" ||
     roomSession.voiceStatus === "requesting";
+  const qualityDisplayStatus = getQualityDisplayStatus(
+    roomSession.liveKitStatus,
+    roomSession.qualityIndicators.status,
+  );
   const watchPlaybackStatus = isHost
     ? toHostWatchPlaybackStatus(roomSession.filePublicationStatus)
     : roomSession.remotePlaybackStatus;
@@ -780,6 +788,53 @@ export function HomePage() {
               </section>
             )}
 
+            {!roomClosed && (
+              <section className="room-card room-card--quality" aria-labelledby="quality-title">
+                <div className="room-card__heading">
+                  <h3 id="quality-title">Качество</h3>
+                  <span className={`room-pill room-pill--quality-${qualityDisplayStatus}`}>
+                    <Activity size={15} aria-hidden="true" />
+                    {formatQualityStatus(qualityDisplayStatus)}
+                  </span>
+                </div>
+
+                <dl className="quality-metrics">
+                  <div>
+                    <dt>Upload</dt>
+                    <dd>{formatBitrate(roomSession.qualityIndicators.upload.bitrateKbps)}</dd>
+                  </div>
+                  <div>
+                    <dt>Download</dt>
+                    <dd>{formatBitrate(roomSession.qualityIndicators.download.bitrateKbps)}</dd>
+                  </div>
+                  <div>
+                    <dt>RTT</dt>
+                    <dd>{formatMetricMs(roomSession.qualityIndicators.upload.rttMs)}</dd>
+                  </div>
+                  <div>
+                    <dt>Jitter</dt>
+                    <dd>{formatMetricMs(getWorstJitter(roomSession.qualityIndicators))}</dd>
+                  </div>
+                  <div>
+                    <dt>Потери</dt>
+                    <dd>{formatPacketLoss(getWorstPacketLoss(roomSession.qualityIndicators))}</dd>
+                  </div>
+                  <div>
+                    <dt>Видео</dt>
+                    <dd>{formatQualityResolution(roomSession.qualityIndicators)}</dd>
+                  </div>
+                </dl>
+
+                <p className={`quality-hint quality-hint--${qualityDisplayStatus}`}>
+                  {formatQualityHint(
+                    qualityDisplayStatus,
+                    roomSession.liveKitStatus,
+                    roomSession.qualityIndicators.warning,
+                  )}
+                </p>
+              </section>
+            )}
+
             <section className="room-card" aria-labelledby="room-details-title">
               <div className="room-card__heading">
                 <h3 id="room-details-title">Состояние комнаты</h3>
@@ -1100,6 +1155,131 @@ function formatLiveKitStatus(status: LiveKitConnectionStatus) {
   };
 
   return labels[status];
+}
+
+function getQualityDisplayStatus(
+  liveKitStatus: LiveKitConnectionStatus,
+  status: QualityIndicatorsState["status"],
+): QualityDisplayStatus {
+  if (liveKitStatus === "connecting" || liveKitStatus === "reconnecting") {
+    return "reconnecting";
+  }
+
+  if (liveKitStatus === "idle" || liveKitStatus === "disconnected") {
+    return "idle";
+  }
+
+  return status;
+}
+
+function formatQualityStatus(status: QualityDisplayStatus) {
+  const labels: Record<QualityDisplayStatus, string> = {
+    checking: "Проверка",
+    good: "Стабильно",
+    idle: "Нет данных",
+    lost: "Потеряно",
+    poor: "Плохая связь",
+    reconnecting: "Переподключение",
+    warning: "Нестабильно",
+  };
+
+  return labels[status];
+}
+
+function formatQualityHint(
+  status: QualityDisplayStatus,
+  liveKitStatus: LiveKitConnectionStatus,
+  warning: string | null,
+) {
+  if (warning) {
+    return warning;
+  }
+
+  if (liveKitStatus === "connecting") {
+    return "LiveKit подключается, показатели скоро появятся.";
+  }
+
+  if (liveKitStatus === "reconnecting") {
+    return "LiveKit переподключается, возможны паузы в видео или голосе.";
+  }
+
+  const labels: Record<QualityDisplayStatus, string> = {
+    checking: "Собираем локальные показатели RTC без отправки наружу.",
+    good: "Соединение выглядит стабильным.",
+    idle: "Показатели появятся после подключения LiveKit.",
+    lost: "LiveKit потерял соединение с участником.",
+    poor: "Качество заметно просело.",
+    reconnecting: "LiveKit переподключается.",
+    warning: "Есть признаки нестабильной сети.",
+  };
+
+  return labels[status];
+}
+
+function formatBitrate(value: number | null) {
+  if (value === null) {
+    return "—";
+  }
+
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(1)} Mbps`;
+  }
+
+  return `${Math.round(value)} kbps`;
+}
+
+function formatMetricMs(value: number | null) {
+  return value === null ? "—" : `${Math.round(value)} ms`;
+}
+
+function formatPacketLoss(value: number | null) {
+  return value === null ? "—" : `${value.toFixed(value >= 10 ? 0 : 1)}%`;
+}
+
+function getWorstJitter(qualityIndicators: QualityIndicatorsState) {
+  return maxNullableMetric(qualityIndicators.upload.jitterMs, qualityIndicators.download.jitterMs);
+}
+
+function getWorstPacketLoss(qualityIndicators: QualityIndicatorsState) {
+  return maxNullableMetric(
+    qualityIndicators.upload.packetLossPercent,
+    qualityIndicators.download.packetLossPercent,
+  );
+}
+
+function formatQualityResolution(qualityIndicators: QualityIndicatorsState) {
+  const frameWidth = Math.max(
+    qualityIndicators.upload.frameWidth ?? 0,
+    qualityIndicators.download.frameWidth ?? 0,
+  );
+  const frameHeight = Math.max(
+    qualityIndicators.upload.frameHeight ?? 0,
+    qualityIndicators.download.frameHeight ?? 0,
+  );
+  const fps = Math.max(
+    qualityIndicators.upload.framesPerSecond ?? 0,
+    qualityIndicators.download.framesPerSecond ?? 0,
+  );
+
+  if (!frameWidth || !frameHeight) {
+    return "—";
+  }
+
+  return fps
+    ? `${frameWidth}×${frameHeight} · ${Math.round(fps)} fps`
+    : `${frameWidth}×${frameHeight}`;
+}
+
+function maxNullableMetric(first: number | null, second: number | null) {
+  if (first === null) {
+    return second;
+  }
+
+  if (second === null) {
+    return first;
+  }
+
+  return Math.max(first, second);
 }
 
 function formatFilePublicationStatus(status: FilePublicationStatus, trackCount: number) {

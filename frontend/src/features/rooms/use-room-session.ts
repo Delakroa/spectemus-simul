@@ -61,6 +61,12 @@ import {
   type PlaybackEvent,
   type PlaybackStatus,
 } from "./playback-state";
+import {
+  createQualityIndicatorController,
+  idleQualityIndicatorsState,
+  type QualityIndicatorController,
+  type QualityIndicatorsState,
+} from "./quality-indicators";
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const MAX_EVENT_LOG_ITEMS = 8;
@@ -83,6 +89,7 @@ export type HostPlaybackStatus = "idle" | "playing" | "paused" | "ended";
 export type {
   FileDiagnosticsResult,
   PlaybackStatus,
+  QualityIndicatorsState,
   RemotePlaybackElements,
   RemotePlaybackStatus,
   VoiceChatStatus,
@@ -142,6 +149,7 @@ export type RoomSessionState = {
   playbackSyncRevision: number;
   playbackSyncSentAt: string | null;
   playbackSyncStatus: PlaybackStatus;
+  qualityIndicators: QualityIndicatorsState;
   remotePlaybackAudioTrackName: string | null;
   remotePlaybackError: string | null;
   remotePlaybackParticipantIdentity: string | null;
@@ -189,6 +197,7 @@ const initialState: RoomSessionState = {
   playbackSyncRevision: 0,
   playbackSyncSentAt: null,
   playbackSyncStatus: "idle",
+  qualityIndicators: idleQualityIndicatorsState,
   remotePlaybackAudioTrackName: null,
   remotePlaybackError: null,
   remotePlaybackParticipantIdentity: null,
@@ -223,6 +232,7 @@ export function useRoomSession(routeRoomId?: string) {
   const pendingActionRef = useRef<RoomActionStatus>(null);
   const playbackStatePublisherRef = useRef<HostPlaybackStatePublisher | null>(null);
   const playbackStateReceiverRef = useRef<GuestPlaybackStateReceiver | null>(null);
+  const qualityIndicatorControllerRef = useRef<QualityIndicatorController | null>(null);
   const remotePlaybackControllerRef = useRef<RemotePlaybackController | null>(null);
   const remotePlaybackElementsRef = useRef<RemotePlaybackElements>({
     audioElement: null,
@@ -335,6 +345,17 @@ export function useRoomSession(routeRoomId?: string) {
     receiver?.disconnect();
     resetPlaybackSyncState();
   }, [resetPlaybackSyncState]);
+
+  const disconnectQualityIndicators = useCallback(() => {
+    const controller = qualityIndicatorControllerRef.current;
+    qualityIndicatorControllerRef.current = null;
+    controller?.disconnect();
+
+    setState((current) => ({
+      ...current,
+      qualityIndicators: idleQualityIndicatorsState,
+    }));
+  }, []);
 
   const setRemotePlaybackElements = useCallback((elements: RemotePlaybackElements) => {
     remotePlaybackElementsRef.current = elements;
@@ -698,6 +719,7 @@ export function useRoomSession(routeRoomId?: string) {
       disconnectRemotePlayback();
       disconnectRemoteVoice();
       disconnectPlaybackStateReceiver();
+      disconnectQualityIndicators();
       const connection = liveKitConnectionRef.current;
       liveKitConnectionRef.current = null;
 
@@ -712,11 +734,13 @@ export function useRoomSession(routeRoomId?: string) {
         filePublicationTrackCount: 0,
         liveKitError: null,
         liveKitStatus: nextStatus,
+        qualityIndicators: idleQualityIndicatorsState,
         voiceError: null,
         voiceStatus: "idle",
       }));
     },
     [
+      disconnectQualityIndicators,
       disconnectPlaybackStateReceiver,
       disconnectRemotePlayback,
       disconnectRemoteVoice,
@@ -761,6 +785,7 @@ export function useRoomSession(routeRoomId?: string) {
       disconnectRemotePlayback();
       disconnectRemoteVoice();
       disconnectPlaybackStateReceiver();
+      disconnectQualityIndicators();
 
       if (existingConnection) {
         existingConnection.disconnect();
@@ -805,6 +830,7 @@ export function useRoomSession(routeRoomId?: string) {
               disconnectRemotePlayback();
               disconnectRemoteVoice();
               disconnectPlaybackStateReceiver();
+              disconnectQualityIndicators();
             }
 
             setState((current) => ({
@@ -816,6 +842,8 @@ export function useRoomSession(routeRoomId?: string) {
                 status === "disconnected" ? 0 : current.filePublicationTrackCount,
               liveKitError: status === "error" ? current.liveKitError : null,
               liveKitStatus: status,
+              qualityIndicators:
+                status === "disconnected" ? idleQualityIndicatorsState : current.qualityIndicators,
               voiceError: status === "disconnected" ? null : current.voiceError,
               voiceStatus: status === "disconnected" ? "idle" : current.voiceStatus,
             }));
@@ -827,6 +855,18 @@ export function useRoomSession(routeRoomId?: string) {
         }
 
         liveKitConnectionRef.current = connection;
+        qualityIndicatorControllerRef.current = createQualityIndicatorController(connection.room, {
+          onStateChange: (qualityIndicators) => {
+            if (liveKitRequestIdRef.current !== requestId) {
+              return;
+            }
+
+            setState((current) => ({
+              ...current,
+              qualityIndicators,
+            }));
+          },
+        });
         const voiceController = createRemoteVoiceController(connection.room, {
           onStateChange: (remoteVoice) => {
             if (liveKitRequestIdRef.current !== requestId) {
@@ -905,6 +945,7 @@ export function useRoomSession(routeRoomId?: string) {
       }
     },
     [
+      disconnectQualityIndicators,
       disconnectPlaybackStateReceiver,
       disconnectRemotePlayback,
       disconnectRemoteVoice,
