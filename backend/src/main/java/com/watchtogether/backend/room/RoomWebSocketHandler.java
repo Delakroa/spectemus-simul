@@ -287,6 +287,9 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
         unregister(roomId, participantId, connectionId, session);
         PresenceResult presence =
                 store.disconnect(roomId, sessionHash, participantId, connectionId, Instant.now(clock));
+        if (presence == null) {
+            return;
+        }
         broadcastPresenceChange(roomId, presence, session);
         handleHostDisconnect(roomId, participantId, presence);
     }
@@ -450,6 +453,10 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
             if (roomSessions.isEmpty()) {
                 sessionsByRoom.remove(roomId, roomSessions);
                 forgetChatRateWindows(roomId);
+                // No sessions remain to serve, so an abandoned-room grace timer has
+                // nothing to close — TTL expiry handles cleanup. Cancelling here also
+                // prevents a pending timer from firing after the room is deserted.
+                cancelHostReconnect(roomId);
             }
         }
 

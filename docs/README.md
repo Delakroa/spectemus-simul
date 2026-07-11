@@ -9,7 +9,7 @@
 3. [WT-004_MEDIA_PIPELINE_ADR.md](WT-004_MEDIA_PIPELINE_ADR.md) — ключевое решение по media pipeline.
 4. [WT-106_CONTRACTS.md](WT-106_CONTRACTS.md) — contract-first граница REST, WebSocket и ошибок.
 5. Документы `WT-201`-`WT-209` — реализованный room lifecycle и первый product UI для него.
-6. Текущие P3-документы `WT-301+` — перенос media pipeline из PoC в product-код.
+6. Документы `WT-301+` — перенос media pipeline из PoC в product-код и стабилизация.
 
 ## P0: media proof of concept
 
@@ -56,6 +56,10 @@
 - [WT-404_VOICE_CHAT.md](WT-404_VOICE_CHAT.md) — voice chat: явное включение микрофона, mute/unmute, отдельные microphone tracks и cleanup.
 - [WT-405_QUALITY_INDICATORS.md](WT-405_QUALITY_INDICATORS.md) — privacy-safe индикаторы качества LiveKit: bitrate, packet loss, jitter, RTT и warning states.
 - [WT-406_FRONTEND_WEBSOCKET_RECONNECT.md](WT-406_FRONTEND_WEBSOCKET_RECONNECT.md) — frontend auto-reconnect room WebSocket, сохранение локального чата, восстановление host-публикации после LiveKit reconnect и Error UX с recovery-действиями.
+
+## P5: stabilization
+
+- [WT-502_FRONTEND_TESTS.md](WT-502_FRONTEND_TESTS.md) — frontend tests: player state, cleanup, errors/reconnect, permissions и API contracts.
 
 ## Как обновлять документы
 
