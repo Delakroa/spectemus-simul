@@ -112,7 +112,7 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
 
         var snapshot = RoomResponseMapper.toSnapshot(room);
         var event = RoomServerEvent.snapshot(snapshot, Instant.now(clock));
-        session.sendMessage(new TextMessage(objectMapper.writeValueAsString(event)));
+        sendTo(session, objectMapper.writeValueAsString(event));
         scheduleExpiry(snapshot.roomId(), snapshot.expiresAt());
         broadcastPresenceChange(roomId, presence, session);
         if (hostRecovered) {
@@ -415,7 +415,7 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
                 retryable);
         var event = RoomServerEvent.error(
                 roomId, participantId, roomVersion, problem, Instant.now(clock));
-        session.sendMessage(new TextMessage(objectMapper.writeValueAsString(event)));
+        sendTo(session, objectMapper.writeValueAsString(event));
     }
 
     private void broadcast(String roomId, String payload, WebSocketSession excludedSession)
@@ -424,7 +424,19 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
         Set<WebSocketSession> roomSessions = sessionsByRoom.getOrDefault(roomId, Set.of());
         for (WebSocketSession roomSession : roomSessions) {
             if (roomSession.isOpen() && !Objects.equals(roomSession.getId(), excludedId)) {
-                roomSession.sendMessage(new TextMessage(payload));
+                sendTo(roomSession, payload);
+            }
+        }
+    }
+
+    private void sendTo(WebSocketSession session, String payload) throws IOException {
+        // A WebSocket session forbids concurrent sends. Broadcasts triggered from REST
+        // request threads (participant joined/left, room closed) and the scheduler
+        // (expiry / host-reconnect timeout) race with container-thread sends (snapshot,
+        // heartbeat presence). Serialize every send per session and skip closed sockets.
+        synchronized (session) {
+            if (session.isOpen()) {
+                session.sendMessage(new TextMessage(payload));
             }
         }
     }
@@ -494,7 +506,7 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
         for (WebSocketSession roomSession : roomSessions) {
             if (!Objects.equals(roomSession.getId(), excludedSession == null ? null : excludedSession.getId())
                     && roomSession.isOpen()) {
-                roomSession.sendMessage(new TextMessage(payload));
+                sendTo(roomSession, payload);
             }
         }
     }
@@ -517,7 +529,7 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
         Set<WebSocketSession> roomSessions = sessionsByRoom.getOrDefault(room.roomId(), Set.of());
         for (WebSocketSession roomSession : roomSessions) {
             if (roomSession.isOpen()) {
-                roomSession.sendMessage(new TextMessage(payload));
+                sendTo(roomSession, payload);
             }
         }
     }
@@ -543,7 +555,7 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
                 sessionsByRoom.getOrDefault(room.roomId(), Set.of()));
         for (WebSocketSession roomSession : roomSessions) {
             if (roomSession.isOpen()) {
-                roomSession.sendMessage(new TextMessage(payload));
+                sendTo(roomSession, payload);
                 roomSession.close(CloseStatus.NORMAL);
             }
         }
@@ -566,7 +578,7 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
             if (!roomSession.isOpen()) {
                 continue;
             }
-            roomSession.sendMessage(new TextMessage(payload));
+            sendTo(roomSession, payload);
             if (participantId.equals(optionalUuid(
                     roomSession.getAttributes(),
                     RoomWebSocketAuthenticationInterceptor.PARTICIPANT_ID_ATTRIBUTE))) {

@@ -510,6 +510,51 @@ class RoomWebSocketIntegrationTest {
         verify(lifecycleStore, timeout(2000)).closeAbandonedRoom(eq(ROOM_ID), any());
     }
 
+    @Test
+    void replacesPreviousConnectionWhenSameParticipantReconnects() throws Exception {
+        Connection first = connect(ROOM_ID, SESSION, null);
+        first.listener().nextText();
+
+        Connection second = connect(ROOM_ID, SESSION, null);
+        second.listener().nextText();
+
+        // The superseded connection is closed by the server; the newest one survives.
+        assertThat(first.listener().closeCode()).isEqualTo(1000);
+        assertThat(second.listener().isClosed()).isFalse();
+
+        close(second, "test complete");
+    }
+
+    @Test
+    void closesStaleConnectionOnHeartbeatWithPolicyViolation() throws Exception {
+        Connection connection = connect(ROOM_ID, SESSION, null);
+        connection.listener().nextText();
+
+        when(store.heartbeat(
+                        eq(ROOM_ID),
+                        eq(SecureHash.sha256(SESSION)),
+                        eq(HOST_ID),
+                        any(),
+                        any(),
+                        any()))
+                .thenReturn(PresenceResult.staleConnection());
+
+        connection.webSocket().sendText(heartbeatJson(HOST_ID, SESSION, 2), true).join();
+
+        assertThat(connection.listener().closeCode()).isEqualTo(1008);
+    }
+
+    @Test
+    void closesHeartbeatWhoseParticipantIdDoesNotMatchSessionWithBadData() throws Exception {
+        Connection connection = connect(ROOM_ID, SESSION, null);
+        connection.listener().nextText();
+
+        // Host session claims to be the guest participant — identity must match the session.
+        connection.webSocket().sendText(heartbeatJson(GUEST_ID, SESSION, 2), true).join();
+
+        assertThat(connection.listener().closeCode()).isEqualTo(1007);
+    }
+
     private void assertHandshakeStatus(
             String roomId, String sessionCredential, String query, int expectedStatus) {
         assertThatThrownBy(() -> connect(roomId, sessionCredential, query))
