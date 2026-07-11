@@ -450,6 +450,10 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
             if (roomSessions.isEmpty()) {
                 sessionsByRoom.remove(roomId, roomSessions);
                 forgetChatRateWindows(roomId);
+                // No sessions remain to serve, so an abandoned-room grace timer has
+                // nothing to close — TTL expiry handles cleanup. Cancelling here also
+                // prevents a pending timer from firing after the room is deserted.
+                cancelHostReconnect(roomId);
             }
         }
 
