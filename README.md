@@ -47,8 +47,9 @@ P0 технически подтверждён.
 - WT-508 готовит закрытую beta deployment основу: TLS/secret/backup/monitoring/rollback runbook, post-deploy smoke, ограничения и privacy/terms draft.
 - WT-601 добавляет beta feedback: endpoint с correlation receipt, privacy-safe metadata, frontend-форму и smoke-проверку.
 - WT-602 фиксирует product review: решение CONTINUE для ограниченной invite-only beta и список follow-up задач перед расширением.
+- WT-604 добавляет client telemetry: privacy-safe endpoint и frontend-события (first frame, publish/playback error, quality) для агрегированной Successful Watch Session Rate поверх WT-506 метрик.
 
-P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. Следующий пакет — P7 beta iteration.
+P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. P7 beta iteration начат: WT-604 закрыл телеметрию для метрики успешности сессии.
 
 ## Как читать репозиторий
 
@@ -184,6 +185,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-508 beta deployment](docs/WT-508_BETA_DEPLOYMENT.md)
 - [WT-601 beta feedback](docs/WT-601_FEEDBACK.md)
 - [WT-602 product review](docs/WT-602_PRODUCT_REVIEW.md)
+- [WT-604 client telemetry](docs/WT-604_CLIENT_TELEMETRY.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation
