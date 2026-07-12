@@ -46,8 +46,9 @@ P0 технически подтверждён.
 - WT-507 подтверждает MVP capacity: host + 1/2/3 guest в Playwright, отказ 5-го участника и runbook CPU/RAM/network с safe limits.
 - WT-508 готовит закрытую beta deployment основу: TLS/secret/backup/monitoring/rollback runbook, post-deploy smoke, ограничения и privacy/terms draft.
 - WT-601 добавляет beta feedback: endpoint с correlation receipt, privacy-safe metadata, frontend-форму и smoke-проверку.
+- WT-602 фиксирует product review: решение CONTINUE для ограниченной invite-only beta и список follow-up задач перед расширением.
 
-P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX и P5 stabilization завершены. Проект находится в P6 closed beta.
+P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. Следующий пакет — P7 beta iteration.
 
 ## Как читать репозиторий
 
@@ -182,6 +183,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-507 capacity test](docs/WT-507_CAPACITY_TEST.md)
 - [WT-508 beta deployment](docs/WT-508_BETA_DEPLOYMENT.md)
 - [WT-601 beta feedback](docs/WT-601_FEEDBACK.md)
+- [WT-602 product review](docs/WT-602_PRODUCT_REVIEW.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation

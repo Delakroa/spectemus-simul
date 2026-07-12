@@ -71,6 +71,11 @@
 ## P6: closed beta
 
 - [WT-601_FEEDBACK.md](WT-601_FEEDBACK.md) — beta feedback: session outcome, reason, optional browser/network metadata, correlation receipt и smoke-check.
+- [WT-602_PRODUCT_REVIEW.md](WT-602_PRODUCT_REVIEW.md) — product review: metrics/errors/requests/traffic cost, решение CONTINUE и follow-up backlog.
+
+## P7: beta iteration
+
+Планируется после WT-602: beta evidence run, client telemetry, feedback operations, security/rate-limit hardening и media QoS/cost benchmark.
 
 ## Как обновлять документы
 
