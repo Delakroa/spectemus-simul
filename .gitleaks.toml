@@ -1,0 +1,26 @@
+# gitleaks configuration for Watch Together (WT-505).
+#
+# Per docs/CONVENTIONS.md real secrets live only in local .env files / secret storage
+# and never in git. Every credential-looking string in the repo is a placeholder,
+# a test fixture, an example payload, or a generated build artifact — allowlisted below.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Fixtures, examples, docs placeholders and generated build output"
+paths = [
+  '''backend/build/.*''',
+  '''.*/dist/.*''',
+  '''contracts/examples/.*''',
+  '''.*\.test\.(ts|tsx)$''',
+  '''.*Test\.java$''',
+  '''pnpm-lock\.yaml$''',
+  # Doc shows a truncated example LiveKit JWT response (…), not a real token.
+  '''docs/WT-301_LIVEKIT_PRODUCT_TOKENS\.md$''',
+]
+# Known placeholder / dev credential values used in docs and local dev env samples.
+regexes = [
+  '''devsecret''',
+  '''devkey''',
+  '''test-secret''',
+]

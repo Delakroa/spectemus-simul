@@ -26,6 +26,7 @@ RUN pnpm --filter @watch-together/frontend build
 
 FROM nginx:1.31.1-alpine3.23
 
+COPY infra/nginx/security-headers.conf /etc/nginx/security-headers.conf
 COPY infra/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /workspace/frontend/dist /usr/share/nginx/html
 
