@@ -14,7 +14,7 @@
     "dev:frontend": "pnpm --filter @watch-together/frontend dev",
     "dev:poc": "pnpm --filter @watch-together/poc-media-capture-livekit dev",
     "dev:poc:down": "pnpm --filter @watch-together/poc-media-capture-livekit dev:down",
-    "format:check": "prettier --check contracts scripts/check-contracts.mjs scripts/check-infra.mjs infra/compose.yaml infra/README.md docs/README.md docs/CONVENTIONS.md docs/DEFINITION_OF_DONE.md docs/WT-106_CONTRACTS.md docs/WT-201_CREATE_ROOM.md docs/WT-202_GUEST_JOIN.md docs/WT-203_WEBSOCKET_SNAPSHOT.md docs/WT-204_PRESENCE_HEARTBEAT.md docs/WT-205_ROOM_CLOSE_EXPIRY.md docs/WT-206_PARTICIPANT_LEAVE.md docs/WT-207_PARTICIPANT_JOINED.md docs/WT-208_FRONTEND_ROOM_EVENTS.md docs/WT-209_ROOM_SNAPSHOT_RESTORE.md docs/WT-301_LIVEKIT_PRODUCT_TOKENS.md docs/WT-302_LIVEKIT_CLIENT_CONNECTION.md docs/WT-303_FILE_DIAGNOSTICS.md docs/WT-304_LIVEKIT_FILE_PUBLISH.md docs/WT-305_GUEST_LIVEKIT_PLAYBACK.md docs/WT-306_PLAYBACK_STATE_SYNC.md docs/WT-401_HOST_CONTROLS.md docs/WT-402_HOST_RECONNECT.md docs/WT-403_TEXT_CHAT.md docs/WT-404_VOICE_CHAT.md docs/WT-405_QUALITY_INDICATORS.md docs/WT-406_FRONTEND_WEBSOCKET_RECONNECT.md docs/WT-501_BACKEND_TESTS.md docs/WT-502_FRONTEND_TESTS.md docs/WT-503_MULTI_USER_E2E.md docs/WT-505_SECURITY_HARDENING.md docs/WT-506_OBSERVABILITY.md && pnpm -r --if-present format:check",
+    "format:check": "prettier --check contracts scripts/check-contracts.mjs scripts/check-infra.mjs infra/compose.yaml infra/README.md docs/README.md docs/CONVENTIONS.md docs/DEFINITION_OF_DONE.md docs/WT-106_CONTRACTS.md docs/WT-201_CREATE_ROOM.md docs/WT-202_GUEST_JOIN.md docs/WT-203_WEBSOCKET_SNAPSHOT.md docs/WT-204_PRESENCE_HEARTBEAT.md docs/WT-205_ROOM_CLOSE_EXPIRY.md docs/WT-206_PARTICIPANT_LEAVE.md docs/WT-207_PARTICIPANT_JOINED.md docs/WT-208_FRONTEND_ROOM_EVENTS.md docs/WT-209_ROOM_SNAPSHOT_RESTORE.md docs/WT-301_LIVEKIT_PRODUCT_TOKENS.md docs/WT-302_LIVEKIT_CLIENT_CONNECTION.md docs/WT-303_FILE_DIAGNOSTICS.md docs/WT-304_LIVEKIT_FILE_PUBLISH.md docs/WT-305_GUEST_LIVEKIT_PLAYBACK.md docs/WT-306_PLAYBACK_STATE_SYNC.md docs/WT-401_HOST_CONTROLS.md docs/WT-402_HOST_RECONNECT.md docs/WT-403_TEXT_CHAT.md docs/WT-404_VOICE_CHAT.md docs/WT-405_QUALITY_INDICATORS.md docs/WT-406_FRONTEND_WEBSOCKET_RECONNECT.md docs/WT-501_BACKEND_TESTS.md docs/WT-502_FRONTEND_TESTS.md docs/WT-503_MULTI_USER_E2E.md docs/WT-504_NETWORK_RESILIENCE.md docs/WT-505_SECURITY_HARDENING.md docs/WT-506_OBSERVABILITY.md e2e/package.json e2e/playwright.config.ts e2e/tests/multi-user.spec.ts e2e/tests/network-resilience.spec.ts e2e/tests/support/room-flow.ts && pnpm -r --if-present format:check",
     "infra:check": "node scripts/check-infra.mjs",
     "infra:config": "docker compose -f infra/compose.yaml config",
     "infra:down": "docker compose -f infra/compose.yaml down",
@@ -26,6 +26,7 @@
     "security:audit": "pnpm audit --prod --audit-level high",
     "test": "pnpm -r --if-present test && pnpm backend:test",
     "test:ci": "pnpm -r --if-present test:ci && pnpm backend:test",
+    "test:e2e:network": "pnpm --filter @watch-together/e2e run test:e2e:network",
     "test:e2e": "pnpm --filter @watch-together/e2e run test:e2e",
     "typecheck": "pnpm -r --if-present typecheck"
   },

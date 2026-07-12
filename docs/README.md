@@ -62,6 +62,7 @@
 - [WT-501_BACKEND_TESTS.md](WT-501_BACKEND_TESTS.md) — backend tests: аудит покрытия по 7 областям и закрытие WebSocket-пробелов (duplicate/stale connection, identity mismatch).
 - [WT-502_FRONTEND_TESTS.md](WT-502_FRONTEND_TESTS.md) — frontend tests: player state, cleanup, errors/reconnect, permissions и API contracts.
 - [WT-503_MULTI_USER_E2E.md](WT-503_MULTI_USER_E2E.md) — multi-user E2E (Playwright): host + 2 гостя, presence и chat через реальный стек; отдельный `test:e2e` вне `check:ci`.
+- [WT-504_NETWORK_RESILIENCE.md](WT-504_NETWORK_RESILIENCE.md) — network resilience: browser offline/reconnect E2E, chat recovery и manual matrix для latency/loss/TURN/VPN.
 - [WT-505_SECURITY_HARDENING.md](WT-505_SECURITY_HARDENING.md) — security hardening: аудит модели угроз, CSP/security-заголовки на gateway, secret-scanning (gitleaks) в CI.
 - [WT-506_OBSERVABILITY.md](WT-506_OBSERVABILITY.md) — observability: Micrometer room-метрики (WS/lifecycle/host/chat) через actuator/prometheus, privacy-safe.
 

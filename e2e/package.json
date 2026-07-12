@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test:e2e": "playwright test",
+    "test:e2e:network": "playwright test tests/network-resilience.spec.ts",
     "e2e:install": "playwright install chromium"
   },
   "devDependencies": {

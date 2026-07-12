@@ -1,43 +1,11 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-const ROOM_STATE_HEADING = "Состояние комнаты";
-
-async function createRoom(page: Page, hostName: string): Promise<string> {
-  await page.goto("/");
-  await page.getByLabel("Имя host").fill(hostName);
-  await page.getByRole("button", { name: "Создать" }).click();
-
-  await expect(
-    page.getByRole("heading", { name: ROOM_STATE_HEADING }),
-  ).toBeVisible();
-  const roomId = (
-    await page.locator(".room-copy-field code").first().textContent()
-  )?.trim();
-  if (!roomId) {
-    throw new Error("Room id was not rendered after creating the room");
-  }
-  return roomId;
-}
-
-async function joinRoom(
-  page: Page,
-  roomId: string,
-  guestName: string,
-): Promise<void> {
-  await page.goto("/");
-  await page.getByLabel("Invite-ссылка или ID комнаты").fill(roomId);
-  await page.getByLabel("Имя гостя").fill(guestName);
-  await page.getByRole("button", { name: "Войти" }).click();
-
-  await expect(
-    page.getByRole("heading", { name: ROOM_STATE_HEADING }),
-  ).toBeVisible();
-}
-
-async function sendChat(page: Page, text: string): Promise<void> {
-  await page.getByLabel("Сообщение в чат").fill(text);
-  await page.getByRole("button", { name: "Отправить" }).click();
-}
+import {
+  closeContexts,
+  createRoom,
+  joinRoom,
+  sendChat,
+} from "./support/room-flow";
 
 test("host and two guests: presence and chat propagate across all clients", async ({
   browser,
@@ -73,8 +41,6 @@ test("host and two guests: presence and chat propagate across all clients", asyn
       await expect(page.getByText("Привет от хоста")).toBeVisible();
     }
   } finally {
-    await hostContext.close();
-    await guestOneContext.close();
-    await guestTwoContext.close();
+    await closeContexts(hostContext, guestOneContext, guestTwoContext);
   }
 });
