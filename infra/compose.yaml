@@ -49,7 +49,13 @@ services:
     build:
       context: ..
       dockerfile: infra/livekit/Dockerfile
-    command: ["--config", "/etc/livekit.yaml", "--node-ip", "127.0.0.1"]
+    command:
+      [
+        "--config",
+        "/etc/livekit.yaml",
+        "--node-ip",
+        "${LIVEKIT_NODE_IP:-127.0.0.1}",
+      ]
     environment:
       LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-devsecretdevsecretdevsecretdevsecret}"
       REDIS_HOST: "redis:6379"
@@ -87,7 +93,7 @@ services:
       WEBSOCKET_CHAT_RATE_LIMIT: "${WEBSOCKET_CHAT_RATE_LIMIT:-5}"
       WEBSOCKET_CHAT_RATE_WINDOW: "${WEBSOCKET_CHAT_RATE_WINDOW:-5s}"
       WEBSOCKET_HOST_RECONNECT_GRACE: "${WEBSOCKET_HOST_RECONNECT_GRACE:-60s}"
-      LIVEKIT_URL: "ws://127.0.0.1:${LIVEKIT_HTTP_PORT:-7880}"
+      LIVEKIT_URL: "${LIVEKIT_URL:-ws://127.0.0.1:${LIVEKIT_HTTP_PORT:-7880}}"
       LIVEKIT_API_KEY: "${LIVEKIT_API_KEY:-devkey}"
       LIVEKIT_API_SECRET: "${LIVEKIT_API_SECRET:-devsecretdevsecretdevsecretdevsecret}"
       LIVEKIT_TOKEN_TTL: "${LIVEKIT_TOKEN_TTL:-10m}"
@@ -116,7 +122,7 @@ services:
       dockerfile: frontend/Dockerfile
       args:
         VITE_API_BASE_URL: ""
-        VITE_LIVEKIT_URL: "ws://127.0.0.1:${LIVEKIT_HTTP_PORT:-7880}"
+        VITE_LIVEKIT_URL: "${PUBLIC_LIVEKIT_URL:-ws://127.0.0.1:${LIVEKIT_HTTP_PORT:-7880}}"
     ports:
       - "127.0.0.1:${APP_PORT:-8088}:80"
     depends_on:

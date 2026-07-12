@@ -66,6 +66,7 @@
 - [WT-505_SECURITY_HARDENING.md](WT-505_SECURITY_HARDENING.md) — security hardening: аудит модели угроз, CSP/security-заголовки на gateway, secret-scanning (gitleaks) в CI.
 - [WT-506_OBSERVABILITY.md](WT-506_OBSERVABILITY.md) — observability: Micrometer room-метрики (WS/lifecycle/host/chat) через actuator/prometheus, privacy-safe.
 - [WT-507_CAPACITY_TEST.md](WT-507_CAPACITY_TEST.md) — capacity test: host + 1/2/3 guest, hard limit `4/4`, отказ 5-го участника и runbook CPU/RAM/network.
+- [WT-508_BETA_DEPLOYMENT.md](WT-508_BETA_DEPLOYMENT.md) — beta deployment: TLS, secrets, backups, monitoring, rollback, post-deploy smoke, ограничения и privacy/terms draft.
 
 ## Как обновлять документы
 

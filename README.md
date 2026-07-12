@@ -44,6 +44,7 @@ P0 технически подтверждён.
 - WT-505 усиливает безопасность: аудит модели угроз, CSP и security-заголовки на gateway, secret-scanning (gitleaks) в CI.
 - WT-506 добавляет observability: Micrometer room-метрики (WS/lifecycle/host/chat) через actuator/prometheus, privacy-safe.
 - WT-507 подтверждает MVP capacity: host + 1/2/3 guest в Playwright, отказ 5-го участника и runbook CPU/RAM/network с safe limits.
+- WT-508 готовит закрытую beta deployment основу: TLS/secret/backup/monitoring/rollback runbook, post-deploy smoke, ограничения и privacy/terms draft.
 
 P1 foundation, P2 room lifecycle, P3 media integration и P4 host UX завершены. Проект находится в P5 stabilization.
 
@@ -178,6 +179,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-505 security hardening](docs/WT-505_SECURITY_HARDENING.md)
 - [WT-506 observability](docs/WT-506_OBSERVABILITY.md)
 - [WT-507 capacity test](docs/WT-507_CAPACITY_TEST.md)
+- [WT-508 beta deployment](docs/WT-508_BETA_DEPLOYMENT.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation

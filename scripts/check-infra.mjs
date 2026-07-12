@@ -478,7 +478,7 @@ if (
   guestToken.body.participantId !== guestParticipantId ||
   guestToken.body.participantIdentity !== guestParticipantId ||
   guestToken.body.role !== "GUEST" ||
-  guestToken.body.canPublish !== false ||
+  guestToken.body.canPublish !== true ||
   guestToken.body.canPublishData !== false
 ) {
   throw new Error("guest LiveKit token response returned invalid grants");
@@ -490,7 +490,7 @@ if (
   guestTokenPayload.video?.room !== roomId ||
   guestTokenPayload.video?.roomJoin !== true ||
   guestTokenPayload.video?.canSubscribe !== true ||
-  guestTokenPayload.video?.canPublish !== false ||
+  guestTokenPayload.video?.canPublish !== true ||
   guestTokenPayload.video?.canPublishData !== false
 ) {
   throw new Error("guest LiveKit token JWT returned invalid claims");

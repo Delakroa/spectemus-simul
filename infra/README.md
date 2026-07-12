@@ -89,3 +89,22 @@ PostgreSQL и Redis используют named volumes:
 Эта среда нужна для воспроизводимой локальной проверки. Бэкенд использует Redis для room state и idempotency; PostgreSQL пока не подключён к product state.
 
 TLS, публичный TURN, monitoring stack и beta deployment находятся вне области WT-104.
+
+## Beta deployment notes
+
+WT-508 добавляет только repo-side подготовку к закрытой beta. Перед публичным запуском нужен внешний TLS/TURN/monitoring слой.
+
+Минимальные production overrides:
+
+- `SESSION_COOKIE_SECURE=true`;
+- реальные `REDIS_PASSWORD`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`;
+- `LIVEKIT_URL=wss://<livekit-public-host>` — URL, который backend возвращает в token response;
+- `PUBLIC_LIVEKIT_URL=wss://<livekit-public-host>` — URL, который встраивается во frontend build;
+- `LIVEKIT_NODE_IP=<public-or-private-routable-ip>` — адрес LiveKit для ICE candidates;
+- TLS termination должен выставлять `Strict-Transport-Security` и прокидывать `X-Forwarded-Proto`.
+
+После деплоя:
+
+```bash
+WT_BETA_BASE_URL=https://<app-host> WT_BETA_LIVEKIT_URL=wss://<livekit-public-host> pnpm beta:smoke
+```
