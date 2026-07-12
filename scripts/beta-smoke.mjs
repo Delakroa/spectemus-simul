@@ -97,6 +97,30 @@ if (invitePath !== `/rooms/${roomId}` || invitePath.includes(hostSecret)) {
 assertSessionCookie(hostCookieHeader, "host session cookie");
 console.log("[ok] create room: created and idempotent");
 
+const acceptedFeedback = await postJson("/api/v1/feedback", {
+  outcome: "WORKED",
+  reason: "SUCCESS",
+  message: "beta smoke",
+  roomId,
+  participantRole: "HOST",
+  metadata: {
+    userAgent: "beta-smoke",
+    language: "en",
+    roomStatus: createdRoom.body.room?.status,
+    roomConnectionStatus: "smoke",
+    liveKitStatus: "smoke",
+    participantCount: createdRoom.body.room?.participants?.length,
+  },
+});
+if (
+  acceptedFeedback.status !== 202 ||
+  !uuidPattern.test(acceptedFeedback.body.feedbackId) ||
+  !uuidPattern.test(acceptedFeedback.body.correlationId)
+) {
+  throw new Error("feedback endpoint returned invalid receipt");
+}
+console.log("[ok] feedback endpoint: accepted");
+
 const joinPath = `/api/v1/rooms/${roomId}/join`;
 const joinedGuest = await postJson(joinPath, {
   displayName: "Beta Smoke Guest",

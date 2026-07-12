@@ -44,6 +44,8 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/rooms/*/events")
                         .permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/feedback")
+                        .permitAll()
                         .anyRequest()
                         .denyAll())
                 .build();

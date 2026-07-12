@@ -6,6 +6,7 @@ import WebSocket from "ws";
 const composeFile = "infra/compose.yaml";
 const appUrl = process.env.WT_APP_URL ?? "http://127.0.0.1:8088";
 const livekitUrl = process.env.WT_LIVEKIT_HTTP_URL ?? "http://127.0.0.1:7880";
+const uuidPattern = /^[0-9a-f-]{36}$/;
 
 function runCompose(args) {
   const result = spawnSync("docker", ["compose", "-f", composeFile, ...args], {
@@ -366,6 +367,30 @@ if (JSON.stringify(createdRoom.body) !== JSON.stringify(replayedRoom.body)) {
 
 console.log("[ok] create room through proxy: created");
 console.log("[ok] create room idempotency: replayed");
+
+const acceptedFeedback = await postJson(`${appUrl}/api/v1/feedback`, {
+  outcome: "WORKED",
+  reason: "SUCCESS",
+  message: "infra smoke",
+  roomId,
+  participantRole: "HOST",
+  metadata: {
+    userAgent: "infra-smoke",
+    language: "en",
+    roomStatus: createdRoom.body.room?.status,
+    roomConnectionStatus: "smoke",
+    liveKitStatus: "smoke",
+    participantCount: createdRoom.body.room?.participants?.length,
+  },
+});
+if (
+  acceptedFeedback.status !== 202 ||
+  !uuidPattern.test(acceptedFeedback.body.feedbackId) ||
+  !uuidPattern.test(acceptedFeedback.body.correlationId)
+) {
+  throw new Error("feedback endpoint returned invalid receipt");
+}
+console.log("[ok] feedback through proxy: accepted");
 
 const joinUrl = `${appUrl}/api/v1/rooms/${roomId}/join`;
 const joinedGuest = await postJson(joinUrl, {

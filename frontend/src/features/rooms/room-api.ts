@@ -148,7 +148,7 @@ async function command(path: string, options: RequestOptions = {}) {
   }
 }
 
-async function createResponseError(response: Response) {
+export async function createResponseError(response: Response) {
   let problem: ApiProblem = {
     retryable: response.status === 429 || response.status >= 500,
     status: response.status,

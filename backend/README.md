@@ -40,6 +40,7 @@ pnpm backend:bootRun
 - `POST /api/v1/rooms/{roomId}/livekit-token`
 - `POST /api/v1/rooms/{roomId}/close`
 - `GET /api/v1/rooms/{roomId}/events` с WebSocket upgrade
+- `POST /api/v1/feedback`
 
 ## Область
 
@@ -54,6 +55,8 @@ WT-402 добавляет backend lifecycle для host reconnect: `HOST_DISCONN
 WT-403 добавляет текстовый чат поверх room WebSocket: server-side validation, per-participant rate limit, `chat.message` broadcast и `error` events для `VALIDATION_FAILED` / `RATE_LIMITED`.
 
 WT-404 добавляет voice chat на LiveKit media plane. Backend выдаёт guest token с `canPublish=true` для публикации microphone track; `canPublishData` для guest остаётся `false`, а playback-state data channel остаётся host-only.
+
+WT-601 добавляет endpoint beta feedback. Backend принимает outcome, reason, optional room/correlation context и privacy-safe browser/network metadata, возвращает `202 Accepted` с `feedbackId`, `correlationId` и пишет структурированный log entry без media bytes, room secrets, LiveKit tokens и chat history.
 
 Вне текущей области: PostgreSQL product state, Flyway migrations, persisted chat history, distributed grace timers и distributed chat rate limit.
 

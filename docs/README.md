@@ -68,6 +68,10 @@
 - [WT-507_CAPACITY_TEST.md](WT-507_CAPACITY_TEST.md) — capacity test: host + 1/2/3 guest, hard limit `4/4`, отказ 5-го участника и runbook CPU/RAM/network.
 - [WT-508_BETA_DEPLOYMENT.md](WT-508_BETA_DEPLOYMENT.md) — beta deployment: TLS, secrets, backups, monitoring, rollback, post-deploy smoke, ограничения и privacy/terms draft.
 
+## P6: closed beta
+
+- [WT-601_FEEDBACK.md](WT-601_FEEDBACK.md) — beta feedback: session outcome, reason, optional browser/network metadata, correlation receipt и smoke-check.
+
 ## Как обновлять документы
 
 - Пишите пользовательский и проектный текст на русском.

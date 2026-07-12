@@ -17,6 +17,8 @@ tags:
     description: Системные endpoints
   - name: Rooms
     description: Жизненный цикл приватной комнаты
+  - name: Feedback
+    description: Обратная связь closed beta
 
 paths:
   /api/v1/health:
@@ -46,6 +48,41 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/VersionResponse"
+
+  /api/v1/feedback:
+    post:
+      tags: [Feedback]
+      operationId: submitFeedback
+      summary: Принять обратную связь по beta-сессии
+      description: |
+        Endpoint принимает короткий session feedback и optional privacy-safe browser/network
+        metadata. Он не принимает медиафайлы, chat history, room secrets или LiveKit tokens.
+      x-implementation-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackRequest"
+      responses:
+        "202":
+          description: Отзыв принят и получил correlation-friendly receipt
+          headers:
+            Cache-Control:
+              description: Ответ содержит диагностический receipt и не должен кэшироваться
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   /api/v1/rooms:
     post:
@@ -313,6 +350,117 @@ components:
         apiVersion:
           type: string
           const: v1
+
+    FeedbackOutcome:
+      type: string
+      enum: [WORKED, ISSUE, BLOCKED]
+
+    FeedbackReason:
+      type: string
+      enum:
+        - SUCCESS
+        - CONNECTION
+        - AUDIO_VIDEO
+        - FILE
+        - VOICE
+        - SYNC
+        - CHAT
+        - ROOM_ACCESS
+        - PERFORMANCE
+        - OTHER
+
+    FeedbackClientMetadata:
+      type: object
+      additionalProperties: false
+      properties:
+        userAgent:
+          type: string
+          maxLength: 512
+        language:
+          type: string
+          maxLength: 32
+        platform:
+          type: string
+          maxLength: 64
+        viewportWidth:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        viewportHeight:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        devicePixelRatio:
+          type: number
+          minimum: 0
+          maximum: 10
+        networkEffectiveType:
+          type: string
+          maxLength: 32
+        networkDownlinkMbps:
+          type: number
+          minimum: 0
+          maximum: 10000
+        networkRttMs:
+          type: integer
+          minimum: 0
+          maximum: 60000
+        networkSaveData:
+          type: boolean
+        roomStatus:
+          type: string
+          maxLength: 32
+        roomConnectionStatus:
+          type: string
+          maxLength: 32
+        liveKitStatus:
+          type: string
+          maxLength: 32
+        qualityStatus:
+          type: string
+          maxLength: 32
+        participantCount:
+          type: integer
+          minimum: 0
+          maximum: 4
+
+    FeedbackRequest:
+      type: object
+      additionalProperties: false
+      required: [outcome, reason]
+      properties:
+        outcome:
+          $ref: "#/components/schemas/FeedbackOutcome"
+        reason:
+          $ref: "#/components/schemas/FeedbackReason"
+        message:
+          type: string
+          maxLength: 2000
+        roomId:
+          $ref: "./schemas/common.schema.json#/$defs/RoomId"
+        participantRole:
+          type: string
+          enum: [HOST, GUEST]
+        relatedCorrelationId:
+          type: string
+          format: uuid
+        metadata:
+          $ref: "#/components/schemas/FeedbackClientMetadata"
+
+    FeedbackResponse:
+      type: object
+      additionalProperties: false
+      required: [feedbackId, correlationId, receivedAt]
+      properties:
+        feedbackId:
+          type: string
+          format: uuid
+        correlationId:
+          type: string
+          format: uuid
+        receivedAt:
+          type: string
+          format: date-time
 
     RoomSnapshot:
       $ref: "./schemas/common.schema.json#/$defs/RoomSnapshot"

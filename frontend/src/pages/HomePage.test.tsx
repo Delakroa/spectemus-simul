@@ -169,6 +169,73 @@ describe("HomePage", () => {
     expect(screen.getByText("Сервис временно недоступен")).toBeInTheDocument();
   });
 
+  it("отправляет beta feedback с техническим контекстом", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const url = String(input);
+
+      if (url.endsWith("/health")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ status: "UP", checkedAt: "2026-07-12T12:00:00Z" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url.endsWith("/version")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              name: "watch-together-backend",
+              version: "0.1.0",
+              buildTime: "2026-07-12T12:00:00Z",
+              apiVersion: "v1",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      if (url.endsWith("/api/v1/feedback") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              feedbackId: "f4b1dc2a-28e1-4490-88cf-3a6f5aefef43",
+              correlationId: "22222222-2222-4222-8222-222222222222",
+              receivedAt: "2026-07-12T12:01:00Z",
+            }),
+            { status: 202 },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response(null, { status: 404 }));
+    });
+
+    renderPage();
+
+    await screen.findByText("Сервис готов");
+    await user.selectOptions(screen.getByLabelText("Итог сессии"), "BLOCKED");
+    await user.selectOptions(screen.getByLabelText("Причина отзыва"), "CONNECTION");
+    await user.type(screen.getByLabelText("Комментарий к beta"), "Связь пропала у гостя.");
+    await user.click(screen.getByRole("button", { name: "Отправить отзыв" }));
+
+    expect(await screen.findByText(/Отзыв отправлен/)).toBeInTheDocument();
+    const feedbackCall = fetchMock.mock.calls.find(([input]) =>
+      String(input).endsWith("/api/v1/feedback"),
+    );
+    const payload = JSON.parse(feedbackCall?.[1]?.body as string);
+    expect(payload).toMatchObject({
+      outcome: "BLOCKED",
+      reason: "CONNECTION",
+      message: "Связь пропала у гостя.",
+      metadata: expect.objectContaining({
+        liveKitStatus: "idle",
+        roomConnectionStatus: "idle",
+      }),
+    });
+  });
+
   it("показывает problem details и recovery-действие для ошибки создания комнаты", async () => {
     const user = userEvent.setup();
 

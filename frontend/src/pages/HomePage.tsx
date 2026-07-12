@@ -31,7 +31,14 @@ import {
 } from "lucide-react";
 import { useParams } from "react-router-dom";
 
-import { type Participant, type RoomSnapshot } from "../features/rooms/room-api";
+import {
+  type FeedbackClientMetadata,
+  type FeedbackOutcome,
+  type FeedbackReason,
+  type FeedbackResponse,
+  submitFeedback,
+} from "../features/feedback/feedback-api";
+import { ApiProblemError, type Participant, type RoomSnapshot } from "../features/rooms/room-api";
 import { type LiveKitConnectionStatus } from "../features/rooms/livekit-connection";
 import {
   type FilePublicationStatus,
@@ -72,6 +79,39 @@ type FullscreenDocument = Document & {
 };
 
 type QualityDisplayStatus = QualityIndicatorsState["status"] | "reconnecting";
+type FeedbackSubmitStatus = "idle" | "sending" | "sent" | "error";
+
+const FEEDBACK_OUTCOME_OPTIONS: Array<{ value: FeedbackOutcome; label: string }> = [
+  { value: "WORKED", label: "Работает" },
+  { value: "ISSUE", label: "Есть проблема" },
+  { value: "BLOCKED", label: "Заблокировало" },
+];
+
+const FEEDBACK_REASON_OPTIONS: Array<{ value: FeedbackReason; label: string }> = [
+  { value: "SUCCESS", label: "Всё хорошо" },
+  { value: "CONNECTION", label: "Связь" },
+  { value: "AUDIO_VIDEO", label: "Видео/звук" },
+  { value: "FILE", label: "Файл" },
+  { value: "VOICE", label: "Голос" },
+  { value: "SYNC", label: "Синхронизация" },
+  { value: "CHAT", label: "Чат" },
+  { value: "ROOM_ACCESS", label: "Вход/комната" },
+  { value: "PERFORMANCE", label: "Производительность" },
+  { value: "OTHER", label: "Другое" },
+];
+
+type NetworkInformationSnapshot = {
+  downlink?: number;
+  effectiveType?: string;
+  rtt?: number;
+  saveData?: boolean;
+};
+
+type NavigatorWithNetworkInformation = Navigator & {
+  connection?: NetworkInformationSnapshot;
+  mozConnection?: NetworkInformationSnapshot;
+  webkitConnection?: NetworkInformationSnapshot;
+};
 
 async function toggleFullscreen(element: HTMLElement | null) {
   if (!element) {
@@ -122,6 +162,13 @@ export function HomePage() {
   const [roomIdCopied, setRoomIdCopied] = useState(false);
   const [seekBarValue, setSeekBarValue] = useState<number | null>(null);
   const [chatDraft, setChatDraft] = useState("");
+  const [feedbackOutcome, setFeedbackOutcome] = useState<FeedbackOutcome>("WORKED");
+  const [feedbackReason, setFeedbackReason] = useState<FeedbackReason>("SUCCESS");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [includeFeedbackMetadata, setIncludeFeedbackMetadata] = useState(true);
+  const [feedbackStatus, setFeedbackStatus] = useState<FeedbackSubmitStatus>("idle");
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
+  const [feedbackReceipt, setFeedbackReceipt] = useState<FeedbackResponse | null>(null);
   const joinRoomId = joinRoomIdDraft || routeRoomId || "";
   const isOnline = !isPending && !isError;
   const room = roomSession.room;
@@ -233,6 +280,65 @@ export function HomePage() {
     if (roomSession.sendChatMessage(chatDraft)) {
       setChatDraft("");
     }
+  }
+
+  function handleFeedbackOutcomeChange(nextOutcome: FeedbackOutcome) {
+    setFeedbackOutcome(nextOutcome);
+    setFeedbackReason((currentReason) => {
+      if (nextOutcome === "WORKED") {
+        return "SUCCESS";
+      }
+
+      return currentReason === "SUCCESS" ? "OTHER" : currentReason;
+    });
+  }
+
+  async function handleSubmitFeedback(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFeedbackStatus("sending");
+    setFeedbackError(null);
+    setFeedbackReceipt(null);
+
+    try {
+      const response = await submitFeedback({
+        outcome: feedbackOutcome,
+        reason: feedbackReason,
+        message: feedbackMessage.trim() || undefined,
+        roomId: room?.roomId,
+        participantRole: participant?.role,
+        relatedCorrelationId: normalizeUuid(roomSession.userError?.correlationId),
+        metadata: includeFeedbackMetadata ? collectFeedbackMetadata() : undefined,
+      });
+
+      setFeedbackReceipt(response);
+      setFeedbackMessage("");
+      setFeedbackStatus("sent");
+    } catch (error) {
+      setFeedbackStatus("error");
+      setFeedbackError(formatFeedbackSubmitError(error));
+    }
+  }
+
+  function collectFeedbackMetadata(): FeedbackClientMetadata {
+    const connection = getNetworkInformation();
+
+    return {
+      userAgent: navigator.userAgent || undefined,
+      language: navigator.language || undefined,
+      platform: navigator.platform || undefined,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      devicePixelRatio: window.devicePixelRatio,
+      networkEffectiveType: connection?.effectiveType,
+      networkDownlinkMbps: connection?.downlink,
+      networkRttMs: connection?.rtt,
+      networkSaveData: connection?.saveData,
+      roomStatus: room?.status,
+      roomConnectionStatus: roomSession.connectionStatus,
+      liveKitStatus: roomSession.liveKitStatus,
+      qualityStatus: roomSession.qualityIndicators.status,
+      participantCount: room?.participants.length,
+    };
   }
 
   async function handleCopyInvite() {
@@ -1090,6 +1196,21 @@ export function HomePage() {
         )}
       </section>
 
+      <FeedbackPanel
+        error={feedbackError}
+        includeMetadata={includeFeedbackMetadata}
+        message={feedbackMessage}
+        onIncludeMetadataChange={setIncludeFeedbackMetadata}
+        onMessageChange={setFeedbackMessage}
+        onOutcomeChange={handleFeedbackOutcomeChange}
+        onReasonChange={setFeedbackReason}
+        onSubmit={handleSubmitFeedback}
+        outcome={feedbackOutcome}
+        reason={feedbackReason}
+        receipt={feedbackReceipt}
+        status={feedbackStatus}
+      />
+
       <section className="system-panel" aria-labelledby="system-title">
         <div className="system-panel__heading">
           <div>
@@ -1188,6 +1309,124 @@ function UserErrorBanner({
   );
 }
 
+function FeedbackPanel({
+  error,
+  includeMetadata,
+  message,
+  onIncludeMetadataChange,
+  onMessageChange,
+  onOutcomeChange,
+  onReasonChange,
+  onSubmit,
+  outcome,
+  reason,
+  receipt,
+  status,
+}: {
+  error: string | null;
+  includeMetadata: boolean;
+  message: string;
+  onIncludeMetadataChange: (value: boolean) => void;
+  onMessageChange: (value: string) => void;
+  onOutcomeChange: (value: FeedbackOutcome) => void;
+  onReasonChange: (value: FeedbackReason) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  outcome: FeedbackOutcome;
+  reason: FeedbackReason;
+  receipt: FeedbackResponse | null;
+  status: FeedbackSubmitStatus;
+}) {
+  return (
+    <section className="feedback-panel" aria-labelledby="feedback-title">
+      <div className="feedback-panel__heading">
+        <div>
+          <p className="eyebrow">Beta</p>
+          <h2 id="feedback-title">Обратная связь</h2>
+        </div>
+        {receipt && (
+          <span className="feedback-panel__receipt">ID {receipt.feedbackId.slice(0, 8)}</span>
+        )}
+      </div>
+
+      <form className="feedback-form" onSubmit={onSubmit}>
+        <div className="feedback-form__grid">
+          <label className="feedback-field" htmlFor="feedback-outcome">
+            <span>Итог</span>
+            <select
+              id="feedback-outcome"
+              aria-label="Итог сессии"
+              value={outcome}
+              onChange={(event) => onOutcomeChange(event.currentTarget.value as FeedbackOutcome)}
+            >
+              {FEEDBACK_OUTCOME_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="feedback-field" htmlFor="feedback-reason">
+            <span>Причина</span>
+            <select
+              id="feedback-reason"
+              aria-label="Причина отзыва"
+              value={reason}
+              onChange={(event) => onReasonChange(event.currentTarget.value as FeedbackReason)}
+            >
+              {FEEDBACK_REASON_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <label className="feedback-field" htmlFor="feedback-message">
+          <span>Комментарий</span>
+          <textarea
+            id="feedback-message"
+            aria-label="Комментарий к beta"
+            maxLength={2000}
+            onChange={(event) => onMessageChange(event.currentTarget.value)}
+            rows={4}
+            value={message}
+          />
+        </label>
+
+        <div className="feedback-form__actions">
+          <label className="feedback-checkbox">
+            <input
+              type="checkbox"
+              checked={includeMetadata}
+              onChange={(event) => onIncludeMetadataChange(event.currentTarget.checked)}
+            />
+            <span>Технические данные</span>
+          </label>
+
+          <button className="button button--primary" type="submit" disabled={status === "sending"}>
+            <Send size={16} aria-hidden="true" />
+            {status === "sending" ? "Отправляем…" : "Отправить отзыв"}
+          </button>
+        </div>
+
+        {status === "sent" && receipt && (
+          <p className="feedback-form__status" role="status">
+            Отзыв отправлен · ID {receipt.feedbackId.slice(0, 8)}
+          </p>
+        )}
+
+        {status === "error" && error && (
+          <p className="feedback-form__error" role="alert">
+            {error}
+          </p>
+        )}
+      </form>
+    </section>
+  );
+}
+
 function ParticipantListItem({ participant }: { participant: Participant }) {
   return (
     <li className="participant-row">
@@ -1219,6 +1458,36 @@ function formatUserErrorAction(action: RoomUserErrorAction) {
   };
 
   return labels[action];
+}
+
+function getNetworkInformation() {
+  const nav = navigator as NavigatorWithNetworkInformation;
+  return nav.connection ?? nav.mozConnection ?? nav.webkitConnection;
+}
+
+function normalizeUuid(value: string | undefined) {
+  if (
+    !value ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+  ) {
+    return undefined;
+  }
+
+  return value;
+}
+
+function formatFeedbackSubmitError(error: unknown) {
+  if (error instanceof ApiProblemError) {
+    return (
+      error.problem.detail ?? error.problem.title ?? `Backend вернул HTTP ${error.problem.status}`
+    );
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Не удалось отправить отзыв.";
 }
 
 function formatUserErrorMeta(error: RoomUserError) {

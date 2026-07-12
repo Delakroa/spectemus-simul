@@ -1129,6 +1129,132 @@ a {
   opacity: 0.45;
 }
 
+.feedback-panel {
+  margin-top: 52px;
+  padding: 28px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.feedback-panel__heading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.feedback-panel h2 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.feedback-panel__receipt {
+  color: var(--success);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.feedback-form {
+  display: grid;
+  margin-top: 22px;
+  padding: 20px;
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.feedback-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.feedback-field {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.feedback-field span,
+.feedback-checkbox span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.feedback-field select,
+.feedback-field textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.feedback-field select {
+  min-height: 44px;
+  padding: 0 12px;
+}
+
+.feedback-field textarea {
+  min-height: 104px;
+  padding: 11px 12px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.feedback-field select:focus,
+.feedback-field textarea:focus {
+  border-color: #f08a72;
+  outline: 3px solid rgb(255 107 74 / 18%);
+}
+
+.feedback-form__actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.feedback-checkbox {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 9px;
+}
+
+.feedback-checkbox input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.feedback-form__status,
+.feedback-form__error {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.feedback-form__status {
+  color: var(--success);
+}
+
+.feedback-form__error {
+  color: var(--danger);
+}
+
 .system-panel {
   margin-top: 52px;
   padding: 28px 0 0;
@@ -1400,7 +1526,8 @@ a {
   }
 
   .room-actions,
-  .room-dashboard {
+  .room-dashboard,
+  .feedback-form__grid {
     grid-template-columns: 1fr;
   }
 
@@ -1491,6 +1618,15 @@ a {
 
   .system-panel {
     margin-top: 42px;
+  }
+
+  .feedback-panel {
+    margin-top: 42px;
+  }
+
+  .feedback-panel__heading {
+    flex-direction: column;
+    gap: 8px;
   }
 
   .system-details {
