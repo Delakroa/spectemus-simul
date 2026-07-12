@@ -1,6 +1,6 @@
 // WT-603 beta evidence run — semi-automated pre-flight.
 // Confirms the evidence-collection pipeline is live on the target stand (health, WT-604 telemetry
-// intake, WT-601 feedback intake, security headers) and prints the run plan. It complements
+// intake, WT-601 feedback intake, optional WT-605 feedback operations, security headers) and prints the run plan. It complements
 // `pnpm beta:smoke` (full room/media-token round-trip); run both before inviting testers.
 // Target: WT_BETA_BASE_URL / WT_APP_URL (default http://127.0.0.1:8088).
 
@@ -60,6 +60,26 @@ check(
   "feedback intake accepts reports (WT-601)",
 );
 
+const feedbackAdminToken =
+  process.env.FEEDBACK_ADMIN_TOKEN ?? process.env.WT_FEEDBACK_ADMIN_TOKEN;
+if (feedbackAdminToken) {
+  const reports = await getJson("/api/v1/feedback/reports?limit=5", {
+    "X-Feedback-Admin-Token": feedbackAdminToken,
+  });
+  check(
+    reports.status === 200 &&
+      Array.isArray(reports.body?.reports) &&
+      reports.body.reports.some(
+        (report) => report.feedbackId === feedback.body?.feedbackId,
+      ),
+    "feedback operations list latest reports (WT-605)",
+  );
+} else {
+  console.log(
+    "[warn] FEEDBACK_ADMIN_TOKEN is not set — skip WT-605 operator export check",
+  );
+}
+
 if (baseUrl.protocol !== "https:" && !isLocalhost(baseUrl)) {
   console.log(
     "[warn] target is remote but not HTTPS — the beta gate requires HTTPS + wss:// LiveKit + SESSION_COOKIE_SECURE=true",
@@ -86,6 +106,7 @@ function printRunPlan() {
       "scenarios: Chrome AND Edge × {host + 1 guest, host + 3 guests}, 15–30 min watch each",
       "per session: publish MP4 · play/pause/seek sync · chat · voice · reconnect · room full (5th denied) · submit feedback",
       "network matrix: normal, then UDP-blocked / TURN-only path (record whether media falls back)",
+      "after sessions: export feedback via WT-605 and triage blocker/non-blocker reports",
       "watch while running (Prometheus, access is internal-only):",
       "  wt.telemetry.first_frame / wt.telemetry.playback_error  → guest watch success",
       "  wt.telemetry.publish_start / wt.telemetry.publish_failure → host publish success",
@@ -128,9 +149,9 @@ async function getText(path) {
   };
 }
 
-async function getJson(path) {
+async function getJson(path, headers = {}) {
   const response = await fetch(resolvePath(path), {
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", ...headers },
     signal: AbortSignal.timeout(5_000),
   });
   return { status: response.status, body: await readJson(response) };

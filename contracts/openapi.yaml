@@ -18,7 +18,7 @@ tags:
   - name: Rooms
     description: Жизненный цикл приватной комнаты
   - name: Feedback
-    description: Обратная связь closed beta
+    description: Обратная связь closed beta и operator triage
   - name: Telemetry
     description: Privacy-safe client telemetry для beta-метрик
 
@@ -81,6 +81,139 @@ paths:
                 $ref: "#/components/schemas/FeedbackResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/feedback/reports:
+    get:
+      tags: [Feedback]
+      operationId: listFeedbackReports
+      summary: Получить последние beta feedback reports
+      description: |
+        Operator endpoint для регулярного triage. Доступен только при настроенном
+        `FEEDBACK_ADMIN_TOKEN` и корректном header `X-Feedback-Admin-Token`.
+      x-implementation-status: implemented
+      security:
+        - feedbackAdminToken: []
+      parameters:
+        - $ref: "#/components/parameters/FeedbackLimit"
+      responses:
+        "200":
+          description: Последние reports в компактном виде
+          headers:
+            Cache-Control:
+              description: Operator данные не кэшируются
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackReportListResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/feedback/reports/export:
+    get:
+      tags: [Feedback]
+      operationId: exportFeedbackReports
+      summary: Выгрузить последние beta feedback reports
+      description: |
+        Operator export для ручного разбора beta-прогона. Возвращает полные reports
+        в пределах `FEEDBACK_EXPORT_LIMIT`; медиа, chat history, room secrets и LiveKit
+        tokens здесь не хранятся и не возвращаются.
+      x-implementation-status: implemented
+      security:
+        - feedbackAdminToken: []
+      parameters:
+        - $ref: "#/components/parameters/FeedbackLimit"
+      responses:
+        "200":
+          description: Последние reports в полном виде
+          headers:
+            Cache-Control:
+              description: Operator данные не кэшируются
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackReportExportResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/feedback/reports/{feedbackId}:
+    parameters:
+      - $ref: "#/components/parameters/FeedbackId"
+    get:
+      tags: [Feedback]
+      operationId: getFeedbackReport
+      summary: Получить один beta feedback report
+      x-implementation-status: implemented
+      security:
+        - feedbackAdminToken: []
+      responses:
+        "200":
+          description: Полный report
+          headers:
+            Cache-Control:
+              description: Operator данные не кэшируются
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackReport"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    patch:
+      tags: [Feedback]
+      operationId: triageFeedbackReport
+      summary: Обновить triage поля beta feedback report
+      x-implementation-status: implemented
+      security:
+        - feedbackAdminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackTriageRequest"
+      responses:
+        "200":
+          description: Report после triage update
+          headers:
+            Cache-Control:
+              description: Operator данные не кэшируются
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackReport"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/ValidationFailed"
         "500":
@@ -325,6 +458,11 @@ components:
       name: wt_session
       description: |
         Opaque session credential. Production cookie: HttpOnly, Secure, SameSite=Strict.
+    feedbackAdminToken:
+      type: apiKey
+      in: header
+      name: X-Feedback-Admin-Token
+      description: Operator token from `FEEDBACK_ADMIN_TOKEN`; disabled when env is empty.
 
   parameters:
     RoomId:
@@ -353,6 +491,22 @@ components:
         minLength: 43
         maxLength: 128
         pattern: ^[A-Za-z0-9_-]+$
+    FeedbackId:
+      name: feedbackId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    FeedbackLimit:
+      name: limit
+      in: query
+      required: false
+      description: Ограничение размера выборки; backend clamp-ит значение к FEEDBACK_EXPORT_LIMIT.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
 
   headers:
     SessionCookie:
@@ -501,6 +655,156 @@ components:
         receivedAt:
           type: string
           format: date-time
+
+    FeedbackTriageStatus:
+      type: string
+      enum: [NEW, REVIEWING, RESOLVED, IGNORED]
+
+    FeedbackSeverity:
+      type: string
+      enum: [UNSET, LOW, MEDIUM, HIGH, BLOCKER]
+
+    FeedbackTriageRequest:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/FeedbackTriageStatus"
+        severity:
+          $ref: "#/components/schemas/FeedbackSeverity"
+        assignee:
+          type: string
+          maxLength: 120
+        note:
+          type: string
+          maxLength: 1000
+
+    FeedbackReportSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - feedbackId
+        - correlationId
+        - receivedAt
+        - outcome
+        - reason
+        - triageStatus
+        - severity
+      properties:
+        feedbackId:
+          type: string
+          format: uuid
+        correlationId:
+          type: string
+        receivedAt:
+          type: string
+          format: date-time
+        outcome:
+          $ref: "#/components/schemas/FeedbackOutcome"
+        reason:
+          $ref: "#/components/schemas/FeedbackReason"
+        roomId:
+          $ref: "./schemas/common.schema.json#/$defs/RoomId"
+        participantRole:
+          type: string
+          enum: [HOST, GUEST]
+        relatedCorrelationId:
+          type: string
+          format: uuid
+        triageStatus:
+          $ref: "#/components/schemas/FeedbackTriageStatus"
+        severity:
+          $ref: "#/components/schemas/FeedbackSeverity"
+        assignee:
+          type: string
+          maxLength: 120
+        messagePreview:
+          type: string
+          maxLength: 160
+
+    FeedbackReport:
+      type: object
+      additionalProperties: false
+      required:
+        - feedbackId
+        - correlationId
+        - receivedAt
+        - outcome
+        - reason
+        - triageStatus
+        - severity
+      properties:
+        feedbackId:
+          type: string
+          format: uuid
+        correlationId:
+          type: string
+        receivedAt:
+          type: string
+          format: date-time
+        outcome:
+          $ref: "#/components/schemas/FeedbackOutcome"
+        reason:
+          $ref: "#/components/schemas/FeedbackReason"
+        message:
+          type: string
+          maxLength: 2000
+        roomId:
+          $ref: "./schemas/common.schema.json#/$defs/RoomId"
+        participantRole:
+          type: string
+          enum: [HOST, GUEST]
+        relatedCorrelationId:
+          type: string
+          format: uuid
+        metadata:
+          $ref: "#/components/schemas/FeedbackClientMetadata"
+        triageStatus:
+          $ref: "#/components/schemas/FeedbackTriageStatus"
+        severity:
+          $ref: "#/components/schemas/FeedbackSeverity"
+        assignee:
+          type: string
+          maxLength: 120
+        triageNote:
+          type: string
+          maxLength: 1000
+        triagedAt:
+          type: string
+          format: date-time
+
+    FeedbackReportListResponse:
+      type: object
+      additionalProperties: false
+      required: [listedAt, count, reports]
+      properties:
+        listedAt:
+          type: string
+          format: date-time
+        count:
+          type: integer
+          minimum: 0
+        reports:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeedbackReportSummary"
+
+    FeedbackReportExportResponse:
+      type: object
+      additionalProperties: false
+      required: [exportedAt, count, reports]
+      properties:
+        exportedAt:
+          type: string
+          format: date-time
+        count:
+          type: integer
+          minimum: 0
+        reports:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeedbackReport"
 
     TelemetryEventType:
       type: string
@@ -689,6 +993,12 @@ components:
             $ref: "#/components/schemas/ProblemDetails"
     RoomUnavailable:
       description: Комната недоступна; ответ не раскрывает, существовала ли она
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    NotFound:
+      description: Ресурс не найден или уже удалён по retention policy
       content:
         application/problem+json:
           schema:

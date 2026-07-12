@@ -28,6 +28,11 @@ watch-together:
     api-key: ${LIVEKIT_API_KEY:devkey}
     api-secret: ${LIVEKIT_API_SECRET:devsecretdevsecretdevsecretdevsecret}
     token-ttl: ${LIVEKIT_TOKEN_TTL:10m}
+  feedback:
+    # WT-605 operator endpoints are disabled until this token is configured.
+    admin-token: ${FEEDBACK_ADMIN_TOKEN:}
+    retention: ${FEEDBACK_RETENTION:30d}
+    export-limit: ${FEEDBACK_EXPORT_LIMIT:200}
   rate-limit:
     # Redis-backed per-client-IP limits on the public mutating endpoints (WT-606).
     # Defaults are generous for real use but cap abuse/runaway LiveKit cost in the beta.

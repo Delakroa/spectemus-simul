@@ -41,6 +41,10 @@ pnpm backend:bootRun
 - `POST /api/v1/rooms/{roomId}/close`
 - `GET /api/v1/rooms/{roomId}/events` с WebSocket upgrade
 - `POST /api/v1/feedback`
+- `GET /api/v1/feedback/reports` с `X-Feedback-Admin-Token`
+- `GET /api/v1/feedback/reports/export` с `X-Feedback-Admin-Token`
+- `GET /api/v1/feedback/reports/{feedbackId}` с `X-Feedback-Admin-Token`
+- `PATCH /api/v1/feedback/reports/{feedbackId}` с `X-Feedback-Admin-Token`
 
 ## Область
 
@@ -57,6 +61,8 @@ WT-403 добавляет текстовый чат поверх room WebSocket:
 WT-404 добавляет voice chat на LiveKit media plane. Backend выдаёт guest token с `canPublish=true` для публикации microphone track; `canPublishData` для guest остаётся `false`, а playback-state data channel остаётся host-only.
 
 WT-601 добавляет endpoint beta feedback. Backend принимает outcome, reason, optional room/correlation context и privacy-safe browser/network metadata, возвращает `202 Accepted` с `feedbackId`, `correlationId` и пишет структурированный log entry без media bytes, room secrets, LiveKit tokens и chat history.
+
+WT-605 добавляет feedback operations: reports сохраняются в Redis с TTL, operator может получить список, полный export, отдельный report и обновить triage поля. Operator endpoints выключены, пока не задан `FEEDBACK_ADMIN_TOKEN`, и требуют `X-Feedback-Admin-Token`.
 
 Вне текущей области: PostgreSQL product state, Flyway migrations, persisted chat history, distributed grace timers и distributed chat rate limit.
 
@@ -77,9 +83,12 @@ LIVEKIT_URL=ws://127.0.0.1:7880
 LIVEKIT_API_KEY=devkey
 LIVEKIT_API_SECRET=devsecretdevsecretdevsecretdevsecret
 LIVEKIT_TOKEN_TTL=10m
+FEEDBACK_ADMIN_TOKEN=
+FEEDBACK_RETENTION=30d
+FEEDBACK_EXPORT_LIMIT=200
 WEBSOCKET_CHAT_RATE_LIMIT=5
 WEBSOCKET_CHAT_RATE_WINDOW=5s
 WEBSOCKET_HOST_RECONNECT_GRACE=60s
 ```
 
-Создание комнаты, восстановление snapshot, вход гостя, выдача LiveKit token, выход guest participant, закрытие комнаты, host reconnect, WebSocket snapshot, presence heartbeat и chat messaging требуют работающий Redis для room/session state. Chat rate limit сейчас in-memory и per-instance. Полная локальная среда запускается командами `pnpm infra:up` и `pnpm infra:check`.
+Создание комнаты, восстановление snapshot, вход гостя, выдача LiveKit token, выход guest participant, закрытие комнаты, host reconnect, WebSocket snapshot, presence heartbeat, chat messaging и feedback operations требуют работающий Redis для room/session/feedback state. Chat rate limit сейчас in-memory и per-instance. Полная локальная среда запускается командами `pnpm infra:up` и `pnpm infra:check`.

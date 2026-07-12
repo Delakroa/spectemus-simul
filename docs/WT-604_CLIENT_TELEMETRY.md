@@ -8,7 +8,7 @@
 
 Дать beta возможность считать ключевую продуктовую метрику **Successful Watch Session Rate**, которую WT-602 product review отметил как неизмеримую. Для этого добавлен privacy-safe telemetry endpoint и frontend-события о ключевых точках watch-сессии (first frame, publish/playback ошибки, quality). Метрики ложатся на уже существующую WT-506 Micrometer/prometheus-основу.
 
-Telemetry не персистит историю и не хранит идентифицирующие данные: backend инкрементирует агрегированные counters и пишет privacy-safe log-строку, но не сохраняет per-session записи (managed storage — область WT-605).
+Telemetry не персистит историю и не хранит идентифицирующие данные: backend инкрементирует агрегированные counters и пишет privacy-safe log-строку, но не сохраняет per-session записи. WT-605 закрывает managed storage/export для feedback; telemetry storage остаётся отдельной будущей задачей, если агрегированных counters не хватит.
 
 ## Поведение
 
@@ -27,7 +27,7 @@ Telemetry не персистит историю и не хранит идент
 - Publish success (host) ≈ `wt.telemetry.publish_start / (wt.telemetry.publish_start + wt.telemetry.publish_failure)`.
 - Широкий знаменатель для контекста — `wt.room.participants.joined` (WT-506).
 
-Точный per-session rate требует хранения событий с session id и появится вместе с managed storage в WT-605.
+Точный per-session rate требует хранения событий с session id и остаётся отдельной будущей задачей, если beta evidence покажет, что агрегированных counters недостаточно.
 
 ## Реализация
 
@@ -63,8 +63,8 @@ pnpm infra:up && pnpm infra:check && pnpm beta:smoke
 
 ## Известные ограничения
 
-- Метрика агрегированная (counter-based), не per-session; точный per-session rate требует storage событий (WT-605).
-- Endpoint публичный без строгого rate limiting; батч ограничен 50 событиями. Redis-backed лимиты — WT-606.
+- Метрика агрегированная (counter-based), не per-session; точный per-session rate требует отдельного storage событий.
+- Endpoint публичный, батч ограничен 50 событиями и защищён Redis-backed лимитом из WT-606.
 - Raw QoS-числа (RTT, jitter, packet loss, bitrate) telemetry не отправляет — только грубый `qualityStatus`. Детальный QoS/cost benchmark — WT-607.
-- Telemetry не персистится: только counters + logs, без экспорта/retention (WT-605).
+- Telemetry не персистится: только counters + logs, без экспорта/retention.
 - Frontend emit покрывает guest first-frame/playback error, host publish start/failure и смену quality-статуса; тайминговые числа (time-to-first-frame, publish latency) вне области WT-604.

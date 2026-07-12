@@ -21,13 +21,14 @@
 
 ## Runbook
 
-1. Поднять/проверить целевой стенд. Запустить `WT_BETA_BASE_URL=https://<beta-host> pnpm beta:evidence:preflight` — подтверждает, что evidence-пайплайн (health, telemetry WT-604, feedback WT-601, security-заголовки WT-606) жив, и печатает план.
+1. Поднять/проверить целевой стенд. Запустить `WT_BETA_BASE_URL=https://<beta-host> pnpm beta:evidence:preflight` — подтверждает, что evidence-пайплайн (health, telemetry WT-604, feedback intake WT-601, security-заголовки WT-606) жив, и печатает план.
 2. `WT_BETA_BASE_URL=https://<beta-host> pnpm beta:smoke` — полный round-trip комнаты/токенов.
 3. Ручные smoke перед сессиями: host публикует MP4 → guest видит video/audio → play/pause/seek синхронизируются; отдельно chat, voice, reconnect, room full, feedback.
 4. Прогнать сценарии из таблицы ниже (Chrome и Edge × host+1 и host+3), по 15–30 минут просмотра. Для каждой сессии заполнить строку в шаблоне.
 5. Один прогон каждой конфигурации повторить на UDP-blocked / TURN-only пути (см. сетевую матрицу) и записать, случился ли fallback и как просел QoS.
 6. Снять metric snapshot из Prometheus в конце прогона и посчитать rates.
-7. Свести issues в blocker / non-blocker и вынести verdict против exit-критериев.
+7. Выгрузить feedback через WT-605 operator export, обновить triage для blocker / non-blocker и перенести `feedbackId` / `correlationId` в evidence report.
+8. Свести issues в blocker / non-blocker и вынести verdict против exit-критериев.
 
 ## Сценарии
 

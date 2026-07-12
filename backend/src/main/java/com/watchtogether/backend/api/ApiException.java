@@ -31,6 +31,14 @@ public final class ApiException extends RuntimeException {
         return new ApiException(HttpStatus.CONFLICT, code, title, detail, false, List.of());
     }
 
+    public static ApiException forbidden(String code, String title, String detail) {
+        return new ApiException(HttpStatus.FORBIDDEN, code, title, detail, false, List.of());
+    }
+
+    public static ApiException notFound(String code, String title, String detail) {
+        return new ApiException(HttpStatus.NOT_FOUND, code, title, detail, false, List.of());
+    }
+
     public static ApiException rateLimited(String detail) {
         return new ApiException(
                 HttpStatus.TOO_MANY_REQUESTS,
