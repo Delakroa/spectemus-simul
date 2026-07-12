@@ -392,6 +392,22 @@ if (
 }
 console.log("[ok] feedback through proxy: accepted");
 
+const acceptedTelemetry = await postJson(`${appUrl}/api/v1/telemetry`, {
+  events: [
+    { type: "FIRST_FRAME", roomId, role: "GUEST" },
+    { type: "QUALITY_SUMMARY", role: "GUEST", qualityStatus: "WARNING" },
+  ],
+});
+if (
+  acceptedTelemetry.status !== 202 ||
+  !uuidPattern.test(acceptedTelemetry.body.telemetryId) ||
+  !uuidPattern.test(acceptedTelemetry.body.correlationId) ||
+  acceptedTelemetry.body.accepted !== 2
+) {
+  throw new Error("telemetry endpoint returned invalid receipt");
+}
+console.log("[ok] telemetry through proxy: accepted");
+
 const joinUrl = `${appUrl}/api/v1/rooms/${roomId}/join`;
 const joinedGuest = await postJson(joinUrl, {
   displayName: "Infra Smoke Guest",

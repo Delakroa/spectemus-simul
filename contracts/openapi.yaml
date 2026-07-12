@@ -19,6 +19,8 @@ tags:
     description: Жизненный цикл приватной комнаты
   - name: Feedback
     description: Обратная связь closed beta
+  - name: Telemetry
+    description: Privacy-safe client telemetry для beta-метрик
 
 paths:
   /api/v1/health:
@@ -77,6 +79,44 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/FeedbackResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/telemetry:
+    post:
+      tags: [Telemetry]
+      operationId: submitTelemetry
+      summary: Принять батч privacy-safe client telemetry
+      description: |
+        Endpoint принимает батч client telemetry событий (first frame, publish/playback
+        ошибки, quality summary) для агрегированных beta-метрик. Он не принимает медиафайлы,
+        chat history, room secrets, LiveKit tokens или identity данные. Каждое событие даёт
+        только aggregate counter и low-cardinality tag; roomId, role и detail используются
+        лишь для log-корреляции и никогда не становятся метрик-тегами.
+      x-implementation-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TelemetryRequest"
+      responses:
+        "202":
+          description: Батч принят и получил correlation-friendly receipt
+          headers:
+            Cache-Control:
+              description: Ответ содержит диагностический receipt и не должен кэшироваться
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TelemetryResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "422":
@@ -461,6 +501,67 @@ components:
         receivedAt:
           type: string
           format: date-time
+
+    TelemetryEventType:
+      type: string
+      enum:
+        - FIRST_FRAME
+        - PLAYBACK_ERROR
+        - PUBLISH_START
+        - PUBLISH_FAILURE
+        - QUALITY_SUMMARY
+
+    TelemetryQualityStatus:
+      type: string
+      enum: [GOOD, WARNING, POOR, LOST, UNKNOWN]
+
+    TelemetryEvent:
+      type: object
+      additionalProperties: false
+      required: [type]
+      properties:
+        type:
+          $ref: "#/components/schemas/TelemetryEventType"
+        roomId:
+          $ref: "./schemas/common.schema.json#/$defs/RoomId"
+        role:
+          type: string
+          enum: [HOST, GUEST]
+        qualityStatus:
+          $ref: "#/components/schemas/TelemetryQualityStatus"
+        detail:
+          type: string
+          maxLength: 200
+
+    TelemetryRequest:
+      type: object
+      additionalProperties: false
+      required: [events]
+      properties:
+        events:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/TelemetryEvent"
+
+    TelemetryResponse:
+      type: object
+      additionalProperties: false
+      required: [telemetryId, correlationId, receivedAt, accepted]
+      properties:
+        telemetryId:
+          type: string
+          format: uuid
+        correlationId:
+          type: string
+          format: uuid
+        receivedAt:
+          type: string
+          format: date-time
+        accepted:
+          type: integer
+          minimum: 0
 
     RoomSnapshot:
       $ref: "./schemas/common.schema.json#/$defs/RoomSnapshot"

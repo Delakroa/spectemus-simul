@@ -46,6 +46,8 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/feedback")
                         .permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/telemetry")
+                        .permitAll()
                         .anyRequest()
                         .denyAll())
                 .build();

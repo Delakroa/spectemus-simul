@@ -121,6 +121,22 @@ if (
 }
 console.log("[ok] feedback endpoint: accepted");
 
+const acceptedTelemetry = await postJson("/api/v1/telemetry", {
+  events: [
+    { type: "PUBLISH_START", roomId, role: "HOST" },
+    { type: "QUALITY_SUMMARY", role: "HOST", qualityStatus: "GOOD" },
+  ],
+});
+if (
+  acceptedTelemetry.status !== 202 ||
+  !uuidPattern.test(acceptedTelemetry.body.telemetryId) ||
+  !uuidPattern.test(acceptedTelemetry.body.correlationId) ||
+  acceptedTelemetry.body.accepted !== 2
+) {
+  throw new Error("telemetry endpoint returned invalid receipt");
+}
+console.log("[ok] telemetry endpoint: accepted");
+
 const joinPath = `/api/v1/rooms/${roomId}/join`;
 const joinedGuest = await postJson(joinPath, {
   displayName: "Beta Smoke Guest",

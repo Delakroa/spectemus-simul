@@ -68,6 +68,8 @@ import {
   type QualityIndicatorController,
   type QualityIndicatorsState,
 } from "./quality-indicators";
+import { createRoomTelemetryTracker, type RoomTelemetryTracker } from "../telemetry/telemetry";
+import { submitTelemetry } from "../telemetry/telemetry-api";
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const MAX_EVENT_LOG_ITEMS = 8;
@@ -271,6 +273,17 @@ export function useRoomSession(routeRoomId?: string) {
   const socketRef = useRef<WebSocket | null>(null);
   const voicePublicationRef = useRef<VoicePublication | null>(null);
   const voiceRequestIdRef = useRef(0);
+  const telemetryTrackerRef = useRef<RoomTelemetryTracker | null>(null);
+  if (telemetryTrackerRef.current === null) {
+    telemetryTrackerRef.current = createRoomTelemetryTracker({
+      emit: (event) => {
+        // Telemetry is best-effort: never let a failed beacon surface to the user.
+        void submitTelemetry({ events: [event] }).catch(() => {});
+      },
+      getRoomId: () => roomRef.current?.roomId ?? null,
+      getRole: () => participantRef.current?.role ?? null,
+    });
+  }
 
   useEffect(() => {
     participantRef.current = state.participant;
@@ -709,6 +722,7 @@ export function useRoomSession(routeRoomId?: string) {
         filePublicationStatus: "live",
         filePublicationTrackCount: publication.tracks.length,
       }));
+      telemetryTrackerRef.current?.onPublishStart();
     } catch (error) {
       if (filePublicationRequestIdRef.current !== requestId) {
         return;
@@ -725,6 +739,7 @@ export function useRoomSession(routeRoomId?: string) {
         filePublicationStatus: "error",
         filePublicationTrackCount: 0,
       }));
+      telemetryTrackerRef.current?.onPublishFailure(message);
     }
   }, [
     attachHostPreview,
@@ -860,6 +875,7 @@ export function useRoomSession(routeRoomId?: string) {
               disconnectRemoteVoice();
               disconnectPlaybackStateReceiver();
               disconnectQualityIndicators();
+              telemetryTrackerRef.current?.reset();
             }
 
             setState((current) => ({
@@ -898,6 +914,8 @@ export function useRoomSession(routeRoomId?: string) {
               ...current,
               qualityIndicators,
             }));
+
+            telemetryTrackerRef.current?.onQuality(qualityIndicators);
           },
         });
         const voiceController = createRemoteVoiceController(connection.room, {
@@ -932,6 +950,8 @@ export function useRoomSession(routeRoomId?: string) {
                 remotePlaybackTrackCount: remotePlayback.trackCount,
                 remotePlaybackVideoTrackName: remotePlayback.videoTrackName,
               }));
+
+              telemetryTrackerRef.current?.onRemotePlayback(remotePlayback);
             },
           });
           remotePlaybackControllerRef.current = playbackController;

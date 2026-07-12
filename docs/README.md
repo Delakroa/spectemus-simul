@@ -75,7 +75,9 @@
 
 ## P7: beta iteration
 
-Планируется после WT-602: beta evidence run, client telemetry, feedback operations, security/rate-limit hardening и media QoS/cost benchmark.
+- [WT-604_CLIENT_TELEMETRY.md](WT-604_CLIENT_TELEMETRY.md) — client telemetry: privacy-safe endpoint и frontend-события (first frame, publish/playback error, quality) для агрегированной Successful Watch Session Rate поверх WT-506 метрик.
+
+Остальной пакет P7 запланирован: WT-603 (beta evidence run), WT-605 (feedback operations), WT-606 (security/rate-limit hardening), WT-607 (media QoS/cost benchmark).
 
 ## Как обновлять документы
 
