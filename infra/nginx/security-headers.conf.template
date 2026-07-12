@@ -1,0 +1,15 @@
+# Security response headers for the Watch Together frontend. Rendered from this template by the
+# nginx entrypoint's envsubst at container start; only ${WT_CSP_CONNECT_SRC} is substituted.
+# CSP notes: the Vite build emits only external scripts (script-src 'self' is safe); inline style
+# attributes (React style={{…}}) require style-src 'unsafe-inline'; blob: is needed for the host's
+# local-file preview / captured media. WebRTC media (UDP) is not governed by CSP.
+# connect-src covers the room WebSocket and LiveKit signaling channel: set WT_CSP_CONNECT_SRC per
+# deployment to the fixed beta host(s) (e.g. "'self' wss://livekit.beta.example"); it defaults to
+# "'self' ws: wss:" for local dev. HSTS is inert over plain HTTP and takes effect once the beta
+# gateway terminates TLS.
+add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src ${WT_CSP_CONNECT_SRC}" always;
+add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-Frame-Options "DENY" always;
+add_header Referrer-Policy "no-referrer" always;
+add_header Permissions-Policy "microphone=(self), camera=(), display-capture=(), geolocation=(), payment=()" always;

@@ -31,6 +31,16 @@ public final class ApiException extends RuntimeException {
         return new ApiException(HttpStatus.CONFLICT, code, title, detail, false, List.of());
     }
 
+    public static ApiException rateLimited(String detail) {
+        return new ApiException(
+                HttpStatus.TOO_MANY_REQUESTS,
+                "RATE_LIMITED",
+                "Слишком много запросов",
+                detail,
+                true,
+                List.of());
+    }
+
     public static ApiException validation(ApiFieldViolation violation) {
         return new ApiException(
                 HttpStatus.UNPROCESSABLE_CONTENT,

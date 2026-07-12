@@ -48,8 +48,9 @@ P0 технически подтверждён.
 - WT-601 добавляет beta feedback: endpoint с correlation receipt, privacy-safe metadata, frontend-форму и smoke-проверку.
 - WT-602 фиксирует product review: решение CONTINUE для ограниченной invite-only beta и список follow-up задач перед расширением.
 - WT-604 добавляет client telemetry: privacy-safe endpoint и frontend-события (first frame, publish/playback error, quality) для агрегированной Successful Watch Session Rate поверх WT-506 метрик.
+- WT-606 усиливает безопасность беты: Redis-backed rate limits на create/join/token/feedback/telemetry (429 + Retry-After), env-управляемый CSP connect-src, HSTS и actuator за Spring Security.
 
-P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. P7 beta iteration начат: WT-604 закрыл телеметрию для метрики успешности сессии.
+P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. P7 beta iteration в работе: WT-604 закрыл телеметрию для метрики успешности сессии, WT-606 — security/rate-limit hardening перед evidence-прогоном.
 
 ## Как читать репозиторий
 
@@ -186,6 +187,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-601 beta feedback](docs/WT-601_FEEDBACK.md)
 - [WT-602 product review](docs/WT-602_PRODUCT_REVIEW.md)
 - [WT-604 client telemetry](docs/WT-604_CLIENT_TELEMETRY.md)
+- [WT-606 beta security hardening](docs/WT-606_BETA_SECURITY_HARDENING.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation

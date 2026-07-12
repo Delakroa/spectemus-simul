@@ -26,7 +26,13 @@ RUN pnpm --filter @watch-together/frontend build
 
 FROM nginx:1.31.1-alpine3.23
 
-COPY infra/nginx/security-headers.conf /etc/nginx/security-headers.conf
+# security-headers.conf is rendered from a template at start-up: the nginx entrypoint runs
+# envsubst over /etc/nginx/templates/*.template into NGINX_ENVSUBST_OUTPUT_DIR. WT_CSP_CONNECT_SRC
+# defaults to the dev value here and can be overridden per deployment to narrow CSP connect-src.
+ENV NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx
+ENV WT_CSP_CONNECT_SRC="'self' ws: wss:"
+
+COPY infra/nginx/security-headers.conf.template /etc/nginx/templates/security-headers.conf.template
 COPY infra/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /workspace/frontend/dist /usr/share/nginx/html
 

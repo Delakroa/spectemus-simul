@@ -28,6 +28,25 @@ watch-together:
     api-key: ${LIVEKIT_API_KEY:devkey}
     api-secret: ${LIVEKIT_API_SECRET:devsecretdevsecretdevsecretdevsecret}
     token-ttl: ${LIVEKIT_TOKEN_TTL:10m}
+  rate-limit:
+    # Redis-backed per-client-IP limits on the public mutating endpoints (WT-606).
+    # Defaults are generous for real use but cap abuse/runaway LiveKit cost in the beta.
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    create-room:
+      requests: ${RATE_LIMIT_CREATE_ROOM:10}
+      window: ${RATE_LIMIT_CREATE_ROOM_WINDOW:1m}
+    join-room:
+      requests: ${RATE_LIMIT_JOIN_ROOM:20}
+      window: ${RATE_LIMIT_JOIN_ROOM_WINDOW:1m}
+    livekit-token:
+      requests: ${RATE_LIMIT_LIVEKIT_TOKEN:30}
+      window: ${RATE_LIMIT_LIVEKIT_TOKEN_WINDOW:1m}
+    feedback:
+      requests: ${RATE_LIMIT_FEEDBACK:10}
+      window: ${RATE_LIMIT_FEEDBACK_WINDOW:1m}
+    telemetry:
+      requests: ${RATE_LIMIT_TELEMETRY:60}
+      window: ${RATE_LIMIT_TELEMETRY_WINDOW:1m}
 
 management:
   endpoints:

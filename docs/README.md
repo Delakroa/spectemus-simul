@@ -76,8 +76,9 @@
 ## P7: beta iteration
 
 - [WT-604_CLIENT_TELEMETRY.md](WT-604_CLIENT_TELEMETRY.md) — client telemetry: privacy-safe endpoint и frontend-события (first frame, publish/playback error, quality) для агрегированной Successful Watch Session Rate поверх WT-506 метрик.
+- [WT-606_BETA_SECURITY_HARDENING.md](WT-606_BETA_SECURITY_HARDENING.md) — beta security: Redis-backed rate limits (create/join/token/feedback/telemetry), env-управляемый CSP connect-src, HSTS, actuator за Spring Security.
 
-Остальной пакет P7 запланирован: WT-603 (beta evidence run), WT-605 (feedback operations), WT-606 (security/rate-limit hardening), WT-607 (media QoS/cost benchmark).
+Остальной пакет P7 запланирован: WT-603 (beta evidence run), WT-605 (feedback operations), WT-607 (media QoS/cost benchmark).
 
 ## Как обновлять документы
 
