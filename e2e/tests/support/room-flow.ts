@@ -27,14 +27,22 @@ export async function joinRoom(
   roomId: string,
   guestName: string,
 ): Promise<void> {
-  await page.goto("/");
-  await page.getByLabel("Invite-ссылка или ID комнаты").fill(roomId);
-  await page.getByLabel("Имя гостя").fill(guestName);
-  await page.getByRole("button", { name: "Войти" }).click();
+  await submitJoinRoom(page, roomId, guestName);
 
   await expect(
     page.getByRole("heading", { name: ROOM_STATE_HEADING }),
   ).toBeVisible();
+}
+
+export async function submitJoinRoom(
+  page: Page,
+  roomId: string,
+  guestName: string,
+): Promise<void> {
+  await page.goto("/");
+  await page.getByLabel("Invite-ссылка или ID комнаты").fill(roomId);
+  await page.getByLabel("Имя гостя").fill(guestName);
+  await page.getByRole("button", { name: "Войти" }).click();
 }
 
 export async function sendChat(page: Page, text: string): Promise<void> {

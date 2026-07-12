@@ -65,6 +65,7 @@
 - [WT-504_NETWORK_RESILIENCE.md](WT-504_NETWORK_RESILIENCE.md) — network resilience: browser offline/reconnect E2E, chat recovery и manual matrix для latency/loss/TURN/VPN.
 - [WT-505_SECURITY_HARDENING.md](WT-505_SECURITY_HARDENING.md) — security hardening: аудит модели угроз, CSP/security-заголовки на gateway, secret-scanning (gitleaks) в CI.
 - [WT-506_OBSERVABILITY.md](WT-506_OBSERVABILITY.md) — observability: Micrometer room-метрики (WS/lifecycle/host/chat) через actuator/prometheus, privacy-safe.
+- [WT-507_CAPACITY_TEST.md](WT-507_CAPACITY_TEST.md) — capacity test: host + 1/2/3 guest, hard limit `4/4`, отказ 5-го участника и runbook CPU/RAM/network.
 
 ## Как обновлять документы
 
