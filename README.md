@@ -1,4 +1,29 @@
-# Watch Together
+<p align="center">
+  <img src=".github/assets/watch-together-banner.svg" alt="Watch Together — CouchSync Stack" width="100%" />
+</p>
+
+<h1 align="center">Watch Together</h1>
+
+<p align="center">
+  <strong>CouchSync Stack</strong> — приватные watch rooms для локальных фильмов. Файл остаётся у host; гости получают синхронный просмотр, чат, voice и reconnect через LiveKit-backed media plane.
+</p>
+
+<p align="center">
+  <a href="docs/WT-608_PRODUCT_REVIEW_REFRESH.md"><img alt="stage: invite-only beta" src="https://img.shields.io/badge/stage-invite--only_beta-22C55E?style=for-the-badge"></a>
+  <a href="docs/WT-004_MEDIA_PIPELINE_ADR.md"><img alt="media: no upload" src="https://img.shields.io/badge/media-no_upload-38BDF8?style=for-the-badge"></a>
+  <a href="docs/WT-106_CONTRACTS.md"><img alt="contracts: REST and WebSocket" src="https://img.shields.io/badge/contracts-REST_%2B_WebSocket-A855F7?style=for-the-badge"></a>
+  <a href=".github/workflows/quality-gate.yml"><img alt="quality gate" src="https://img.shields.io/badge/quality-gated-F97316?style=for-the-badge"></a>
+</p>
+
+## Repository Card
+
+**GitHub About:** CouchSync: private co-watch rooms for local movies — no uploads, just shared playback.
+
+**Topics:** `watch-party`, `co-watch`, `couchsync`, `webrtc`, `livekit`, `synchronized-playback`, `local-media`, `private-rooms`, `spring-boot`, `react`, `redis`, `websocket`, `closed-beta`.
+
+Готовый текст для GitHub sidebar лежит в [.github/repository-profile.md](.github/repository-profile.md).
+
+## Что это
 
 Watch Together — MVP для приватного синхронного просмотра. Host выбирает локальный видеофайл, создаёт приватную комнату и приглашает гостей одной ссылкой. Приложение не является видеохостингом: байты фильма остаются на машине host.
 
@@ -52,8 +77,9 @@ P0 технически подтверждён.
 - WT-605 добавляет feedback operations: Redis TTL storage, operator export, triage поля и runbook регулярного просмотра beta feedback.
 - WT-606 усиливает безопасность беты: Redis-backed rate limits на create/join/token/feedback/telemetry (429 + Retry-After), env-управляемый CSP connect-src, HSTS и actuator за Spring Security.
 - WT-607 добавляет media QoS/cost benchmark kit: JSON-шаблон, summary script, traffic/cost thresholds и scaling gates для host + 1/2/3 guest.
+- WT-608 повторяет product review после закрытия P7: обновлённый evidence snapshot, статус beta-гейтов и решение CONTINUE к фактическому прогону invite-only beta (реальные user/QoS данные — за внешним прогоном).
 
-P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. P7 beta iteration закрыт repo-side: WT-603 готовит evidence-прогон, WT-604 закрыл телеметрию для метрики успешности сессии, WT-605 добавил управляемый feedback triage, WT-606 — security/rate-limit hardening, WT-607 — media QoS/cost benchmark kit.
+P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. P7 beta iteration закрыт repo-side: WT-603 готовит evidence-прогон, WT-604 закрыл телеметрию для метрики успешности сессии, WT-605 добавил управляемый feedback triage, WT-606 — security/rate-limit hardening, WT-607 — media QoS/cost benchmark kit. WT-608 (P8) повторил product review: repo-side готовность полная, оставшийся гейт — реальный beta-прогон на staging.
 
 ## Как читать репозиторий
 
@@ -194,6 +220,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-605 feedback operations](docs/WT-605_FEEDBACK_OPERATIONS.md)
 - [WT-606 beta security hardening](docs/WT-606_BETA_SECURITY_HARDENING.md)
 - [WT-607 media QoS/cost benchmark](docs/WT-607_MEDIA_QOS_COST_BENCHMARK.md)
+- [WT-608 product review refresh](docs/WT-608_PRODUCT_REVIEW_REFRESH.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation

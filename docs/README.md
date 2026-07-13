@@ -83,6 +83,10 @@
 
 P7 repo-side готов; реальные evidence/QoS отчёты заполняются во время beta/staging прогонов.
 
+## P8: beta evidence & review refresh
+
+- [WT-608_PRODUCT_REVIEW_REFRESH.md](WT-608_PRODUCT_REVIEW_REFRESH.md) — повторный product review после закрытия P7: обновлённый evidence snapshot, статус beta-гейтов и решение CONTINUE к фактическому прогону invite-only beta. Локальная верификация evidence-пайплайна — в [evidence/](evidence/).
+
 ## Как обновлять документы
 
 - Пишите пользовательский и проектный текст на русском.

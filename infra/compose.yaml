@@ -97,6 +97,9 @@ services:
       LIVEKIT_API_KEY: "${LIVEKIT_API_KEY:-devkey}"
       LIVEKIT_API_SECRET: "${LIVEKIT_API_SECRET:-devsecretdevsecretdevsecretdevsecret}"
       LIVEKIT_TOKEN_TTL: "${LIVEKIT_TOKEN_TTL:-10m}"
+      FEEDBACK_ADMIN_TOKEN: "${FEEDBACK_ADMIN_TOKEN:-}"
+      FEEDBACK_RETENTION: "${FEEDBACK_RETENTION:-30d}"
+      FEEDBACK_EXPORT_LIMIT: "${FEEDBACK_EXPORT_LIMIT:-200}"
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
     depends_on:
@@ -123,6 +126,10 @@ services:
       args:
         VITE_API_BASE_URL: ""
         VITE_LIVEKIT_URL: "${PUBLIC_LIVEKIT_URL:-ws://127.0.0.1:${LIVEKIT_HTTP_PORT:-7880}}"
+    environment:
+      # WT-606 CSP connect-src, rendered into security headers by the nginx entrypoint.
+      # Narrow to the fixed beta host(s) in production, e.g. "'self' wss://<livekit-public-host>".
+      WT_CSP_CONNECT_SRC: "${WT_CSP_CONNECT_SRC:-'self' ws: wss:}"
     ports:
       - "127.0.0.1:${APP_PORT:-8088}:80"
     depends_on:
