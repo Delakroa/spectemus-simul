@@ -22,6 +22,10 @@
 - Добавлены фильтры по triage status и outcome.
 - Добавлены действия triage: `REVIEWING`, `BLOCKER`, `RESOLVED`, `IGNORED`.
 - Export скачивает JSON с полными reports для evidence/runbook разбора.
+- Stale list/detail/triage/export responses отменяются и не могут вернуть
+  данные после reset token или подменить выбранный report.
+- `PATCH` triage сохраняет уже заданные `assignee` и `note`, когда следующий
+  переход статуса их не передаёт.
 
 ## Privacy boundary
 
@@ -39,15 +43,25 @@
 ## Проверка
 
 ```bash
-pnpm --filter @watch-together/frontend test --OperatorDashboardPage operator-api App
-pnpm --filter @watch-together/frontend typecheck
+pnpm check
+pnpm test:e2e
 ```
 
 Покрыто:
 
 - operator API client: list и triage headers/body;
 - `/operator` route;
-- UI flow: token -> reports -> details -> blocker triage.
+- UI flow: token -> reports -> details -> blocker triage -> resolved;
+- stale list/detail responses после reset или выбора другого report;
+- JSON export: browser download anchor и release temporary Blob URL;
+- backend regression: `RESOLVED` не стирает assignee/note;
+- Playwright regression: chat helper выбирает ровно кнопку `Отправить`, а не
+  новую кнопку `Отправить отзыв`.
+
+Локально 2026-07-13: `pnpm check` прошёл; `pnpm test:e2e` прошёл (capacity,
+multi-user, network resilience). Ручной сценарий через `/operator` проверил
+filters, details/metadata, Blocker → Решено с сохранением `beta-ops`, export и
+reset token.
 
 ## Ограничения
 
