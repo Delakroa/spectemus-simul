@@ -47,7 +47,7 @@ export async function submitJoinRoom(
 
 export async function sendChat(page: Page, text: string): Promise<void> {
   await page.getByLabel("Сообщение в чат").fill(text);
-  await page.getByRole("button", { name: "Отправить" }).click();
+  await page.getByRole("button", { name: "Отправить", exact: true }).click();
 }
 
 export async function expectRoomSocketOpen(page: Page): Promise<void> {

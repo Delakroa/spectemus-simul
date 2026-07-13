@@ -83,9 +83,10 @@
 
 P7 repo-side готов; реальные evidence/QoS отчёты заполняются во время beta/staging прогонов.
 
-## P8: beta evidence & review refresh
+## P8: beta evidence & operator tooling
 
 - [WT-608_PRODUCT_REVIEW_REFRESH.md](WT-608_PRODUCT_REVIEW_REFRESH.md) — повторный product review после закрытия P7: обновлённый evidence snapshot, статус beta-гейтов и решение CONTINUE к фактическому прогону invite-only beta. Локальная верификация evidence-пайплайна — в [evidence/](evidence/).
+- [WT-609_OPERATOR_DASHBOARD.md](WT-609_OPERATOR_DASHBOARD.md) — operator dashboard поверх WT-605 feedback reports: token-gated UI, summary, filters, details, export и triage actions.
 
 ## Как обновлять документы
 

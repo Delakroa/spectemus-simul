@@ -457,6 +457,26 @@ describe("useRoomSession room reconnect", () => {
     await waitFor(() => expect(screen.getByTestId("conn")).toHaveTextContent("reconnecting"));
   });
 
+  it("переподключается, когда браузер сообщает о потере сети", async () => {
+    const user = userEvent.setup();
+    const socket = await openSession(user);
+
+    vi.useFakeTimers();
+    act(() => {
+      window.dispatchEvent(new Event("offline"));
+    });
+
+    expect(screen.getByTestId("conn")).toHaveTextContent("reconnecting");
+    expect(socket.close).toHaveBeenCalledOnce();
+
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+    vi.useRealTimers();
+
+    expect(MockWebSocket.instances).toHaveLength(2);
+  });
+
   it("после исчерпания reconnect показывает ручное переподключение", async () => {
     const user = userEvent.setup();
     const socket = await openSession(user);

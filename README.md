@@ -21,8 +21,6 @@
 
 **Topics:** `watch-party`, `co-watch`, `couchsync`, `webrtc`, `livekit`, `synchronized-playback`, `local-media`, `private-rooms`, `spring-boot`, `react`, `redis`, `websocket`, `closed-beta`.
 
-Готовый текст для GitHub sidebar лежит в [.github/repository-profile.md](.github/repository-profile.md).
-
 ## Что это
 
 Watch Together — MVP для приватного синхронного просмотра. Host выбирает локальный видеофайл, создаёт приватную комнату и приглашает гостей одной ссылкой. Приложение не является видеохостингом: байты фильма остаются на машине host.
@@ -78,8 +76,9 @@ P0 технически подтверждён.
 - WT-606 усиливает безопасность беты: Redis-backed rate limits на create/join/token/feedback/telemetry (429 + Retry-After), env-управляемый CSP connect-src, HSTS и actuator за Spring Security.
 - WT-607 добавляет media QoS/cost benchmark kit: JSON-шаблон, summary script, traffic/cost thresholds и scaling gates для host + 1/2/3 guest.
 - WT-608 повторяет product review после закрытия P7: обновлённый evidence snapshot, статус beta-гейтов и решение CONTINUE к фактическому прогону invite-only beta (реальные user/QoS данные — за внешним прогоном).
+- WT-609 добавляет operator dashboard: `/operator` UI для просмотра feedback reports, фильтров, деталей, export и triage actions поверх WT-605 endpoints.
 
-P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. P7 beta iteration закрыт repo-side: WT-603 готовит evidence-прогон, WT-604 закрыл телеметрию для метрики успешности сессии, WT-605 добавил управляемый feedback triage, WT-606 — security/rate-limit hardening, WT-607 — media QoS/cost benchmark kit. WT-608 (P8) повторил product review: repo-side готовность полная, оставшийся гейт — реальный beta-прогон на staging.
+P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. P7 beta iteration закрыт repo-side: WT-603 готовит evidence-прогон, WT-604 закрыл телеметрию для метрики успешности сессии, WT-605 добавил управляемый feedback triage, WT-606 — security/rate-limit hardening, WT-607 — media QoS/cost benchmark kit. WT-608/WT-609 (P8) закрывают repo-side evidence refresh и operator feedback UI; оставшийся гейт — реальный beta-прогон на staging.
 
 ## Как читать репозиторий
 
@@ -221,6 +220,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-606 beta security hardening](docs/WT-606_BETA_SECURITY_HARDENING.md)
 - [WT-607 media QoS/cost benchmark](docs/WT-607_MEDIA_QOS_COST_BENCHMARK.md)
 - [WT-608 product review refresh](docs/WT-608_PRODUCT_REVIEW_REFRESH.md)
+- [WT-609 operator dashboard](docs/WT-609_OPERATOR_DASHBOARD.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation

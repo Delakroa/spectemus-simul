@@ -113,6 +113,15 @@ class FeedbackServiceTest {
         assertThat(updated.triageNote()).isEqualTo("проверить ревизию");
         assertThat(updated.triagedAt()).isEqualTo(NOW);
         assertThat(store.find(feedbackId)).contains(updated);
+
+        FeedbackReport resolved = service.triage(
+                feedbackId,
+                new FeedbackTriageRequest(FeedbackTriageStatus.RESOLVED, null, null, null));
+
+        assertThat(resolved.triageStatus()).isEqualTo(FeedbackTriageStatus.RESOLVED);
+        assertThat(resolved.severity()).isEqualTo(FeedbackSeverity.HIGH);
+        assertThat(resolved.assignee()).isEqualTo("ops lead");
+        assertThat(resolved.triageNote()).isEqualTo("проверить ревизию");
     }
 
     private static final class InMemoryFeedbackStore implements FeedbackStore {

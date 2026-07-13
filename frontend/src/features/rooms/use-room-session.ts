@@ -1390,6 +1390,22 @@ export function useRoomSession(routeRoomId?: string) {
     connectRoomEventsRef.current = connectRoomEvents;
   }, [connectRoomEvents]);
 
+  useEffect(() => {
+    const handleOffline = () => {
+      const room = roomRef.current;
+      const participant = participantRef.current;
+      if (!room || !participant || !socketRef.current || isTerminalRoomStatus(room.status)) {
+        return;
+      }
+
+      disconnectSocket("reconnecting", { resetReconnect: false });
+      scheduleRoomReconnect();
+    };
+
+    window.addEventListener("offline", handleOffline);
+    return () => window.removeEventListener("offline", handleOffline);
+  }, [disconnectSocket, scheduleRoomReconnect]);
+
   const create = useCallback(
     async (hostDisplayName: string) => {
       const displayName = hostDisplayName.trim();

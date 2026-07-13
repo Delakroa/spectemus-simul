@@ -31,6 +31,10 @@ test("guest browser recovers room WebSocket after offline window", async ({
     await expect(host.getByText("before offline")).toBeVisible();
 
     await guestContext.setOffline(true);
+    // Chromium's network emulation does not always dispatch the standard browser
+    // event for already-open WebSockets. The app uses that signal to start the
+    // same reconnect path a real browser takes on a network outage.
+    await guest.evaluate(() => window.dispatchEvent(new Event("offline")));
     await expectRoomSocketReconnecting(guest);
 
     await guestContext.setOffline(false);

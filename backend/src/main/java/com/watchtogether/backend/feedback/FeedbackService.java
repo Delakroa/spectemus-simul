@@ -94,8 +94,8 @@ class FeedbackService {
         FeedbackReport updated = current.withTriage(
                 request.status(),
                 request.severity() == null ? current.severity() : request.severity(),
-                sanitize(request.assignee()),
-                sanitize(request.note()),
+                request.assignee() == null ? current.assignee() : sanitize(request.assignee()),
+                request.note() == null ? current.triageNote() : sanitize(request.note()),
                 Instant.now(clock));
         store.save(updated);
 

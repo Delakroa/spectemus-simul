@@ -1,5 +1,5 @@
-import { Film } from "lucide-react";
-import { Link, Outlet } from "react-router-dom";
+import { Film, ShieldCheck } from "lucide-react";
+import { Link, NavLink, Outlet } from "react-router-dom";
 
 export function AppShell() {
   return (
@@ -11,6 +11,13 @@ export function AppShell() {
           </span>
           <span>Watch Together</span>
         </Link>
+
+        <nav className="app-nav" aria-label="Основная навигация">
+          <NavLink className="app-nav__link" to="/operator">
+            <ShieldCheck size={16} aria-hidden="true" />
+            Оператор
+          </NavLink>
+        </nav>
       </header>
 
       <main className="app-main">
