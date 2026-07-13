@@ -107,6 +107,7 @@ function printRunPlan() {
       "per session: publish MP4 · play/pause/seek sync · chat · voice · reconnect · room full (5th denied) · submit feedback",
       "network matrix: normal, then UDP-blocked / TURN-only path (record whether media falls back)",
       "after sessions: export feedback via WT-605 and triage blocker/non-blocker reports",
+      "media QoS/cost: fill WT-607 JSON and run `pnpm beta:qos:summary <file>`",
       "watch while running (Prometheus, access is internal-only):",
       "  wt.telemetry.first_frame / wt.telemetry.playback_error  → guest watch success",
       "  wt.telemetry.publish_start / wt.telemetry.publish_failure → host publish success",

@@ -27,8 +27,9 @@
 4. Прогнать сценарии из таблицы ниже (Chrome и Edge × host+1 и host+3), по 15–30 минут просмотра. Для каждой сессии заполнить строку в шаблоне.
 5. Один прогон каждой конфигурации повторить на UDP-blocked / TURN-only пути (см. сетевую матрицу) и записать, случился ли fallback и как просел QoS.
 6. Снять metric snapshot из Prometheus в конце прогона и посчитать rates.
-7. Выгрузить feedback через WT-605 operator export, обновить triage для blocker / non-blocker и перенести `feedbackId` / `correlationId` в evidence report.
-8. Свести issues в blocker / non-blocker и вынести verdict против exit-критериев.
+7. Заполнить WT-607 QoS/cost JSON для media-прогонов и вставить `pnpm beta:qos:summary` output в evidence report.
+8. Выгрузить feedback через WT-605 operator export, обновить triage для blocker / non-blocker и перенести `feedbackId` / `correlationId` в evidence report.
+9. Свести issues в blocker / non-blocker и вынести verdict против exit-критериев.
 
 ## Сценарии
 
@@ -108,7 +109,7 @@ Successful Watch Session Rate (ручной подсчёт по таблице) 
 - feedback не просматривается регулярно;
 - есть незакрытый blocker на baseline;
 - TURN/UDP-blocked path не проверен на целевой инфраструктуре;
-- LiveKit traffic/cost при host + 3 guest остаётся неизвестным (это добивает WT-607).
+- LiveKit traffic/cost при host + 3 guest не измерены через WT-607 summary.
 
 ## Проверка
 
@@ -126,5 +127,5 @@ pnpm beta:smoke
 
 - Сами сессии выполняет человек на реальном staging (HTTPS/TLS, `wss://` LiveKit, реальные браузеры, реальная сеть) — их нельзя проиграть из dev-песочницы или CI.
 - Preflight проверяет readiness evidence-пайплайна и печатает план; он НЕ заменяет ручной media/voice/reconnect smoke.
-- Матрица UDP-blocked/TURN зависит от целевой инфраструктуры (LiveKit + TURN); полноценный QoS/cost benchmark — отдельный WT-607.
+- Матрица UDP-blocked/TURN зависит от целевой инфраструктуры (LiveKit + TURN); полноценный QoS/cost benchmark заполняется по WT-607 runbook.
 - Заполненный evidence report предполагается класть в `docs/evidence/` (создаётся при первом прогоне); в этот тикет входит только шаблон.

@@ -79,8 +79,9 @@
 - [WT-604_CLIENT_TELEMETRY.md](WT-604_CLIENT_TELEMETRY.md) — client telemetry: privacy-safe endpoint и frontend-события (first frame, publish/playback error, quality) для агрегированной Successful Watch Session Rate поверх WT-506 метрик.
 - [WT-605_FEEDBACK_OPERATIONS.md](WT-605_FEEDBACK_OPERATIONS.md) — feedback operations: Redis TTL storage, operator export, triage fields и runbook просмотра beta feedback.
 - [WT-606_BETA_SECURITY_HARDENING.md](WT-606_BETA_SECURITY_HARDENING.md) — beta security: Redis-backed rate limits (create/join/token/feedback/telemetry), env-управляемый CSP connect-src, HSTS, actuator за Spring Security.
+- [WT-607_MEDIA_QOS_COST_BENCHMARK.md](WT-607_MEDIA_QOS_COST_BENCHMARK.md) — media QoS/cost benchmark: JSON-шаблон, summary script, traffic/cost thresholds и scaling gates.
 
-Остальной пакет P7 запланирован: WT-607 (media QoS/cost benchmark).
+P7 repo-side готов; реальные evidence/QoS отчёты заполняются во время beta/staging прогонов.
 
 ## Как обновлять документы
 

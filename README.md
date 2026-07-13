@@ -51,8 +51,9 @@ P0 технически подтверждён.
 - WT-604 добавляет client telemetry: privacy-safe endpoint и frontend-события (first frame, publish/playback error, quality) для агрегированной Successful Watch Session Rate поверх WT-506 метрик.
 - WT-605 добавляет feedback operations: Redis TTL storage, operator export, triage поля и runbook регулярного просмотра beta feedback.
 - WT-606 усиливает безопасность беты: Redis-backed rate limits на create/join/token/feedback/telemetry (429 + Retry-After), env-управляемый CSP connect-src, HSTS и actuator за Spring Security.
+- WT-607 добавляет media QoS/cost benchmark kit: JSON-шаблон, summary script, traffic/cost thresholds и scaling gates для host + 1/2/3 guest.
 
-P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. P7 beta iteration в работе: WT-603 готовит evidence-прогон, WT-604 закрыл телеметрию для метрики успешности сессии, WT-605 добавил управляемый feedback triage, WT-606 — security/rate-limit hardening перед evidence-прогоном.
+P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. P7 beta iteration закрыт repo-side: WT-603 готовит evidence-прогон, WT-604 закрыл телеметрию для метрики успешности сессии, WT-605 добавил управляемый feedback triage, WT-606 — security/rate-limit hardening, WT-607 — media QoS/cost benchmark kit.
 
 ## Как читать репозиторий
 
@@ -192,6 +193,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-604 client telemetry](docs/WT-604_CLIENT_TELEMETRY.md)
 - [WT-605 feedback operations](docs/WT-605_FEEDBACK_OPERATIONS.md)
 - [WT-606 beta security hardening](docs/WT-606_BETA_SECURITY_HARDENING.md)
+- [WT-607 media QoS/cost benchmark](docs/WT-607_MEDIA_QOS_COST_BENCHMARK.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation

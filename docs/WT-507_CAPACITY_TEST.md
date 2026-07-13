@@ -65,7 +65,7 @@ pnpm test:e2e
 - backend metrics показывают рост reconnect/close/error counters при заполненных комнатах;
 - CPU/RAM sampling показывает runaway или нестабильную память на 15+ минутной сессии.
 
-Следующий технический шаг для масштабирования: отдельный load/media benchmark с фиксированным видеофикстуром, сбором WebRTC stats, Prometheus snapshot и профилями сети из WT-504.
+Следующий технический шаг для масштабирования закрывает WT-607: отдельный load/media benchmark с фиксированным видеофикстуром, сбором WebRTC stats, Prometheus snapshot и профилями сети из WT-504.
 
 ## Реализация
 
@@ -95,5 +95,5 @@ pnpm format:check
 ## Известные ограничения
 
 - Automated WT-507 не доказывает media QoS под нагрузкой: он проверяет product capacity, presence, chat и отказ сверх лимита.
-- CPU/RAM/network baseline требует ручного прогона на целевой машине и сохранения evidence перед invite-only beta.
+- CPU/RAM/network baseline требует ручного прогона на целевой машине и сохранения evidence через WT-607 перед расширением beta.
 - `test:e2e:capacity` зависит от поднятого stack на `http://127.0.0.1:8088` и установленного Chromium (`pnpm --filter @watch-together/e2e run e2e:install`).
