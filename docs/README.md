@@ -88,6 +88,10 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [WT-608_PRODUCT_REVIEW_REFRESH.md](WT-608_PRODUCT_REVIEW_REFRESH.md) — повторный product review после закрытия P7: обновлённый evidence snapshot, статус beta-гейтов и решение CONTINUE к фактическому прогону invite-only beta. Локальная верификация evidence-пайплайна — в [evidence/](evidence/).
 - [WT-609_OPERATOR_DASHBOARD.md](WT-609_OPERATOR_DASHBOARD.md) — operator dashboard поверх WT-605 feedback reports: token-gated UI, summary, filters, details, export и triage actions.
 
+## P9: private review room foundation
+
+- [WT-619_NATIVE_MEDIA_CAPABILITY_FOUNDATION.md](WT-619_NATIVE_MEDIA_CAPABILITY_FOUNDATION.md) — browser-native policy для локальных MP4/M4V и WebM, runtime diagnostics и честные границы codec support.
+
 ## Как обновлять документы
 
 - Пишите пользовательский и проектный текст на русском.

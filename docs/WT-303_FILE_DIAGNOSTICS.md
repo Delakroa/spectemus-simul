@@ -23,6 +23,7 @@
 | ---------------------------- | ------------------------------------------ |
 | `UNSUPPORTED_FORMAT`         | `canPlayType()` вернул пустую строку       |
 | `CAPTURE_STREAM_UNAVAILABLE` | `captureStream()` недоступен в браузере    |
+| `CAPTURE_PREVIEW_FAILED`     | Decode/capture preview не дал видеодорожку |
 | `NO_VIDEO_TRACK`             | `videoWidth === 0` после загрузки metadata |
 | `METADATA_LOAD_FAILED`       | `onerror` до `onloadedmetadata`            |
 
@@ -48,6 +49,10 @@ pnpm --filter @watch-together/frontend test
 
 ## Известные ограничения
 
-- `hasAudio` всегда `true`: браузерное API не позволяет надёжно определить наличие аудиодорожки из metadata без декодирования.
+- В исторической реализации WT-303 `hasAudio` всегда был `true`: metadata сам по себе не даёт надёжный ответ. WT-619 заменил это на проверку audio track из короткого `captureStream()` preview.
 - WT-303 не публикует файл в LiveKit — это задача WT-304.
 - `captureStream()` поддерживается только в Chrome и Edge; Safari и Firefox вызовут `CAPTURE_STREAM_UNAVAILABLE`.
+
+## Продолжение
+
+WT-619 формализует текущую compatibility policy для MP4/M4V и WebM, точный `accept` file picker и диагностические сообщения. Исторический baseline этого тикета остаётся прежним: первая доказанная связка была MP4 H.264/AAC на desktop Chromium.

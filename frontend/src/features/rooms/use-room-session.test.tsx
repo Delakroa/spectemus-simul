@@ -32,14 +32,28 @@ function RoomSessionHarness() {
 }
 
 function makeDeferredVideoStub(pendingMetadata: Map<string, () => void>) {
+  const videoTrack = { kind: "video", stop: vi.fn() } as unknown as MediaStreamTrack;
+  const audioTrack = { kind: "audio", stop: vi.fn() } as unknown as MediaStreamTrack;
+  const stream = {
+    getAudioTracks: () => [audioTrack],
+    getTracks: () => [videoTrack, audioTrack],
+    getVideoTracks: () => [videoTrack],
+  } as unknown as MediaStream;
   const stub: Record<string, unknown> = {
     duration: 60,
+    load: vi.fn(),
+    muted: false,
+    pause: vi.fn(),
+    play: vi.fn().mockResolvedValue(undefined),
+    playsInline: false,
     videoWidth: 1920,
+    videoHeight: 1080,
     preload: "",
     onloadedmetadata: null,
     onerror: null,
     canPlayType: vi.fn().mockReturnValue("probably"),
-    captureStream: vi.fn(),
+    captureStream: vi.fn(() => stream),
+    removeAttribute: vi.fn(),
   };
 
   Object.defineProperty(stub, "src", {

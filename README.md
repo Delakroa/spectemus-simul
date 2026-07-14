@@ -77,8 +77,9 @@ P0 технически подтверждён.
 - WT-607 добавляет media QoS/cost benchmark kit: JSON-шаблон, summary script, traffic/cost thresholds и scaling gates для host + 1/2/3 guest.
 - WT-608 повторяет product review после закрытия P7: обновлённый evidence snapshot, статус beta-гейтов и решение CONTINUE к фактическому прогону invite-only beta (реальные user/QoS данные — за внешним прогоном).
 - WT-609 добавляет operator dashboard: `/operator` UI для просмотра feedback reports, фильтров, деталей, export и triage actions поверх WT-605 endpoints.
+- WT-619 формализует browser-native поддержку локальных MP4/M4V и WebM: явный file picker policy, runtime diagnostics и честные границы codec support без загрузки файла на backend.
 
-P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. P7 beta iteration закрыт repo-side: WT-603 готовит evidence-прогон, WT-604 закрыл телеметрию для метрики успешности сессии, WT-605 добавил управляемый feedback triage, WT-606 — security/rate-limit hardening, WT-607 — media QoS/cost benchmark kit. WT-608/WT-609 (P8) закрывают repo-side evidence refresh и operator feedback UI; оставшийся гейт — реальный beta-прогон на staging.
+P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. P7 beta iteration закрыт repo-side: WT-603 готовит evidence-прогон, WT-604 закрыл телеметрию для метрики успешности сессии, WT-605 добавил управляемый feedback triage, WT-606 — security/rate-limit hardening, WT-607 — media QoS/cost benchmark kit. WT-608/WT-609 (P8) закрывают repo-side evidence refresh и operator feedback UI; P9 начинается с предсказуемой media compatibility policy. Оставшийся гейт расширения beta — реальный staging-прогон.
 
 ## Как читать репозиторий
 
@@ -221,6 +222,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-607 media QoS/cost benchmark](docs/WT-607_MEDIA_QOS_COST_BENCHMARK.md)
 - [WT-608 product review refresh](docs/WT-608_PRODUCT_REVIEW_REFRESH.md)
 - [WT-609 operator dashboard](docs/WT-609_OPERATOR_DASHBOARD.md)
+- [WT-619 native media capability foundation](docs/WT-619_NATIVE_MEDIA_CAPABILITY_FOUNDATION.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation

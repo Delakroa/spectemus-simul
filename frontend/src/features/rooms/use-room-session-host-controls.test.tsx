@@ -128,10 +128,16 @@ vi.mock("./file-diagnostics", async (importOriginal) => {
     diagnoseFile: vi.fn().mockResolvedValue({
       displayName: "movie.mp4",
       durationMs: 120000,
+      format: "mp4",
+      formatLabel: "MP4",
       hasAudio: true,
       hasVideo: true,
+      height: 1080,
       mimeType: "video/mp4",
       objectUrl: "blob:movie-url",
+      verdict: "CAN_STREAM",
+      verdictLabel: "Можно транслировать с этого устройства",
+      width: 1920,
     }),
   };
 });

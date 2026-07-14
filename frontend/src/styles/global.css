@@ -864,6 +864,19 @@ a {
   font-weight: 700;
 }
 
+.file-picker__verdict {
+  color: var(--success);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.file-picker__hint {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .file-picker__actions {
   display: inline-flex;
   flex: 0 0 auto;

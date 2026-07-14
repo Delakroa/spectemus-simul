@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
@@ -1086,14 +1086,28 @@ describe("HomePage", () => {
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:movie-url");
     vi.spyOn(URL, "revokeObjectURL");
 
+    const diagnosticVideoTrack = { stop: vi.fn() } as unknown as MediaStreamTrack;
+    const diagnosticAudioTrack = { stop: vi.fn() } as unknown as MediaStreamTrack;
+    const diagnosticStream = {
+      getAudioTracks: () => [diagnosticAudioTrack],
+      getTracks: () => [diagnosticVideoTrack, diagnosticAudioTrack],
+      getVideoTracks: () => [diagnosticVideoTrack],
+    } as unknown as MediaStream;
     const videoStub: Record<string, unknown> = {
       duration: 5400,
+      load: vi.fn(),
+      muted: false,
+      pause: vi.fn(),
+      play: vi.fn().mockResolvedValue(undefined),
+      playsInline: false,
       videoWidth: 1920,
+      videoHeight: 1080,
       preload: "",
       onloadedmetadata: null,
       onerror: null,
       canPlayType: vi.fn().mockReturnValue("probably"),
-      captureStream: vi.fn(),
+      captureStream: vi.fn(() => diagnosticStream),
+      removeAttribute: vi.fn(),
     };
     Object.defineProperty(videoStub, "src", {
       set(_src: string) {
@@ -1120,12 +1134,19 @@ describe("HomePage", () => {
 
     const file = new File([""], "movie.mp4", { type: "video/mp4" });
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(input.accept).toBe(".mp4,.m4v,.webm,video/mp4,video/x-m4v,video/webm");
+    expect(
+      screen.getByText("Поддерживаются MP4/M4V (H.264/AAC) и WebM (VP8/VP9/Opus)."),
+    ).toBeInTheDocument();
     await user.upload(input, file);
 
     await waitFor(() => {
       expect(screen.getByText("movie.mp4")).toBeInTheDocument();
     });
-    expect(screen.getByText(/1:30:00/)).toBeInTheDocument();
+    expect(screen.getByText(/MP4 · 1920×1080 · 1:30:00/)).toBeInTheDocument();
+    expect(
+      screen.getByText("Проверено: Можно транслировать с этого устройства"),
+    ).toBeInTheDocument();
   });
 
   it("host публикует выбранный файл в LiveKit и останавливает публикацию", async () => {
@@ -1357,12 +1378,12 @@ describe("HomePage", () => {
 
     const file = new File([""], "video.mkv", { type: "video/x-matroska" });
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-    await user.upload(input, file);
+    fireEvent.change(input, { target: { files: [file] } });
 
     await waitFor(() => {
       expect(
         screen.getByText(
-          "Этот формат не поддерживается браузером. Используйте MP4 с кодеками H.264 и AAC.",
+          "Этот контейнер пока не поддерживается в браузерной версии. Поддерживаются MP4/M4V (H.264/AAC) и WebM (VP8/VP9/Opus).",
         ),
       ).toBeInTheDocument();
     });
@@ -1407,6 +1428,7 @@ function createVideoStub(
     paused: { configurable: true, value: false },
     readyState: { configurable: true, value: 0 },
     videoWidth: { configurable: true, value: 1920 },
+    videoHeight: { configurable: true, value: 1080 },
   });
 
   Object.assign(stub, {
@@ -1416,6 +1438,11 @@ function createVideoStub(
     pause: vi.fn(),
     removeAttribute: vi.fn(),
     load: vi.fn(),
+    requestVideoFrameCallback: vi.fn((callback: () => void) => {
+      void Promise.resolve().then(callback);
+      return 1;
+    }),
+    cancelVideoFrameCallback: vi.fn(),
   });
 
   const addEventListener = stub.addEventListener.bind(stub);

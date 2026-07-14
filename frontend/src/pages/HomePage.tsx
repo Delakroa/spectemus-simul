@@ -51,6 +51,10 @@ import {
   type VoiceChatStatus,
   useRoomSession,
 } from "../features/rooms/use-room-session";
+import {
+  LOCAL_MEDIA_FILE_ACCEPT,
+  LOCAL_MEDIA_FORMATS_HINT,
+} from "../features/rooms/file-diagnostics";
 import { useSystemStatus } from "../features/system/use-system-status";
 
 function formatCheckedAt(value?: string) {
@@ -602,7 +606,7 @@ export function HomePage() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="video/mp4,video/webm,video/*"
+                  accept={LOCAL_MEDIA_FILE_ACCEPT}
                   aria-hidden="true"
                   style={{ display: "none" }}
                   tabIndex={-1}
@@ -627,8 +631,13 @@ export function HomePage() {
                         {roomSession.fileResult.displayName}
                       </span>
                       <span className="file-picker__meta">
+                        {roomSession.fileResult.formatLabel} · {roomSession.fileResult.width}×
+                        {roomSession.fileResult.height} ·{" "}
                         {formatDurationMs(roomSession.fileResult.durationMs)}
                         {roomSession.fileResult.hasAudio ? " · со звуком" : " · без звука"}
+                      </span>
+                      <span className="file-picker__verdict">
+                        Проверено: {roomSession.fileResult.verdictLabel}
                       </span>
                     </div>
                   )}
@@ -687,6 +696,7 @@ export function HomePage() {
                     </div>
                   )}
                 </div>
+                <p className="file-picker__hint">{LOCAL_MEDIA_FORMATS_HINT}</p>
 
                 {roomSession.filePublicationStatus === "live" && (
                   <div className="host-controls" aria-label="Управление воспроизведением">

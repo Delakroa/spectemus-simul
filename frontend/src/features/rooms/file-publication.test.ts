@@ -94,10 +94,16 @@ describe("publishFileToLiveKit", () => {
     const publication = await publishFileToLiveKit(room as never, {
       displayName: "movie.mp4",
       durationMs: 120000,
+      format: "mp4",
+      formatLabel: "MP4",
       hasAudio: true,
       hasVideo: true,
+      height: 1080,
       mimeType: "video/mp4",
       objectUrl: "blob:movie",
+      verdict: "CAN_STREAM",
+      verdictLabel: "Можно транслировать с этого устройства",
+      width: 1920,
     });
 
     expect(publication.tracks).toEqual([videoTrack, audioTrack]);
@@ -140,10 +146,16 @@ describe("publishFileToLiveKit", () => {
       publishFileToLiveKit(room as never, {
         displayName: "audio.mp4",
         durationMs: 120000,
+        format: "mp4",
+        formatLabel: "MP4",
         hasAudio: true,
         hasVideo: true,
+        height: 1080,
         mimeType: "video/mp4",
         objectUrl: "blob:audio",
+        verdict: "CAN_STREAM",
+        verdictLabel: "Можно транслировать с этого устройства",
+        width: 1920,
       }),
     ).rejects.toSatisfy(
       (error) => error instanceof FilePublicationFailure && error.code === "NO_VIDEO_TRACK",
