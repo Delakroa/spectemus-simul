@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import QRCode from "qrcode";
 import {
   Activity,
   AlertTriangle,
@@ -26,10 +27,12 @@ import {
   Play,
   Plus,
   Power,
+  QrCode,
   Radio,
   RefreshCw,
   Send,
   Server,
+  Share2,
   Square,
   Users,
   Wifi,
@@ -62,6 +65,13 @@ import {
   LOCAL_MEDIA_FILE_ACCEPT,
   LOCAL_MEDIA_FORMATS_HINT,
 } from "../features/rooms/file-diagnostics";
+import {
+  INVITE_SHARE_TEXT,
+  INVITE_SHARE_TITLE,
+  createRoomInviteUrl,
+  toPublicRoomInviteUrl,
+  toTelegramShareUrl,
+} from "../features/rooms/share-invite";
 import { useSystemStatus } from "../features/system/use-system-status";
 
 function formatCheckedAt(value?: string) {
@@ -91,6 +101,11 @@ type FullscreenDocument = Document & {
 
 type QualityDisplayStatus = QualityIndicatorsState["status"] | "reconnecting";
 type FeedbackSubmitStatus = "idle" | "sending" | "sent" | "error";
+type InviteShareStatus = "idle" | "copied" | "shared" | "error";
+
+type NavigatorWithWebShare = Navigator & {
+  share?: (data: { text?: string; title?: string; url?: string }) => Promise<void>;
+};
 
 const FEEDBACK_OUTCOME_OPTIONS: Array<{ value: FeedbackOutcome; label: string }> = [
   { value: "WORKED", label: "Работает" },
@@ -163,14 +178,19 @@ async function toggleFullscreen(element: HTMLElement | null) {
 
 export function HomePage() {
   const { roomId: routeRoomId } = useParams();
+  const isMobileInviteHandoff = useMobileInviteHandoff(Boolean(routeRoomId));
   const { health, version, isPending, isError, refetch } = useSystemStatus();
-  const roomSession = useRoomSession(routeRoomId);
+  const roomSession = useRoomSession(isMobileInviteHandoff ? undefined : routeRoomId);
   const { setHostPreviewElement, setRemotePlaybackElements } = roomSession;
   const [hostDisplayName, setHostDisplayName] = useState("Host");
   const [guestDisplayName, setGuestDisplayName] = useState("Guest");
   const [joinRoomIdDraft, setJoinRoomIdDraft] = useState("");
   const [isFileDropActive, setIsFileDropActive] = useState(false);
   const [inviteCopied, setInviteCopied] = useState(false);
+  const [isInviteShareSheetOpen, setIsInviteShareSheetOpen] = useState(false);
+  const [inviteShareStatus, setInviteShareStatus] = useState<InviteShareStatus>("idle");
+  const [inviteQrSvg, setInviteQrSvg] = useState<string | null>(null);
+  const [inviteQrError, setInviteQrError] = useState(false);
   const [roomIdCopied, setRoomIdCopied] = useState(false);
   const [seekBarValue, setSeekBarValue] = useState<number | null>(null);
   const [chatDraft, setChatDraft] = useState("");
@@ -185,6 +205,10 @@ export function HomePage() {
   const isOnline = !isPending && !isError;
   const room = roomSession.room;
   const participant = roomSession.participant;
+  const publicInviteUrl = toPublicRoomInviteUrl(roomSession.inviteUrl);
+  const telegramShareUrl = toTelegramShareUrl(publicInviteUrl);
+  const mobileInviteUrl = routeRoomId ? createRoomInviteUrl(routeRoomId) : null;
+  const canUseNativeShare = typeof (navigator as NavigatorWithWebShare).share === "function";
   const roomClosed = room?.status === "CLOSED" || room?.status === "EXPIRED";
   const isHost = participant?.role === "HOST";
   const isRoomActionPending = roomSession.pendingAction !== null;
@@ -250,6 +274,36 @@ export function HomePage() {
       node.scrollIntoView({ block: "nearest" });
     }
   }, [chatMessageCount]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!isInviteShareSheetOpen || !publicInviteUrl) {
+      return undefined;
+    }
+
+    void QRCode.toString(publicInviteUrl, {
+      color: { dark: "#f6f1ff", light: "#15111f" },
+      errorCorrectionLevel: "M",
+      margin: 1,
+      type: "svg",
+      width: 232,
+    })
+      .then((svg) => {
+        if (!cancelled) {
+          setInviteQrSvg(svg);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setInviteQrError(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isInviteShareSheetOpen, publicInviteUrl]);
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -370,13 +424,47 @@ export function HomePage() {
   }
 
   async function handleCopyInvite() {
-    if (!roomSession.inviteUrl) {
+    if (!publicInviteUrl) {
+      return false;
+    }
+
+    try {
+      await navigator.clipboard.writeText(publicInviteUrl);
+      setInviteCopied(true);
+      setInviteShareStatus("copied");
+      window.setTimeout(() => setInviteCopied(false), 1800);
+      return true;
+    } catch {
+      setInviteShareStatus("error");
+      return false;
+    }
+  }
+
+  async function handleNativeInviteShare() {
+    if (!publicInviteUrl) {
       return;
     }
 
-    await navigator.clipboard.writeText(roomSession.inviteUrl);
-    setInviteCopied(true);
-    window.setTimeout(() => setInviteCopied(false), 1800);
+    const nativeShare = (navigator as NavigatorWithWebShare).share;
+    if (!nativeShare) {
+      await handleCopyInvite();
+      return;
+    }
+
+    try {
+      await nativeShare({
+        text: INVITE_SHARE_TEXT,
+        title: INVITE_SHARE_TITLE,
+        url: publicInviteUrl,
+      });
+      setInviteShareStatus("shared");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+
+      await handleCopyInvite();
+    }
   }
 
   async function handleCopyRoomId() {
@@ -387,6 +475,10 @@ export function HomePage() {
     await navigator.clipboard.writeText(room.roomId);
     setRoomIdCopied(true);
     window.setTimeout(() => setRoomIdCopied(false), 1800);
+  }
+
+  if (isMobileInviteHandoff && mobileInviteUrl) {
+    return <MobileInviteHandoff inviteUrl={mobileInviteUrl} />;
   }
 
   return (
@@ -447,32 +539,63 @@ export function HomePage() {
             )}
           </div>
           {room && (
-            <div className="room-connection-group">
-              <span
-                className={`room-connection room-connection--${roomSession.connectionStatus}`}
-                role="status"
-              >
-                {roomSession.connectionStatus === "open" ? (
-                  <Wifi size={17} aria-hidden="true" />
-                ) : (
-                  <WifiOff size={17} aria-hidden="true" />
-                )}
-                {formatConnectionStatus(roomSession.connectionStatus)}
-              </span>
-              <span
-                className={`room-connection room-connection--${roomSession.liveKitStatus}`}
-                role="status"
-              >
-                {roomSession.liveKitStatus === "connected" ? (
-                  <Wifi size={17} aria-hidden="true" />
-                ) : (
-                  <WifiOff size={17} aria-hidden="true" />
-                )}
-                LiveKit: {formatLiveKitStatus(roomSession.liveKitStatus)}
-              </span>
+            <div className="room-workspace__actions">
+              <div className="room-connection-group">
+                <span
+                  className={`room-connection room-connection--${roomSession.connectionStatus}`}
+                  role="status"
+                >
+                  {roomSession.connectionStatus === "open" ? (
+                    <Wifi size={17} aria-hidden="true" />
+                  ) : (
+                    <WifiOff size={17} aria-hidden="true" />
+                  )}
+                  {formatConnectionStatus(roomSession.connectionStatus)}
+                </span>
+                <span
+                  className={`room-connection room-connection--${roomSession.liveKitStatus}`}
+                  role="status"
+                >
+                  {roomSession.liveKitStatus === "connected" ? (
+                    <Wifi size={17} aria-hidden="true" />
+                  ) : (
+                    <WifiOff size={17} aria-hidden="true" />
+                  )}
+                  LiveKit: {formatLiveKitStatus(roomSession.liveKitStatus)}
+                </span>
+              </div>
+              {publicInviteUrl && (
+                <button
+                  className="button room-share-trigger"
+                  onClick={() => {
+                    setInviteShareStatus("idle");
+                    setInviteQrSvg(null);
+                    setInviteQrError(false);
+                    setIsInviteShareSheetOpen(true);
+                  }}
+                  type="button"
+                >
+                  <Share2 size={17} aria-hidden="true" />
+                  Пригласить
+                </button>
+              )}
             </div>
           )}
         </div>
+
+        {isInviteShareSheetOpen && publicInviteUrl && (
+          <InviteShareSheet
+            canUseNativeShare={canUseNativeShare}
+            inviteUrl={publicInviteUrl}
+            onClose={() => setIsInviteShareSheetOpen(false)}
+            onCopy={() => void handleCopyInvite()}
+            onNativeShare={() => void handleNativeInviteShare()}
+            qrError={inviteQrError}
+            qrSvg={inviteQrSvg}
+            shareStatus={inviteShareStatus}
+            telegramShareUrl={telegramShareUrl}
+          />
+        )}
 
         {(!room || roomClosed) && (
           <div className="room-actions">
@@ -1318,6 +1441,230 @@ export function HomePage() {
       </section>
     </div>
   );
+}
+
+function InviteShareSheet({
+  canUseNativeShare,
+  inviteUrl,
+  onClose,
+  onCopy,
+  onNativeShare,
+  qrError,
+  qrSvg,
+  shareStatus,
+  telegramShareUrl,
+}: {
+  canUseNativeShare: boolean;
+  inviteUrl: string;
+  onClose: () => void;
+  onCopy: () => void;
+  onNativeShare: () => void;
+  qrError: boolean;
+  qrSvg: string | null;
+  shareStatus: InviteShareStatus;
+  telegramShareUrl: string | null;
+}) {
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="invite-share-sheet__backdrop" onMouseDown={onClose} role="presentation">
+      <section
+        aria-labelledby="invite-share-title"
+        aria-modal="true"
+        className="invite-share-sheet"
+        onMouseDown={(event) => event.stopPropagation()}
+        role="dialog"
+      >
+        <div className="invite-share-sheet__heading">
+          <div>
+            <p className="eyebrow">Приглашение</p>
+            <h2 id="invite-share-title">Позовите в комнату</h2>
+          </div>
+          <button
+            aria-label="Закрыть приглашение"
+            className="icon-button"
+            onClick={onClose}
+            type="button"
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="invite-share-sheet__content">
+          <div className="invite-share-sheet__qr" role="img" aria-label="QR-код приглашения">
+            {qrSvg ? (
+              // The SVG comes only from qrcode and encodes the canonical public room route above.
+              <div dangerouslySetInnerHTML={{ __html: qrSvg }} />
+            ) : qrError ? (
+              <span>Не удалось подготовить QR-код.</span>
+            ) : (
+              <span>Готовим QR-код…</span>
+            )}
+          </div>
+
+          <div className="invite-share-sheet__copy">
+            <p>Отсканируйте код или отправьте ссылку. Просмотр поддерживается на компьютере.</p>
+            <code>{inviteUrl}</code>
+            <div className="invite-share-sheet__actions">
+              <button className="button button--primary" onClick={onCopy} type="button">
+                <Copy size={17} aria-hidden="true" />
+                Скопировать ссылку
+              </button>
+              <button className="button" onClick={onNativeShare} type="button">
+                <Share2 size={17} aria-hidden="true" />
+                {canUseNativeShare ? "Поделиться через устройство" : "Скопировать как fallback"}
+              </button>
+              {telegramShareUrl && (
+                <a
+                  className="button invite-share-sheet__telegram"
+                  href={telegramShareUrl}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  <Send size={17} aria-hidden="true" />
+                  Telegram
+                </a>
+              )}
+            </div>
+            {shareStatus !== "idle" && (
+              <p
+                className={`invite-share-sheet__status invite-share-sheet__status--${shareStatus}`}
+                role="status"
+              >
+                {shareStatus === "copied" && "Ссылка скопирована."}
+                {shareStatus === "shared" && "Системное меню отправки открыто."}
+                {shareStatus === "error" && "Не удалось скопировать ссылку. Скопируйте её вручную."}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <p className="invite-share-sheet__privacy">
+          <QrCode size={15} aria-hidden="true" />В приглашение входит только публичная ссылка
+          комнаты — без токенов, названия видео и данных сессии.
+        </p>
+      </section>
+    </div>
+  );
+}
+
+function MobileInviteHandoff({ inviteUrl }: { inviteUrl: string }) {
+  const [status, setStatus] = useState<InviteShareStatus>("idle");
+  const telegramShareUrl = toTelegramShareUrl(inviteUrl);
+  const nativeShare = (navigator as NavigatorWithWebShare).share;
+
+  async function copyInvite() {
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setStatus("copied");
+    } catch {
+      setStatus("error");
+    }
+  }
+
+  async function shareInvite() {
+    if (!nativeShare) {
+      await copyInvite();
+      return;
+    }
+
+    try {
+      await nativeShare({ text: INVITE_SHARE_TEXT, title: INVITE_SHARE_TITLE, url: inviteUrl });
+      setStatus("shared");
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        await copyInvite();
+      }
+    }
+  }
+
+  return (
+    <main className="mobile-invite-handoff">
+      <section className="mobile-invite-handoff__card" aria-labelledby="mobile-invite-title">
+        <span className="mobile-invite-handoff__icon" aria-hidden="true">
+          <MonitorPlay size={28} />
+        </span>
+        <p className="eyebrow">Приглашение в приватную комнату</p>
+        <h1 id="mobile-invite-title">Откройте просмотр на компьютере</h1>
+        <p>
+          Эта beta поддерживает совместное видео в Chrome или Edge на desktop. Отправьте приглашение
+          себе и откройте его на компьютере.
+        </p>
+        <code>{inviteUrl}</code>
+        <div className="mobile-invite-handoff__actions">
+          <button
+            className="button button--primary"
+            onClick={() => void copyInvite()}
+            type="button"
+          >
+            <Copy size={17} aria-hidden="true" />
+            Скопировать ссылку
+          </button>
+          <button className="button" onClick={() => void shareInvite()} type="button">
+            <Share2 size={17} aria-hidden="true" />
+            Отправить себе
+          </button>
+          {telegramShareUrl && (
+            <a className="button" href={telegramShareUrl} rel="noreferrer" target="_blank">
+              <Send size={17} aria-hidden="true" />
+              Telegram
+            </a>
+          )}
+        </div>
+        {status !== "idle" && (
+          <p className="mobile-invite-handoff__status" role="status">
+            {status === "copied" && "Ссылка скопирована."}
+            {status === "shared" && "Системное меню отправки открыто."}
+            {status === "error" && "Не удалось скопировать ссылку. Скопируйте её вручную."}
+          </p>
+        )}
+      </section>
+    </main>
+  );
+}
+
+function useMobileInviteHandoff(enabled: boolean) {
+  const getMatch = () => {
+    if (!enabled || typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return false;
+    }
+
+    return (
+      window.matchMedia("(max-width: 720px)").matches &&
+      window.matchMedia("(pointer: coarse)").matches
+    );
+  };
+
+  const [, setMediaQueryRevision] = useState(0);
+
+  useEffect(() => {
+    if (!enabled || typeof window.matchMedia !== "function") {
+      return undefined;
+    }
+
+    const narrowViewport = window.matchMedia("(max-width: 720px)");
+    const coarsePointer = window.matchMedia("(pointer: coarse)");
+    const updateMatch = () => setMediaQueryRevision((current) => current + 1);
+
+    narrowViewport.addEventListener("change", updateMatch);
+    coarsePointer.addEventListener("change", updateMatch);
+
+    return () => {
+      narrowViewport.removeEventListener("change", updateMatch);
+      coarsePointer.removeEventListener("change", updateMatch);
+    };
+  }, [enabled]);
+
+  return getMatch();
 }
 
 function UserErrorBanner({

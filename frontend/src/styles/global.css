@@ -2360,6 +2360,209 @@ a {
   accent-color: #ff8a70;
 }
 
+.room-workspace__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.room-share-trigger {
+  min-height: 38px;
+  white-space: nowrap;
+}
+
+.room-workspace--active .room-share-trigger {
+  border-color: #5a4277;
+  color: #f6f1ff;
+  background: #2a213a;
+}
+
+.room-workspace--active .room-share-trigger:hover:not(:disabled) {
+  border-color: #b693ff;
+  background: #352848;
+}
+
+.invite-share-sheet__backdrop {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  display: grid;
+  padding: 24px;
+  place-items: center;
+  background: rgb(5 3 9 / 74%);
+  backdrop-filter: blur(8px);
+}
+
+.invite-share-sheet {
+  width: min(100%, 680px);
+  padding: 22px;
+  border: 1px solid #4b3768;
+  border-radius: 18px;
+  color: #f6f1ff;
+  background: #15111f;
+  box-shadow: 0 28px 70px rgb(0 0 0 / 44%);
+}
+
+.invite-share-sheet__heading,
+.invite-share-sheet__content {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 22px;
+}
+
+.invite-share-sheet__heading h2 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.invite-share-sheet__heading .icon-button {
+  flex: 0 0 auto;
+  color: #c5bad7;
+}
+
+.invite-share-sheet__content {
+  margin-top: 20px;
+  align-items: center;
+}
+
+.invite-share-sheet__qr {
+  display: grid;
+  width: 232px;
+  min-width: 232px;
+  min-height: 232px;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid #39304e;
+  border-radius: 12px;
+  color: #aaa1bc;
+  background: #15111f;
+}
+
+.invite-share-sheet__qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.invite-share-sheet__copy {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+}
+
+.invite-share-sheet__copy > p,
+.invite-share-sheet__privacy {
+  margin: 0;
+  color: #bcb1d0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.invite-share-sheet__copy code,
+.mobile-invite-handoff code {
+  display: block;
+  overflow: hidden;
+  padding: 10px 12px;
+  border: 1px solid #39304e;
+  border-radius: 9px;
+  color: #f6f1ff;
+  font-size: 12px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: #0f0c17;
+}
+
+.invite-share-sheet__actions,
+.mobile-invite-handoff__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.invite-share-sheet__actions .button,
+.mobile-invite-handoff__actions .button {
+  min-height: 38px;
+  text-decoration: none;
+}
+
+.invite-share-sheet__telegram {
+  color: #f6f1ff;
+}
+
+.invite-share-sheet__status,
+.mobile-invite-handoff__status {
+  margin: 0;
+  color: #79e6af;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.invite-share-sheet__status--error,
+.mobile-invite-handoff__status--error {
+  color: #ffaaa8;
+}
+
+.invite-share-sheet__privacy {
+  display: flex;
+  margin-top: 18px;
+  align-items: flex-start;
+  gap: 7px;
+  color: #aaa1bc;
+}
+
+.invite-share-sheet__privacy svg {
+  flex: 0 0 auto;
+  margin-top: 3px;
+  color: #b693ff;
+}
+
+.mobile-invite-handoff {
+  display: grid;
+  min-height: 100vh;
+  padding: 24px;
+  place-items: center;
+  color: #f6f1ff;
+  background: radial-gradient(circle at 15% 0%, rgb(115 63 255 / 26%), transparent 26rem), #0b0911;
+}
+
+.mobile-invite-handoff__card {
+  display: grid;
+  width: min(100%, 480px);
+  gap: 16px;
+  padding: 26px;
+  border: 1px solid #3d2b5c;
+  border-radius: 18px;
+  background: #15111f;
+  box-shadow: 0 20px 56px rgb(0 0 0 / 30%);
+}
+
+.mobile-invite-handoff__icon {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  border: 1px solid #865bd0;
+  border-radius: 16px;
+  color: #16111e;
+  background: linear-gradient(135deg, #ffc746, #ff7b62 48%, #c26bf3);
+}
+
+.mobile-invite-handoff__card h1 {
+  margin: 0;
+  font-size: clamp(28px, 8vw, 38px);
+  line-height: 1.05;
+}
+
+.mobile-invite-handoff__card > p:not(.eyebrow) {
+  margin: 0;
+  color: #bcb1d0;
+  line-height: 1.55;
+}
+
 @media (max-width: 920px) {
   .hero {
     min-height: 0;
@@ -2437,6 +2640,15 @@ a {
 
   .room-workspace--active .chat-list {
     max-height: 280px;
+  }
+
+  .invite-share-sheet__content {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .invite-share-sheet__qr {
+    width: min(100%, 232px);
   }
 }
 
@@ -2553,6 +2765,30 @@ a {
     align-items: flex-start;
     flex-direction: column;
     gap: 10px;
+  }
+
+  .room-workspace__actions {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .room-workspace__actions .room-connection-group,
+  .room-share-trigger {
+    width: 100%;
+  }
+
+  .invite-share-sheet__backdrop {
+    padding: 14px;
+  }
+
+  .invite-share-sheet {
+    padding: 18px;
+  }
+
+  .invite-share-sheet__actions .button,
+  .mobile-invite-handoff__actions .button {
+    width: 100%;
   }
 
   .room-workspace--active .room-workspace__heading :is(h1, h2) {

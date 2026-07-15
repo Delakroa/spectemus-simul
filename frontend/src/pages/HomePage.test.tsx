@@ -169,6 +169,27 @@ describe("HomePage", () => {
     expect(screen.getByText("Сервис временно недоступен")).toBeInTheDocument();
   });
 
+  it("показывает desktop handoff при открытии invite на телефоне", async () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn().mockImplementation(() => ({
+        addEventListener: vi.fn(),
+        matches: true,
+        removeEventListener: vi.fn(),
+      })),
+    );
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 503 }));
+
+    renderPage([`/rooms/${roomId}`]);
+
+    expect(
+      await screen.findByRole("heading", { name: "Откройте просмотр на компьютере" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Chrome или Edge на desktop/)).toBeInTheDocument();
+    expect(screen.getByText(`http://localhost:3000/rooms/${roomId}`)).toBeInTheDocument();
+    expect(screen.queryByText("LiveKit: подключён")).not.toBeInTheDocument();
+  });
+
   it("отправляет beta feedback с техническим контекстом", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
@@ -407,6 +428,20 @@ describe("HomePage", () => {
 
     expect(await screen.findByText("Guest")).toBeInTheDocument();
     expect(screen.getByText("Guest вошёл в комнату")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Пригласить" }));
+
+    const shareSheet = await screen.findByRole("dialog", { name: "Позовите в комнату" });
+    expect(screen.getByRole("img", { name: "QR-код приглашения" })).toBeInTheDocument();
+    expect(shareSheet).toHaveTextContent("Просмотр поддерживается на компьютере.");
+    expect(shareSheet).toHaveTextContent(`http://localhost:3000/rooms/${roomId}`);
+    expect(shareSheet).not.toHaveTextContent("a".repeat(43));
+
+    const telegramUrl = new URL(
+      screen.getByRole("link", { name: "Telegram" }).getAttribute("href") ?? "",
+    );
+    expect(telegramUrl.origin).toBe("https://t.me");
+    expect(telegramUrl.searchParams.get("url")).toBe(`http://localhost:3000/rooms/${roomId}`);
   });
 
   it("позволяет повторить LiveKit после ошибки media-plane", async () => {
