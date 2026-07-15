@@ -1,4 +1,11 @@
-import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
+import {
+  type ChangeEvent,
+  type DragEvent,
+  type FormEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   Activity,
   AlertTriangle,
@@ -162,6 +169,7 @@ export function HomePage() {
   const [hostDisplayName, setHostDisplayName] = useState("Host");
   const [guestDisplayName, setGuestDisplayName] = useState("Guest");
   const [joinRoomIdDraft, setJoinRoomIdDraft] = useState("");
+  const [isFileDropActive, setIsFileDropActive] = useState(false);
   const [inviteCopied, setInviteCopied] = useState(false);
   const [roomIdCopied, setRoomIdCopied] = useState(false);
   const [seekBarValue, setSeekBarValue] = useState<number | null>(null);
@@ -245,10 +253,26 @@ export function HomePage() {
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
+    selectLocalFile(file);
+    event.target.value = "";
+  }
+
+  function selectLocalFile(file: File | undefined) {
     if (file) {
       void roomSession.selectFile(file);
     }
-    event.target.value = "";
+  }
+
+  function handleFileDragOver(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setIsFileDropActive(true);
+  }
+
+  function handleFileDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsFileDropActive(false);
+    selectLocalFile(event.dataTransfer.files?.[0]);
   }
 
   function handleCreateRoom(event: FormEvent<HTMLFormElement>) {
@@ -366,85 +390,61 @@ export function HomePage() {
   }
 
   return (
-    <div className="home">
-      <section className="hero" aria-labelledby="home-title">
-        <div className="hero__content">
-          <p className="eyebrow">Один вечер. Один экран.</p>
-          <h1 id="home-title">Смотрите вместе, даже когда вы далеко</h1>
-          <p className="hero__lead">
-            Запускайте любимое видео и оставайтесь рядом с теми, кто важен.
-          </p>
+    <div className={`home ${room && !roomClosed ? "home--room" : "home--entry"}`}>
+      {!room && (
+        <section className="hero" aria-labelledby="home-title">
+          <div className="hero__content">
+            <p className="eyebrow">Один вечер. Один экран.</p>
+            <h1 id="home-title">Смотрите вместе, даже когда вы далеко</h1>
+            <p className="hero__lead">
+              Запускайте любимое видео и оставайтесь рядом с теми, кто важен.
+            </p>
 
-          <div
-            className={`service-status service-status--${
-              isPending ? "pending" : isError ? "error" : "online"
-            }`}
-            role="status"
-          >
-            <span className="service-status__indicator" aria-hidden="true" />
-            {isPending && "Подключаемся к сервису"}
-            {isError && "Сервис временно недоступен"}
-            {isOnline && "Сервис готов"}
-          </div>
-        </div>
-
-        <div className="watch-stage" aria-label="Экран совместного просмотра">
-          <div className="watch-stage__topline">
-            <span className="watch-stage__label">
-              {room ? `Комната ${formatShortRoomId(room.roomId)}` : "Сеанс просмотра"}
-            </span>
-            <span className="watch-stage__state">
-              {room ? formatRoomStatus(room.status) : "Не начат"}
-            </span>
-          </div>
-
-          {room ? (
-            <div className="watch-stage__room">
-              <span className="watch-stage__icon" aria-hidden="true">
-                <Clapperboard size={34} />
-              </span>
-              <div>
-                <strong>{room.media?.displayName ?? "Видео не выбрано"}</strong>
-                <span>
-                  {participant
-                    ? `${participant.displayName} · ${formatParticipantRole(participant.role)}`
-                    : "Участник не выбран"}
-                </span>
-              </div>
-              <div className="watch-stage__participants" aria-label="Участники комнаты">
-                {room.participants.map((item) => (
-                  <span
-                    className={`watch-stage__participant ${
-                      item.online ? "watch-stage__participant--online" : ""
-                    }`}
-                    key={item.participantId}
-                    title={item.displayName}
-                  >
-                    {getInitials(item.displayName)}
-                  </span>
-                ))}
-              </div>
+            <div
+              className={`service-status service-status--${
+                isPending ? "pending" : isError ? "error" : "online"
+              }`}
+              role="status"
+            >
+              <span className="service-status__indicator" aria-hidden="true" />
+              {isPending && "Подключаемся к сервису"}
+              {isError && "Сервис временно недоступен"}
+              {isOnline && "Сервис готов"}
             </div>
-          ) : (
+          </div>
+
+          <div className="watch-stage" aria-label="Экран совместного просмотра">
+            <div className="watch-stage__topline">
+              <span className="watch-stage__label">Приватная комната</span>
+              <span className="watch-stage__state">Готова к началу</span>
+            </div>
+
             <div className="watch-stage__empty">
               <span className="watch-stage__icon" aria-hidden="true">
                 <Clapperboard size={34} />
               </span>
-              <strong>Комната пока не выбрана</strong>
+              <strong>Создайте комнату и выберите свой видеофайл</strong>
             </div>
-          )}
 
-          <div className="watch-stage__timeline" aria-hidden="true">
-            <span style={{ width: `${getMediaProgress(room)}%` }} />
+            <div className="watch-stage__timeline" aria-hidden="true">
+              <span style={{ width: "0%" }} />
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
-      <section className="room-workspace" aria-labelledby="room-workspace-title">
+      <section
+        className={`room-workspace${room && !roomClosed ? " room-workspace--active" : ""}`}
+        aria-labelledby="room-workspace-title"
+      >
         <div className="room-workspace__heading">
           <div>
-            <p className="eyebrow">Комната</p>
-            <h2 id="room-workspace-title">Управление сеансом</h2>
+            <p className="eyebrow">{room ? "Private review room" : "Ваша комната"}</p>
+            {room ? (
+              <h1 id="room-workspace-title">Комната {formatShortRoomId(room.roomId)}</h1>
+            ) : (
+              <h2 id="room-workspace-title">Начните совместный просмотр</h2>
+            )}
           </div>
           {room && (
             <div className="room-connection-group">
@@ -581,13 +581,9 @@ export function HomePage() {
         )}
 
         {room && (
-          <div className="room-dashboard">
+          <div className={`room-dashboard room-dashboard--${isHost ? "host" : "guest"}`}>
             {isHost && !roomClosed && (
-              <section
-                className="room-card"
-                aria-labelledby="file-picker-title"
-                style={{ gridColumn: "1 / -1" }}
-              >
+              <section className="room-card room-card--file" aria-labelledby="file-picker-title">
                 <div className="room-card__heading">
                   <h3 id="file-picker-title">Видеофайл</h3>
                   {roomSession.fileStatus === "ready" && (
@@ -613,10 +609,18 @@ export function HomePage() {
                   onChange={handleFileChange}
                 />
 
-                <div className="file-picker">
+                <div
+                  className={`file-picker file-picker--dropzone${
+                    isFileDropActive ? " file-picker--dropzone-active" : ""
+                  }`}
+                  onDragLeave={() => setIsFileDropActive(false)}
+                  onDragOver={handleFileDragOver}
+                  onDrop={handleFileDrop}
+                >
                   <button
                     className="button file-picker__trigger"
                     type="button"
+                    aria-describedby="file-picker-help"
                     disabled={roomSession.fileStatus === "checking" || isFilePublishing}
                     onClick={() => fileInputRef.current?.click()}
                   >
@@ -696,7 +700,10 @@ export function HomePage() {
                     </div>
                   )}
                 </div>
-                <p className="file-picker__hint">{LOCAL_MEDIA_FORMATS_HINT}</p>
+                <p className="file-picker__hint" id="file-picker-help">
+                  <span>Перетащите файл сюда или выберите его с устройства. </span>
+                  <span>{LOCAL_MEDIA_FORMATS_HINT}</span>
+                </p>
 
                 {roomSession.filePublicationStatus === "live" && (
                   <div className="host-controls" aria-label="Управление воспроизведением">
@@ -762,7 +769,6 @@ export function HomePage() {
               <section
                 className="room-card room-card--remote-playback"
                 aria-labelledby="remote-playback-title"
-                style={{ gridColumn: "1 / -1" }}
               >
                 <div className="room-card__heading">
                   <h3 id="remote-playback-title">Просмотр</h3>
@@ -963,136 +969,181 @@ export function HomePage() {
             )}
 
             {!roomClosed && (
-              <section className="room-card room-card--quality" aria-labelledby="quality-title">
-                <div className="room-card__heading">
-                  <h3 id="quality-title">Качество</h3>
-                  <span className={`room-pill room-pill--quality-${qualityDisplayStatus}`}>
-                    <Activity size={15} aria-hidden="true" />
-                    {formatQualityStatus(qualityDisplayStatus)}
+              <details className="workspace-diagnostics">
+                <summary>
+                  <span>
+                    <Activity size={17} aria-hidden="true" />
+                    Диагностика сеанса
                   </span>
-                </div>
+                </summary>
+                <section className="room-card room-card--quality" aria-labelledby="quality-title">
+                  <div className="room-card__heading">
+                    <h3 id="quality-title">Качество</h3>
+                    <span className={`room-pill room-pill--quality-${qualityDisplayStatus}`}>
+                      <Activity size={15} aria-hidden="true" />
+                      {formatQualityStatus(qualityDisplayStatus)}
+                    </span>
+                  </div>
 
-                <dl className="quality-metrics">
-                  <div>
-                    <dt>Upload</dt>
-                    <dd>{formatBitrate(roomSession.qualityIndicators.upload.bitrateKbps)}</dd>
-                  </div>
-                  <div>
-                    <dt>Download</dt>
-                    <dd>{formatBitrate(roomSession.qualityIndicators.download.bitrateKbps)}</dd>
-                  </div>
-                  <div>
-                    <dt>RTT</dt>
-                    <dd>{formatMetricMs(roomSession.qualityIndicators.upload.rttMs)}</dd>
-                  </div>
-                  <div>
-                    <dt>Jitter</dt>
-                    <dd>{formatMetricMs(getWorstJitter(roomSession.qualityIndicators))}</dd>
-                  </div>
-                  <div>
-                    <dt>Потери</dt>
-                    <dd>{formatPacketLoss(getWorstPacketLoss(roomSession.qualityIndicators))}</dd>
-                  </div>
-                  <div>
-                    <dt>Видео</dt>
-                    <dd>{formatQualityResolution(roomSession.qualityIndicators)}</dd>
-                  </div>
-                </dl>
+                  <dl className="quality-metrics">
+                    <div>
+                      <dt>Upload</dt>
+                      <dd>{formatBitrate(roomSession.qualityIndicators.upload.bitrateKbps)}</dd>
+                    </div>
+                    <div>
+                      <dt>Download</dt>
+                      <dd>{formatBitrate(roomSession.qualityIndicators.download.bitrateKbps)}</dd>
+                    </div>
+                    <div>
+                      <dt>RTT</dt>
+                      <dd>{formatMetricMs(roomSession.qualityIndicators.upload.rttMs)}</dd>
+                    </div>
+                    <div>
+                      <dt>Jitter</dt>
+                      <dd>{formatMetricMs(getWorstJitter(roomSession.qualityIndicators))}</dd>
+                    </div>
+                    <div>
+                      <dt>Потери</dt>
+                      <dd>{formatPacketLoss(getWorstPacketLoss(roomSession.qualityIndicators))}</dd>
+                    </div>
+                    <div>
+                      <dt>Видео</dt>
+                      <dd>{formatQualityResolution(roomSession.qualityIndicators)}</dd>
+                    </div>
+                  </dl>
 
-                <p className={`quality-hint quality-hint--${qualityDisplayStatus}`}>
-                  {formatQualityHint(
-                    qualityDisplayStatus,
-                    roomSession.liveKitStatus,
-                    roomSession.qualityIndicators.warning,
-                  )}
-                </p>
-              </section>
+                  <p className={`quality-hint quality-hint--${qualityDisplayStatus}`}>
+                    {formatQualityHint(
+                      qualityDisplayStatus,
+                      roomSession.liveKitStatus,
+                      roomSession.qualityIndicators.warning,
+                    )}
+                  </p>
+                </section>
+              </details>
             )}
 
-            <section className="room-card" aria-labelledby="room-details-title">
-              <div className="room-card__heading">
-                <h3 id="room-details-title">Состояние комнаты</h3>
-                <span className={`room-pill room-pill--${room.status.toLowerCase()}`}>
-                  {formatRoomStatus(room.status)}
+            <details className="workspace-diagnostics workspace-diagnostics--room">
+              <summary>
+                <span>
+                  <CircleCheck size={17} aria-hidden="true" />
+                  Комната и события
                 </span>
-              </div>
-
-              <dl className="room-metrics">
-                <div>
-                  <dt>ID</dt>
-                  <dd>{formatShortRoomId(room.roomId)}</dd>
-                </div>
-                <div>
-                  <dt>Версия</dt>
-                  <dd>{room.roomVersion}</dd>
-                </div>
-                <div>
-                  <dt>До</dt>
-                  <dd>{formatCheckedAt(room.expiresAt)}</dd>
-                </div>
-              </dl>
-
-              <div className="room-copy-list">
-                <div className="room-copy-field">
-                  <span>ID комнаты</span>
-                  <code>{room.roomId}</code>
-                  <button
-                    className="icon-button"
-                    type="button"
-                    onClick={() => void handleCopyRoomId()}
-                    aria-label="Скопировать ID комнаты"
-                    title={roomIdCopied ? "Скопировано" : "Скопировать ID комнаты"}
-                  >
-                    <Copy size={17} aria-hidden="true" />
-                  </button>
-                </div>
-
-                {roomSession.inviteUrl && (
-                  <div className="room-copy-field">
-                    <span>
-                      <LinkIcon size={15} aria-hidden="true" />
-                      Invite
+              </summary>
+              <div className="workspace-diagnostics__content">
+                <section
+                  className="room-card room-card--details"
+                  aria-labelledby="room-details-title"
+                >
+                  <div className="room-card__heading">
+                    <h3 id="room-details-title">Состояние комнаты</h3>
+                    <span className={`room-pill room-pill--${room.status.toLowerCase()}`}>
+                      {formatRoomStatus(room.status)}
                     </span>
-                    <a href={roomSession.inviteUrl}>{roomSession.inviteUrl}</a>
-                    <button
-                      className="icon-button"
-                      type="button"
-                      onClick={() => void handleCopyInvite()}
-                      aria-label="Скопировать приглашение"
-                      title={inviteCopied ? "Скопировано" : "Скопировать приглашение"}
-                    >
-                      <Copy size={17} aria-hidden="true" />
-                    </button>
                   </div>
-                )}
-              </div>
 
-              <div className="room-card__commands">
-                {isHost ? (
-                  <button
-                    className="button button--danger"
-                    disabled={isRoomActionPending || roomClosed}
-                    onClick={() => void roomSession.close()}
-                    type="button"
-                  >
-                    <Power size={18} aria-hidden="true" />
-                    Закрыть
-                  </button>
-                ) : (
-                  <button
-                    className="button"
-                    disabled={isRoomActionPending || roomClosed}
-                    onClick={() => void roomSession.leave()}
-                    type="button"
-                  >
-                    <DoorOpen size={18} aria-hidden="true" />
-                    Выйти
-                  </button>
-                )}
-              </div>
-            </section>
+                  <dl className="room-metrics">
+                    <div>
+                      <dt>ID</dt>
+                      <dd>{formatShortRoomId(room.roomId)}</dd>
+                    </div>
+                    <div>
+                      <dt>Версия</dt>
+                      <dd>{room.roomVersion}</dd>
+                    </div>
+                    <div>
+                      <dt>До</dt>
+                      <dd>{formatCheckedAt(room.expiresAt)}</dd>
+                    </div>
+                  </dl>
 
-            <section className="room-card" aria-labelledby="participants-title">
+                  <div className="room-copy-list">
+                    <div className="room-copy-field">
+                      <span>ID комнаты</span>
+                      <code>{room.roomId}</code>
+                      <button
+                        className="icon-button"
+                        type="button"
+                        onClick={() => void handleCopyRoomId()}
+                        aria-label="Скопировать ID комнаты"
+                        title={roomIdCopied ? "Скопировано" : "Скопировать ID комнаты"}
+                      >
+                        <Copy size={17} aria-hidden="true" />
+                      </button>
+                    </div>
+
+                    {roomSession.inviteUrl && (
+                      <div className="room-copy-field">
+                        <span>
+                          <LinkIcon size={15} aria-hidden="true" />
+                          Invite
+                        </span>
+                        <a href={roomSession.inviteUrl}>{roomSession.inviteUrl}</a>
+                        <button
+                          className="icon-button"
+                          type="button"
+                          onClick={() => void handleCopyInvite()}
+                          aria-label="Скопировать приглашение"
+                          title={inviteCopied ? "Скопировано" : "Скопировать приглашение"}
+                        >
+                          <Copy size={17} aria-hidden="true" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="room-card__commands">
+                    {isHost ? (
+                      <button
+                        className="button button--danger"
+                        disabled={isRoomActionPending || roomClosed}
+                        onClick={() => void roomSession.close()}
+                        type="button"
+                      >
+                        <Power size={18} aria-hidden="true" />
+                        Закрыть
+                      </button>
+                    ) : (
+                      <button
+                        className="button"
+                        disabled={isRoomActionPending || roomClosed}
+                        onClick={() => void roomSession.leave()}
+                        type="button"
+                      >
+                        <DoorOpen size={18} aria-hidden="true" />
+                        Выйти
+                      </button>
+                    )}
+                  </div>
+                </section>
+
+                <section className="room-card room-card--events" aria-labelledby="events-title">
+                  <div className="room-card__heading">
+                    <h3 id="events-title">События</h3>
+                  </div>
+
+                  {roomSession.events.length > 0 ? (
+                    <ol className="event-list">
+                      {roomSession.events.map((event) => (
+                        <li key={event.eventId}>
+                          <time dateTime={event.occurredAt}>
+                            {formatCheckedAt(event.occurredAt)}
+                          </time>
+                          <span>{event.label}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className="room-card__empty">Событий пока нет</p>
+                  )}
+                </section>
+              </div>
+            </details>
+
+            <section
+              className="room-card room-card--participants"
+              aria-labelledby="participants-title"
+            >
               <div className="room-card__heading">
                 <h3 id="participants-title">Участники</h3>
                 <span className="room-count">
@@ -1108,35 +1159,26 @@ export function HomePage() {
               </ul>
             </section>
 
-            <section className="room-card room-card--events" aria-labelledby="events-title">
-              <div className="room-card__heading">
-                <h3 id="events-title">События</h3>
-              </div>
-
-              {roomSession.events.length > 0 ? (
-                <ol className="event-list">
-                  {roomSession.events.map((event) => (
-                    <li key={event.eventId}>
-                      <time dateTime={event.occurredAt}>{formatCheckedAt(event.occurredAt)}</time>
-                      <span>{event.label}</span>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="room-card__empty">Событий пока нет</p>
-              )}
-            </section>
-
-            <section
-              className="room-card room-card--chat"
-              aria-labelledby="chat-title"
-              style={{ gridColumn: "1 / -1" }}
-            >
+            <section className="room-card room-card--chat" aria-labelledby="chat-title">
               <div className="room-card__heading">
                 <h3 id="chat-title">Чат</h3>
                 <span className="room-count">
                   <MessageSquare size={16} aria-hidden="true" />
                   {roomSession.chatMessages.length}
+                </span>
+              </div>
+
+              <div className="room-rail-tabs" aria-label="Разделы комнаты">
+                <span className="room-rail-tabs__item room-rail-tabs__item--active">
+                  <MessageSquare size={14} aria-hidden="true" />
+                  Чат
+                </span>
+                <span className="room-rail-tabs__item">
+                  <Users size={14} aria-hidden="true" />
+                  {room.participants.length}
+                </span>
+                <span className="room-rail-tabs__item room-rail-tabs__item--muted">
+                  Заметки · скоро
                 </span>
               </div>
 
@@ -1815,14 +1857,6 @@ function getInitials(displayName: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
-}
-
-function getMediaProgress(room: RoomSnapshot | null) {
-  if (!room?.media || room.media.durationMs === 0) {
-    return 0;
-  }
-
-  return Math.min(100, Math.round((room.media.positionMs / room.media.durationMs) * 100));
 }
 
 function formatDurationMs(ms: number) {

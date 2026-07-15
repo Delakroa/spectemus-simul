@@ -91,6 +91,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 ## P9: private review room foundation
 
 - [WT-619_NATIVE_MEDIA_CAPABILITY_FOUNDATION.md](WT-619_NATIVE_MEDIA_CAPABILITY_FOUNDATION.md) — browser-native policy для локальных MP4/M4V и WebM, runtime diagnostics и честные границы codec support.
+- [WT-620_PRIVATE_REVIEW_WORKSPACE.md](WT-620_PRIVATE_REVIEW_WORKSPACE.md) — отдельные entry/active room surfaces, media-first workspace, правый chat/participants rail, сворачиваемая диагностика и drag-and-drop local file dock.
 
 ## Как обновлять документы
 

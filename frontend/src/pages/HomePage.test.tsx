@@ -1132,13 +1132,21 @@ describe("HomePage", () => {
 
     await screen.findByText("Видеофайл");
 
+    expect(document.querySelector(".home--room")).toBeInTheDocument();
+    expect(document.querySelector(".room-card--chat")).toBeInTheDocument();
+    expect(document.querySelector(".room-card--participants")).toBeInTheDocument();
+    expect(document.querySelector(".workspace-diagnostics")).not.toHaveAttribute("open");
+
     const file = new File([""], "movie.mp4", { type: "video/mp4" });
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const dropzone = document.querySelector(".file-picker--dropzone") as HTMLDivElement;
     expect(input.accept).toBe(".mp4,.m4v,.webm,video/mp4,video/x-m4v,video/webm");
     expect(
       screen.getByText("Поддерживаются MP4/M4V (H.264/AAC) и WebM (VP8/VP9/Opus)."),
     ).toBeInTheDocument();
-    await user.upload(input, file);
+    fireEvent.dragOver(dropzone, { dataTransfer: { dropEffect: "none", files: [file] } });
+    expect(dropzone).toHaveClass("file-picker--dropzone-active");
+    fireEvent.drop(dropzone, { dataTransfer: { files: [file] } });
 
     await waitFor(() => {
       expect(screen.getByText("movie.mp4")).toBeInTheDocument();
