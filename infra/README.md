@@ -86,27 +86,52 @@ PostgreSQL и Redis используют named volumes:
 
 ## Проверка между домашними компьютерами (LAN)
 
-Обычный запуск намеренно доступен только на MacBook. Чтобы проверить комнату с
-Windows-компьютера в **той же приватной домашней сети**, не меняйте
-`compose.yaml` и не открывайте router port forwarding:
+Обычный запуск намеренно доступен только на host-компьютере. Чтобы проверить
+комнату между Windows и Mac в **той же приватной домашней сети**, не меняйте
+`compose.yaml` и не открывайте router port forwarding.
+
+На компьютере, где запущен Docker (например, Windows host), сначала создайте
+LAN-конфигурацию. Команда выберет единственный физический private IPv4 и
+соберёт `infra/lan.env`; адрес не нужно вписывать в файл вручную:
 
 ```bash
-cp infra/lan.env.example infra/lan.env
-```
-
-В `infra/lan.env` заменить `192.168.1.42` на текущий private IPv4 MacBook.
-Затем перезапустить стек в opt-in LAN-режиме:
-
-```bash
-pnpm infra:down
+pnpm infra:lan:setup
 pnpm infra:lan:up
+pnpm infra:lan:doctor
 ```
 
-Windows открывает `http://<MacBook-private-IP>:8088`. Gateway и LiveKit
-сигналинг будут доступны в LAN; backend, Redis и PostgreSQL останутся на
-loopback. `lan.env` задаёт тот же LAN URL для backend token response и
-frontend build: это необходимо, иначе Windows попытается подключиться к
-собственному `127.0.0.1`. После проверки вернуть обычный закрытый режим:
+Если у host-а два физических подключения, setup безопасно остановится и
+покажет кандидаты. В этом единственном случае передайте выбранный адрес явно:
+
+```bash
+pnpm infra:lan:setup -- --ip 192.168.1.42
+```
+
+`infra:lan:doctor` проверяет gateway, LiveKit TCP-сигналинг, TCP fallback и
+создаёт короткоживущую test-room, чтобы убедиться: backend отдаёт в token
+`ws://<IPv4-host>:7880`, а не `localhost` или адрес другого компьютера.
+
+С Mac guest-компьютера повторите тот же тест **через Windows IP**:
+
+```bash
+pnpm infra:lan:doctor -- --host 192.168.1.42
+```
+
+Только после зелёного результата открывайте на Mac
+`http://192.168.1.42:8088`, создавайте новую комнату на Windows по этому же
+адресу и передавайте новую invite-ссылку. Gateway и LiveKit сигналинг будут
+доступны в LAN; backend, Redis и PostgreSQL останутся на loopback.
+
+Если удалённый doctor не может открыть gateway или TCP-порты с Mac, сначала
+проверьте firewall и профиль сети Windows. На Windows откройте PowerShell от
+имени администратора и выполните один раз:
+
+```powershell
+New-NetFirewallRule -DisplayName "Watch Together LAN TCP" -Direction Inbound -Action Allow -Profile Private -Protocol TCP -LocalPort 8088,7880,7881
+New-NetFirewallRule -DisplayName "Watch Together LAN UDP" -Direction Inbound -Action Allow -Profile Private -Protocol UDP -LocalPort 50000-50100
+```
+
+После проверки вернуть обычный закрытый режим:
 
 ```bash
 pnpm infra:lan:down
@@ -114,10 +139,12 @@ pnpm infra:up
 ```
 
 Этот режим не является staging или production: нет TLS, public TURN и
-secure-cookie semantics. Браузеры по правилам безопасности не дают доступ к
-микрофону на `http://<private-IP>`: в LAN проверяйте room/file/chat, а голос —
-только через `https` staging или `localhost`. Не используйте этот режим с
-публичным IP, пробросом портов на router, VPN exit node или облачной VM.
+secure-cookie semantics. Doctor подтверждает control path и TCP fallback, но
+UDP `50000–50100` проверяется только реальным просмотром с другого компьютера.
+Браузеры по правилам безопасности не дают доступ к микрофону на
+`http://<private-IP>`: в LAN проверяйте room/file/chat, а голос — только через
+`https` staging или `localhost`. Не используйте этот режим с публичным IP,
+пробросом портов на router, VPN exit node или облачной VM.
 
 ## Границы
 

@@ -106,10 +106,11 @@ public class RoomController {
     @PostMapping("/{roomId}/livekit-token")
     ResponseEntity<LiveKitTokenResponse> mintLiveKitToken(
             @PathVariable String roomId,
-            @CookieValue(name = SESSION_COOKIE, required = false) String sessionCredential) {
+            @CookieValue(name = SESSION_COOKIE, required = false) String sessionCredential,
+            @RequestHeader(name = HttpHeaders.HOST, required = false) String requestHost) {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
-                .body(liveKitTokenService.mint(roomId, sessionCredential));
+                .body(liveKitTokenService.mint(roomId, sessionCredential, requestHost));
     }
 
     @PostMapping("/{roomId}/close")

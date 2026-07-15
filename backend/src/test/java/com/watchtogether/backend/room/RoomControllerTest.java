@@ -211,10 +211,12 @@ class RoomControllerTest {
     @Test
     void mintsLiveKitTokenAccordingToContract() throws Exception {
         LiveKitTokenResponse response = liveKitTokenResponse();
-        when(liveKitTokenService.mint(ROOM_ID, SESSION)).thenReturn(response);
+        when(liveKitTokenService.mint(ROOM_ID, SESSION, "192.168.1.146:8088"))
+                .thenReturn(response);
 
         mockMvc.perform(post("/api/v1/rooms/{roomId}/livekit-token", ROOM_ID)
-                        .cookie(new Cookie("wt_session", SESSION)))
+                        .cookie(new Cookie("wt_session", SESSION))
+                        .header(HttpHeaders.HOST, "192.168.1.146:8088"))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(header().exists(CorrelationIdFilter.HEADER))
@@ -229,7 +231,7 @@ class RoomControllerTest {
                 .andExpect(jsonPath("$.canPublishData").value(true))
                 .andExpect(jsonPath("$.expiresAt").value("2026-07-09T08:10:00Z"));
 
-        verify(liveKitTokenService).mint(ROOM_ID, SESSION);
+        verify(liveKitTokenService).mint(ROOM_ID, SESSION, "192.168.1.146:8088");
     }
 
     private CreationResult creationResult() {

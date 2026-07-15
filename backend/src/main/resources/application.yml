@@ -25,6 +25,8 @@ watch-together:
     host-reconnect-grace: ${WEBSOCKET_HOST_RECONNECT_GRACE:60s}
   livekit:
     url: ${LIVEKIT_URL:ws://127.0.0.1:7880}
+    # Включается только private LAN-конфигурацией; staging оставляет фиксированный public URL.
+    url-from-request: ${LIVEKIT_URL_FROM_REQUEST:false}
     api-key: ${LIVEKIT_API_KEY:devkey}
     api-secret: ${LIVEKIT_API_SECRET:devsecretdevsecretdevsecretdevsecret}
     token-ttl: ${LIVEKIT_TOKEN_TTL:10m}

@@ -37,6 +37,7 @@ class LiveKitTokenServiceTest {
 
     private final LiveKitProperties properties = new LiveKitProperties(
             "ws://127.0.0.1:7880",
+            false,
             "devkey",
             API_SECRET,
             Duration.ofMinutes(10));
@@ -47,7 +48,7 @@ class LiveKitTokenServiceTest {
                 new FakeRealtimeStore(AuthenticationResult.authenticated(room(), HOST_ID));
         LiveKitTokenService service = service(store);
 
-        LiveKitTokenResponse response = service.mint(ROOM_ID, SESSION);
+        LiveKitTokenResponse response = service.mint(ROOM_ID, SESSION, null);
 
         String payload = payload(response.token());
         assertThat(response.liveKitUrl()).isEqualTo("ws://127.0.0.1:7880");
@@ -78,7 +79,7 @@ class LiveKitTokenServiceTest {
         LiveKitTokenService service =
                 service(new FakeRealtimeStore(AuthenticationResult.authenticated(room(), GUEST_ID)));
 
-        LiveKitTokenResponse response = service.mint(ROOM_ID, SESSION);
+        LiveKitTokenResponse response = service.mint(ROOM_ID, SESSION, null);
         String payload = payload(response.token());
 
         assertThat(response.role()).isEqualTo(ParticipantRole.GUEST);
@@ -99,11 +100,11 @@ class LiveKitTokenServiceTest {
                 service(new FakeRealtimeStore(AuthenticationResult.authenticated(room(), HOST_ID)));
 
         assertApiException(
-                () -> service.mint(ROOM_ID, null),
+                () -> service.mint(ROOM_ID, null, null),
                 HttpStatus.UNAUTHORIZED,
                 "AUTHENTICATION_REQUIRED");
         assertApiException(
-                () -> service.mint(ROOM_ID, "bad-session"),
+                () -> service.mint(ROOM_ID, "bad-session", null),
                 HttpStatus.UNAUTHORIZED,
                 "AUTHENTICATION_REQUIRED");
     }
@@ -116,11 +117,11 @@ class LiveKitTokenServiceTest {
                 service(new FakeRealtimeStore(AuthenticationResult.roomUnavailable()));
 
         assertApiException(
-                () -> invalidRoomService.mint("invalid", SESSION),
+                () -> invalidRoomService.mint("invalid", SESSION, null),
                 HttpStatus.NOT_FOUND,
                 "ROOM_UNAVAILABLE");
         assertApiException(
-                () -> unavailableRoomService.mint(ROOM_ID, SESSION),
+                () -> unavailableRoomService.mint(ROOM_ID, SESSION, null),
                 HttpStatus.NOT_FOUND,
                 "ROOM_UNAVAILABLE");
     }
@@ -131,9 +132,48 @@ class LiveKitTokenServiceTest {
                 service(new FakeRealtimeStore(AuthenticationResult.authenticationRequired()));
 
         assertApiException(
-                () -> service.mint(ROOM_ID, SESSION),
+                () -> service.mint(ROOM_ID, SESSION, null),
                 HttpStatus.UNAUTHORIZED,
                 "AUTHENTICATION_REQUIRED");
+    }
+
+    @Test
+    void derivesLiveKitUrlFromPrivateLanRequestHostWhenEnabled() {
+        LiveKitProperties lanProperties = new LiveKitProperties(
+                "ws://192.168.1.42:7880",
+                true,
+                "devkey",
+                API_SECRET,
+                Duration.ofMinutes(10));
+        LiveKitTokenService service = new LiveKitTokenService(
+                new FakeRealtimeStore(AuthenticationResult.authenticated(room(), HOST_ID)),
+                new LiveKitTokenSigner(),
+                lanProperties,
+                Clock.fixed(NOW, ZoneOffset.UTC));
+
+        LiveKitTokenResponse response = service.mint(ROOM_ID, SESSION, "192.168.1.146:8088");
+
+        assertThat(response.liveKitUrl()).isEqualTo("ws://192.168.1.146:7880");
+    }
+
+    @Test
+    void keepsConfiguredLiveKitUrlForLoopbackOrPublicRequestHost() {
+        LiveKitProperties lanProperties = new LiveKitProperties(
+                "ws://192.168.1.42:7880",
+                true,
+                "devkey",
+                API_SECRET,
+                Duration.ofMinutes(10));
+        LiveKitTokenService service = new LiveKitTokenService(
+                new FakeRealtimeStore(AuthenticationResult.authenticated(room(), HOST_ID)),
+                new LiveKitTokenSigner(),
+                lanProperties,
+                Clock.fixed(NOW, ZoneOffset.UTC));
+
+        assertThat(service.mint(ROOM_ID, SESSION, "localhost:8088").liveKitUrl())
+                .isEqualTo("ws://192.168.1.42:7880");
+        assertThat(service.mint(ROOM_ID, SESSION, "203.0.113.10:8088").liveKitUrl())
+                .isEqualTo("ws://192.168.1.42:7880");
     }
 
     private LiveKitTokenService service(FakeRealtimeStore store) {

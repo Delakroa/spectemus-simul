@@ -5,7 +5,12 @@ import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties("watch-together.livekit")
-public record LiveKitProperties(String url, String apiKey, String apiSecret, Duration tokenTtl) {
+public record LiveKitProperties(
+        String url,
+        boolean urlFromRequest,
+        String apiKey,
+        String apiSecret,
+        Duration tokenTtl) {
 
     public LiveKitProperties {
         if (url == null || url.isBlank()) {

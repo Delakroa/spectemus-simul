@@ -1,5 +1,7 @@
 package com.watchtogether.backend.room;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -36,7 +38,7 @@ class LiveKitTokenService {
         this.clock = clock;
     }
 
-    LiveKitTokenResponse mint(String roomId, String sessionCredential) {
+    LiveKitTokenResponse mint(String roomId, String sessionCredential, String requestHost) {
         if (!ROOM_ID_PATTERN.matcher(roomId).matches()) {
             throw roomUnavailable();
         }
@@ -78,7 +80,7 @@ class LiveKitTokenService {
 
         return new LiveKitTokenResponse(
                 token,
-                properties.url(),
+                resolveLiveKitUrl(requestHost),
                 result.room().roomId(),
                 participant.participantId(),
                 participantIdentity,
@@ -86,6 +88,62 @@ class LiveKitTokenService {
                 canPublish,
                 canPublishData,
                 expiresAt);
+    }
+
+    private String resolveLiveKitUrl(String requestHost) {
+        if (!properties.urlFromRequest()) {
+            return properties.url();
+        }
+
+        try {
+            URI configuredUrl = URI.create(properties.url());
+            URI requestUrl = URI.create("http://" + requestHost);
+            String requestHostname = requestUrl.getHost();
+
+            if (!isPrivateIpv4(requestHostname)) {
+                return properties.url();
+            }
+
+            return new URI(
+                            configuredUrl.getScheme(),
+                            configuredUrl.getUserInfo(),
+                            requestHostname,
+                            configuredUrl.getPort(),
+                            configuredUrl.getPath(),
+                            configuredUrl.getQuery(),
+                            configuredUrl.getFragment())
+                    .toString();
+        } catch (IllegalArgumentException | URISyntaxException ignored) {
+            return properties.url();
+        }
+    }
+
+    private boolean isPrivateIpv4(String host) {
+        if (host == null) {
+            return false;
+        }
+
+        String[] parts = host.split("\\.", -1);
+        if (parts.length != 4) {
+            return false;
+        }
+
+        int[] octets = new int[4];
+        for (int index = 0; index < parts.length; index += 1) {
+            try {
+                octets[index] = Integer.parseInt(parts[index]);
+            } catch (NumberFormatException ignored) {
+                return false;
+            }
+
+            if (octets[index] < 0 || octets[index] > 255) {
+                return false;
+            }
+        }
+
+        return octets[0] == 10
+                || (octets[0] == 172 && octets[1] >= 16 && octets[1] <= 31)
+                || (octets[0] == 192 && octets[1] == 168);
     }
 
     private ApiException authenticationRequired() {
