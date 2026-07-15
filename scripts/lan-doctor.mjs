@@ -175,12 +175,11 @@ function printRecoveryHint(error, isRemoteCheck) {
   console.error(
     "На Windows host проверьте профиль сети Private и Docker Desktop.",
   );
-  console.error("Откройте PowerShell от имени администратора и выполните:");
   console.error(
-    'New-NetFirewallRule -DisplayName "Watch Together LAN TCP" -Direction Inbound -Action Allow -Profile Private -Protocol TCP -LocalPort 8088,7880,7881',
+    "В корне репозитория на Windows выполните: pnpm infra:lan:windows",
   );
   console.error(
-    'New-NetFirewallRule -DisplayName "Watch Together LAN UDP" -Direction Inbound -Action Allow -Profile Private -Protocol UDP -LocalPort 50000-50100',
+    "Команда запросит UAC и откроет только LAN-порты приложения для профиля Private.",
   );
 }
 

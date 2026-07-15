@@ -111,7 +111,15 @@ pnpm infra:lan:setup -- --ip 192.168.1.42
 создаёт короткоживущую test-room, чтобы убедиться: backend отдаёт в token
 `ws://<IPv4-host>:7880`, а не `localhost` или адрес другого компьютера.
 
-С Mac guest-компьютера повторите тот же тест **через Windows IP**:
+На Windows host можно выполнить все локальные шаги и открыть только нужные
+private-LAN порты одной командой. Она запросит стандартный UAC для двух узких
+firewall-правил, не меняет router и не действует для Public/Domain profile:
+
+```bash
+pnpm infra:lan:windows
+```
+
+С Mac guest-компьютера повторите doctor **через Windows IP**:
 
 ```bash
 pnpm infra:lan:doctor -- --host 192.168.1.42
@@ -122,14 +130,11 @@ pnpm infra:lan:doctor -- --host 192.168.1.42
 адресу и передавайте новую invite-ссылку. Gateway и LiveKit сигналинг будут
 доступны в LAN; backend, Redis и PostgreSQL останутся на loopback.
 
-Если удалённый doctor не может открыть gateway или TCP-порты с Mac, сначала
-проверьте firewall и профиль сети Windows. На Windows откройте PowerShell от
-имени администратора и выполните один раз:
-
-```powershell
-New-NetFirewallRule -DisplayName "Watch Together LAN TCP" -Direction Inbound -Action Allow -Profile Private -Protocol TCP -LocalPort 8088,7880,7881
-New-NetFirewallRule -DisplayName "Watch Together LAN UDP" -Direction Inbound -Action Allow -Profile Private -Protocol UDP -LocalPort 50000-50100
-```
+Если удалённый doctor не может открыть gateway или TCP-порты с Mac, повторите
+на Windows `pnpm infra:lan:windows`. Если он сообщает о профиле `Public`, сначала
+измените только доверенную домашнюю сеть на `Private` в Windows Settings. Полная
+граница и повторяемые firewall-правила описаны в
+[WT-624 Windows LAN bootstrap](../docs/WT-624_WINDOWS_LAN_BOOTSTRAP.md).
 
 После проверки вернуть обычный закрытый режим:
 

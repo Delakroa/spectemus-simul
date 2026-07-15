@@ -31,9 +31,9 @@ LiveKit token возвращал неверный endpoint.
   `pnpm infra:lan:doctor -- --host <IPv4>` проверяет удалённый Docker host с
   Mac/Windows guest. В проверочной комнате не печатаются и не сохраняются
   session, host secret или LiveKit token; комната закрывается после проверки.
-- На Windows firewall не меняется скриптом: для этого требуются права
-  администратора. Doctor показывает ровно две PowerShell-команды для профиля
-  `Private`, если сеть недоступна.
+- WT-624 добавляет Windows bootstrap: он запросит UAC и повторяемо создаст
+  ровно два firewall-правила только для профиля `Private`, после чего запустит
+  LAN stack и doctor. Doctor направляет к этой одной команде при remote timeout.
 
 ## Проверки
 
@@ -54,5 +54,5 @@ pnpm infra:lan:doctor
   передачей видео между Windows и Mac.
 - HTTP LAN намеренно не обещает voice chat: микрофон требует HTTPS или
   localhost.
-- После этого останется WT-623: унифицировать entry page с private-review
-  visual system активной комнаты.
+- После bootstrap остаётся физическое межкомпьютерное evidence: зелёный doctor
+  с Mac и реальный host + guest просмотр для UDP media range.
