@@ -686,11 +686,17 @@ if (
   throw new Error("participant offline event was not broadcast");
 }
 
-const onlineReconnect = await connectRoomEvents(eventsUrl, guestCookie);
-const onlineEvent = await waitForJsonMessage(
+// Subscribe before reconnecting the guest. The backend can broadcast
+// participant.online while the guest's initial snapshot is still in flight.
+const onlineEventPromise = waitForJsonMessageMatching(
   hostEventsConnection.socket,
+  (event) =>
+    event.type === "participant.online" &&
+    event.participantId === guestParticipantId,
   "participant online event",
 );
+const onlineReconnect = await connectRoomEvents(eventsUrl, guestCookie);
+const onlineEvent = await onlineEventPromise;
 if (
   onlineReconnect.event.type !== "room.snapshot" ||
   onlineReconnect.event.roomVersion <= offlineEvent.roomVersion ||
