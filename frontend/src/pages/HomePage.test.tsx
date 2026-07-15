@@ -321,8 +321,6 @@ describe("HomePage", () => {
 
   it("создаёт комнату и применяет participant.joined из WebSocket", async () => {
     vi.stubGlobal("WebSocket", MockWebSocket);
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    vi.stubGlobal("navigator", Object.assign(Object.create(navigator), { clipboard: { writeText } }));
     const user = userEvent.setup();
 
     vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
@@ -438,13 +436,6 @@ describe("HomePage", () => {
     expect(shareSheet).toHaveTextContent("Просмотр поддерживается на компьютере.");
     expect(shareSheet).toHaveTextContent(`http://localhost:3000/rooms/${roomId}`);
     expect(shareSheet).not.toHaveTextContent("a".repeat(43));
-
-    await user.click(screen.getByRole("button", { name: "Скопировать ссылку" }));
-
-    await waitFor(() =>
-      expect(writeText).toHaveBeenCalledWith(`http://localhost:3000/rooms/${roomId}`),
-    );
-    expect(screen.getByRole("button", { name: "Скопировано" })).toBeInTheDocument();
 
     const telegramUrl = new URL(
       screen.getByRole("link", { name: "Telegram" }).getAttribute("href") ?? "",

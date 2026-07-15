@@ -2147,6 +2147,12 @@ a {
   background: #167654;
 }
 
+.room-workspace--active .invite-share-sheet__copy-button.is-copied {
+  border-color: #23b77a;
+  color: #e7fff3;
+  background: #167654;
+}
+
 .room-workspace--active .room-pill,
 .room-workspace--active .room-count,
 .room-workspace--active .room-metrics dt,

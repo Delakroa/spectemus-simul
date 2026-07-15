@@ -50,6 +50,7 @@ import {
   submitFeedback,
 } from "../features/feedback/feedback-api";
 import { ApiProblemError, type Participant, type RoomSnapshot } from "../features/rooms/room-api";
+import { copyText } from "../features/rooms/copy-text";
 import { type LiveKitConnectionStatus } from "../features/rooms/livekit-connection";
 import {
   type FilePublicationStatus,
@@ -85,34 +86,6 @@ function formatCheckedAt(value?: string) {
     minute: "2-digit",
     second: "2-digit",
   }).format(new Date(value));
-}
-
-async function copyText(value: string): Promise<void> {
-  if (navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(value);
-      return;
-    } catch {
-      // Clipboard API is unavailable in some private HTTP LAN contexts. Try the legacy
-      // browser mechanism before showing an error to the person in the room.
-    }
-  }
-
-  const textArea = document.createElement("textarea");
-  textArea.value = value;
-  textArea.setAttribute("readonly", "");
-  textArea.style.position = "fixed";
-  textArea.style.opacity = "0";
-  textArea.style.pointerEvents = "none";
-  document.body.append(textArea);
-  textArea.select();
-
-  const copied = document.execCommand("copy");
-  textArea.remove();
-
-  if (!copied) {
-    throw new Error("Clipboard write failed");
-  }
 }
 
 type FullscreenTarget = HTMLElement & {
@@ -1221,7 +1194,9 @@ export function HomePage() {
                         className={`icon-button room-copy-field__copy${roomIdCopied ? " is-copied" : ""}`}
                         type="button"
                         onClick={() => void handleCopyRoomId()}
-                        aria-label={roomIdCopied ? "ID комнаты скопирован" : "Скопировать ID комнаты"}
+                        aria-label={
+                          roomIdCopied ? "ID комнаты скопирован" : "Скопировать ID комнаты"
+                        }
                         title={roomIdCopied ? "Скопировано" : "Скопировать ID комнаты"}
                       >
                         {roomIdCopied ? (
