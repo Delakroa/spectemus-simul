@@ -1954,6 +1954,412 @@ a {
   opacity: 0.56;
 }
 
+/* WT-620: the room is a focused workspace, not a dashboard of equal cards. */
+.app-shell:has(.home--room) {
+  color: #f6f1ff;
+  background:
+    radial-gradient(circle at 18% -20%, rgb(115 63 255 / 19%), transparent 34rem),
+    radial-gradient(circle at 92% 8%, rgb(247 87 154 / 10%), transparent 28rem), #09080f;
+}
+
+.app-shell:has(.home--room) .app-header,
+.app-shell:has(.home--room) .app-footer {
+  width: min(1480px, calc(100% - 48px));
+  border-color: #29223b;
+  color: #f6f1ff;
+}
+
+.app-shell:has(.home--room) .app-main {
+  width: min(1480px, calc(100% - 48px));
+}
+
+.app-shell:has(.home--room) .brand,
+.app-shell:has(.home--room) .app-nav__link {
+  color: #f6f1ff;
+}
+
+.app-shell:has(.home--room) .brand__mark {
+  color: #17131f;
+  background: linear-gradient(135deg, #ffc746, #ff7b62 58%, #bf63ff);
+}
+
+.app-shell:has(.home--room) .app-footer {
+  color: #aaa1bc;
+}
+
+.home--room {
+  padding: 24px 0 44px;
+}
+
+.room-workspace--active {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.room-workspace--active .room-workspace__heading {
+  min-height: 74px;
+  padding: 0 4px 18px;
+  align-items: center;
+  border-bottom: 1px solid #29223b;
+}
+
+.room-workspace--active .eyebrow {
+  margin-bottom: 5px;
+  color: #b693ff;
+  letter-spacing: 0.06em;
+}
+
+.room-workspace--active :is(h1, h2) {
+  color: #f6f1ff;
+  font-size: 22px;
+}
+
+.room-workspace--active .room-connection-group {
+  gap: 12px;
+}
+
+.room-workspace--active .room-connection {
+  color: #aaa1bc;
+}
+
+.room-workspace--active .room-connection--connected,
+.room-workspace--active .room-connection--open {
+  color: #79e6af;
+}
+
+.room-workspace--active .room-connection--connecting,
+.room-workspace--active .room-connection--reconnecting {
+  color: #ffd06a;
+}
+
+.room-workspace--active .room-connection--error,
+.room-workspace--active .room-connection--closed,
+.room-workspace--active .room-connection--disconnected {
+  color: #ff9a9a;
+}
+
+.room-workspace--active .system-message {
+  margin-top: 18px;
+  border-color: rgb(255 148 148 / 30%);
+  color: #ffaaa8;
+  background: rgb(104 31 44 / 34%);
+}
+
+.room-workspace--active .system-message span {
+  color: #edc5cb;
+}
+
+.room-workspace--active .room-dashboard {
+  margin-top: 22px;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.34fr);
+  align-items: start;
+  gap: 14px;
+}
+
+.room-workspace--active .room-dashboard--host {
+  grid-template-areas:
+    "file chat"
+    "stage chat"
+    "voice people"
+    "diagnostics people"
+    "details people";
+}
+
+.room-workspace--active .room-dashboard--guest {
+  grid-template-areas:
+    "stage chat"
+    "voice people"
+    "diagnostics people"
+    "details people";
+}
+
+.room-workspace--active .room-card {
+  gap: 14px;
+  border-color: #2b243d;
+  border-radius: 14px;
+  color: #f6f1ff;
+  background: #15111f;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
+}
+
+.room-workspace--active .room-card h3,
+.room-workspace--active .room-metrics dd,
+.room-workspace--active .participant-row strong,
+.room-workspace--active .chat-message__meta strong,
+.room-workspace--active .chat-message__text,
+.room-workspace--active .room-copy-field a,
+.room-workspace--active .room-copy-field code {
+  color: #f6f1ff;
+}
+
+.room-workspace--active .room-pill,
+.room-workspace--active .room-count,
+.room-workspace--active .room-metrics dt,
+.room-workspace--active .participant-row div > span,
+.room-workspace--active .event-list time,
+.room-workspace--active .room-card__empty,
+.room-workspace--active .remote-player__meta,
+.room-workspace--active .voice-meta,
+.room-workspace--active .quality-metrics dt,
+.room-workspace--active .quality-hint,
+.room-workspace--active .file-picker__hint,
+.room-workspace--active .file-picker__meta {
+  color: #aaa1bc;
+}
+
+.room-workspace--active .button {
+  border: 1px solid #39304e;
+  color: #f6f1ff;
+  background: #211b30;
+}
+
+.room-workspace--active .button--primary {
+  border-color: transparent;
+  color: #17111f;
+  background: linear-gradient(100deg, #ffc746, #ff7b62 48%, #c26bf3);
+  box-shadow: 0 8px 21px rgb(185 89 231 / 20%);
+}
+
+.room-workspace--active .button--primary:hover:not(:disabled) {
+  background: linear-gradient(100deg, #ffcf62, #ff8d72 48%, #cf7dff);
+}
+
+.room-card--file {
+  grid-area: file;
+}
+
+.room-card--remote-playback {
+  grid-area: stage;
+}
+
+.room-card--voice {
+  grid-area: voice;
+}
+
+.room-card--participants {
+  grid-area: people;
+}
+
+.room-card--chat {
+  grid-area: chat;
+}
+
+.workspace-diagnostics {
+  grid-area: diagnostics;
+  overflow: hidden;
+  border: 1px solid #2b243d;
+  border-radius: 14px;
+  background: #15111f;
+}
+
+.workspace-diagnostics--room {
+  grid-area: details;
+}
+
+.workspace-diagnostics > summary {
+  display: flex;
+  min-height: 52px;
+  padding: 0 17px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  color: #f6f1ff;
+  cursor: pointer;
+  list-style: none;
+  font-size: 14px;
+  font-weight: 780;
+}
+
+.workspace-diagnostics > summary::-webkit-details-marker {
+  display: none;
+}
+
+.workspace-diagnostics > summary > span:first-child {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.workspace-diagnostics > summary > span:first-child svg {
+  color: #b693ff;
+}
+
+.workspace-diagnostics[open] > summary {
+  border-bottom: 1px solid #2b243d;
+}
+
+.workspace-diagnostics .room-card {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.workspace-diagnostics__content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr);
+  gap: 1px;
+  background: #2b243d;
+}
+
+.workspace-diagnostics__content .room-card {
+  min-height: 100%;
+}
+
+.room-workspace--active .room-card--remote-playback {
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+  border-color: #3d2b5c;
+  background: #08070d;
+}
+
+.room-workspace--active .room-card--remote-playback .room-card__heading {
+  min-height: 50px;
+  padding: 0 16px;
+}
+
+.room-workspace--active .remote-player {
+  border-radius: 0;
+  background: #020203;
+}
+
+.room-workspace--active .remote-player__meta {
+  min-height: 42px;
+  padding: 0 16px;
+  align-items: center;
+  border-top: 1px solid #2b243d;
+}
+
+.room-workspace--active .playback-sync {
+  margin: 14px;
+  border-color: #39304e;
+  color: #bcb1d0;
+  background: #211b30;
+}
+
+.room-workspace--active .file-picker--dropzone {
+  min-height: 94px;
+  padding: 14px;
+  border: 1px dashed #544170;
+  border-radius: 10px;
+  background: #1c1628;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.room-workspace--active .file-picker--dropzone-active {
+  border-color: #dc8bff;
+  background: #261c36;
+  box-shadow: inset 0 0 0 1px rgb(220 139 255 / 30%);
+}
+
+.room-workspace--active .file-picker__trigger {
+  background: #2a213a;
+}
+
+.room-workspace--active .file-picker__trigger:hover:not(:disabled) {
+  background: #352848;
+}
+
+.room-workspace--active .file-picker__name {
+  color: #f6f1ff;
+}
+
+.room-workspace--active .file-picker__verdict {
+  color: #79e6af;
+}
+
+.room-workspace--active .participant-row__avatar {
+  color: #181221;
+  background: linear-gradient(135deg, #ffc746, #ef87ba 60%, #b693ff);
+}
+
+.room-workspace--active .participant-row__state--online {
+  color: #79e6af;
+}
+
+.room-workspace--active .chat-list {
+  max-height: min(42vh, 430px);
+}
+
+.room-rail-tabs {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.room-rail-tabs__item {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 5px;
+  color: #bcb1d0;
+  font-size: 11px;
+  font-weight: 780;
+}
+
+.room-rail-tabs__item--active {
+  padding: 0 10px;
+  border-radius: 999px;
+  color: #17111f;
+  background: linear-gradient(100deg, #ffc746, #ff7b62 48%, #c26bf3);
+}
+
+.room-rail-tabs__item--muted {
+  margin-left: auto;
+  color: #827995;
+}
+
+.room-workspace--active .chat-message {
+  border-color: #342c47;
+  background: #201a2d;
+}
+
+.room-workspace--active .chat-message--own {
+  border-color: #a567de;
+  background: #352247;
+}
+
+.room-workspace--active .chat-message--system {
+  color: #aaa1bc;
+  background: transparent;
+}
+
+.room-workspace--active .chat-form input {
+  border-color: #39304e;
+  color: #f6f1ff;
+  background: #0f0c17;
+}
+
+.room-workspace--active .chat-form input::placeholder {
+  color: #827995;
+}
+
+.room-workspace--active .quality-metrics dd,
+.room-workspace--active .playback-sync strong {
+  color: #f6f1ff;
+}
+
+.room-workspace--active .host-controls {
+  padding: 14px 16px 16px;
+  border-color: #2b243d;
+}
+
+.room-workspace--active .host-controls__time {
+  color: #bcb1d0;
+}
+
+.room-workspace--active .host-controls__seek {
+  background: #39304e;
+  accent-color: #ff8a70;
+}
+
 @media (max-width: 920px) {
   .hero {
     min-height: 0;
@@ -2000,6 +2406,38 @@ a {
   .room-form__grid {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .app-shell:has(.home--room) .app-header,
+  .app-shell:has(.home--room) .app-main,
+  .app-shell:has(.home--room) .app-footer {
+    width: min(100% - 32px, 1480px);
+  }
+
+  .room-workspace--active .room-dashboard--host,
+  .room-workspace--active .room-dashboard--guest {
+    grid-template-areas:
+      "file"
+      "stage"
+      "chat"
+      "people"
+      "voice"
+      "diagnostics"
+      "details";
+  }
+
+  .room-workspace--active .room-dashboard--guest {
+    grid-template-areas:
+      "stage"
+      "chat"
+      "people"
+      "voice"
+      "diagnostics"
+      "details";
+  }
+
+  .room-workspace--active .chat-list {
+    max-height: 280px;
+  }
 }
 
 @media (max-width: 640px) {
@@ -2022,6 +2460,10 @@ a {
 
   .home {
     padding: 38px 0 46px;
+  }
+
+  .home--room {
+    padding: 16px 0 32px;
   }
 
   .hero {
@@ -2103,6 +2545,32 @@ a {
 
   .room-workspace h2 {
     font-size: 24px;
+  }
+
+  .room-workspace--active .room-workspace__heading {
+    min-height: 0;
+    padding-bottom: 14px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .room-workspace--active .room-workspace__heading :is(h1, h2) {
+    font-size: 20px;
+  }
+
+  .workspace-diagnostics__content {
+    grid-template-columns: 1fr;
+  }
+
+  .room-workspace--active .file-picker--dropzone {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .room-workspace--active .file-picker__actions,
+  .room-workspace--active .file-picker__actions .button {
+    width: 100%;
   }
 
   .room-form__row {
