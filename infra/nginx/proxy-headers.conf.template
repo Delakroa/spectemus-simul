@@ -1,0 +1,4 @@
+# The value is rendered once by the nginx entrypoint. Local Compose explicitly
+# uses `http`; the staging overlay sets a trusted `https` because TLS terminates
+# in the LiveKit Caddy layer before this gateway.
+proxy_set_header X-Forwarded-Proto ${WT_FORWARDED_PROTO};

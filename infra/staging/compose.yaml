@@ -1,0 +1,67 @@
+name: watch-together-staging
+
+# Application layer for a Linux VM running the official LiveKit Caddy/TURN stack.
+# The generated LiveKit stack owns ports 80/443/7881/3478 and Redis on localhost.
+# Do not deploy this file together with infra/compose.yaml: that file is local-only.
+services:
+  backend:
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile
+    environment:
+      REDIS_HOST: host.docker.internal
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: "${LIVEKIT_REDIS_PASSWORD:?set LIVEKIT_REDIS_PASSWORD}"
+      # LiveKit generated config uses database 0. Product room and feedback state
+      # stays isolated in database 1 while sharing the same protected Redis service.
+      SPRING_DATA_REDIS_DATABASE: "1"
+      ROOM_TTL: "${ROOM_TTL:-4h}"
+      ROOM_CLEANUP_GRACE: "${ROOM_CLEANUP_GRACE:-5m}"
+      SESSION_COOKIE_SECURE: "true"
+      LIVEKIT_URL: "wss://${WT_STAGING_RTC_DOMAIN:?set WT_STAGING_RTC_DOMAIN}"
+      LIVEKIT_API_KEY: "${LIVEKIT_API_KEY:?set LIVEKIT_API_KEY}"
+      LIVEKIT_API_SECRET: "${LIVEKIT_API_SECRET:?set LIVEKIT_API_SECRET}"
+      LIVEKIT_TOKEN_TTL: "${LIVEKIT_TOKEN_TTL:-10m}"
+      FEEDBACK_ADMIN_TOKEN: "${FEEDBACK_ADMIN_TOKEN:?set FEEDBACK_ADMIN_TOKEN}"
+      FEEDBACK_RETENTION: "${FEEDBACK_RETENTION:-30d}"
+      FEEDBACK_EXPORT_LIMIT: "${FEEDBACK_EXPORT_LIMIT:-200}"
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'wget -qO- http://127.0.0.1:8080/actuator/health | grep -q ''"status":"UP"''',
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ../..
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: ""
+        VITE_LIVEKIT_URL: "wss://${WT_STAGING_RTC_DOMAIN:?set WT_STAGING_RTC_DOMAIN}"
+    environment:
+      WT_CSP_CONNECT_SRC: "'self' wss://${WT_STAGING_RTC_DOMAIN:?set WT_STAGING_RTC_DOMAIN}"
+      # The LiveKit Caddy layer terminates TLS and forwards trusted plain HTTP to
+      # this loopback-only gateway. Do not accept this value from public requests.
+      WT_FORWARDED_PROTO: https
+    ports:
+      - "127.0.0.1:8088:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/gateway-health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped

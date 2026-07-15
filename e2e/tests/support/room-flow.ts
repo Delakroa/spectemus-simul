@@ -1,6 +1,6 @@
 import { expect, type BrowserContext, type Page } from "@playwright/test";
 
-const ROOM_STATE_HEADING = "Состояние комнаты";
+const ROOM_WORKSPACE_HEADING = /^Комната /;
 
 export async function createRoom(
   page: Page,
@@ -10,9 +10,9 @@ export async function createRoom(
   await page.getByLabel("Имя host").fill(hostName);
   await page.getByRole("button", { name: "Создать" }).click();
 
-  await expect(
-    page.getByRole("heading", { name: ROOM_STATE_HEADING }),
-  ).toBeVisible();
+  await expectRoomWorkspace(page);
+  await page.getByText("Комната и события", { exact: true }).click();
+  await expect(page.locator(".room-copy-field code").first()).toBeVisible();
   const roomId = (
     await page.locator(".room-copy-field code").first().textContent()
   )?.trim();
@@ -29,9 +29,7 @@ export async function joinRoom(
 ): Promise<void> {
   await submitJoinRoom(page, roomId, guestName);
 
-  await expect(
-    page.getByRole("heading", { name: ROOM_STATE_HEADING }),
-  ).toBeVisible();
+  await expectRoomWorkspace(page);
 }
 
 export async function submitJoinRoom(
@@ -60,6 +58,13 @@ export async function expectRoomSocketReconnecting(page: Page): Promise<void> {
   await expect(
     page.locator(".room-connection--reconnecting").first(),
   ).toContainText("переподключение", { timeout: 30_000 });
+}
+
+async function expectRoomWorkspace(page: Page): Promise<void> {
+  await expect(
+    page.getByRole("heading", { name: ROOM_WORKSPACE_HEADING }),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Участники" })).toBeVisible();
 }
 
 export async function closeContexts(

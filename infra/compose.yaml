@@ -130,6 +130,8 @@ services:
       # WT-606 CSP connect-src, rendered into security headers by the nginx entrypoint.
       # Narrow to the fixed beta host(s) in production, e.g. "'self' wss://<livekit-public-host>".
       WT_CSP_CONNECT_SRC: "${WT_CSP_CONNECT_SRC:-'self' ws: wss:}"
+      # Local Compose is HTTP; the staging overlay terminates TLS upstream.
+      WT_FORWARDED_PROTO: http
     ports:
       - "127.0.0.1:${APP_PORT:-8088}:80"
     depends_on:

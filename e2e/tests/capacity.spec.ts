@@ -55,7 +55,7 @@ test("room capacity: host plus three guests stay usable and the next guest is re
       "В комнате уже находится максимально допустимое число участников.",
     );
     await expect(
-      overflowGuest.getByRole("heading", { name: "Состояние комнаты" }),
+      overflowGuest.getByRole("heading", { name: /^Комната / }),
     ).toHaveCount(0);
 
     await expectParticipantCounter(

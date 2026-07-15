@@ -1,0 +1,19 @@
+# Add this fragment to the Caddy YAML created by the official LiveKit generator.
+# It is deliberately not a standalone Caddy configuration: replace the two
+# placeholders before merging it into the generated `caddy.yaml`.
+#
+# 1. Add <APP_DOMAIN> to apps.tls.certificates.automate.
+# 2. Append this route to apps.layer4.servers.main.routes.
+# 3. Preserve the generated rtc/turn routes and their order.
+
+- match:
+    - tls:
+        sni:
+          - "<APP_DOMAIN>"
+  handle:
+    - handler: tls
+      connection_policies:
+        - alpn: ["http/1.1"]
+    - handler: proxy
+      upstreams:
+        - dial: ["localhost:8088"]
