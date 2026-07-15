@@ -96,6 +96,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [WT-610_STAGING_BOOTSTRAP.md](WT-610_STAGING_BOOTSTRAP.md) — Linux VM staging bootstrap: official LiveKit Caddy/TURN foundation и отдельный loopback-only application layer перед реальным evidence run.
 - [WT-621_LAN_ROOM_USABILITY.md](WT-621_LAN_ROOM_USABILITY.md) — читаемый LAN workspace, честный HTTPS-статус голоса и предупреждение для `localhost` invite.
 - [WT-622_CROSS_PLATFORM_LAN_SETUP.md](WT-622_CROSS_PLATFORM_LAN_SETUP.md) — автоматическая LAN-конфигурация Windows/Mac, корректный LiveKit endpoint и проверка host → guest.
+- [WT-623_UNIFIED_REVIEW_THEME.md](WT-623_UNIFIED_REVIEW_THEME.md) — единая тёмная private-review тема для entry, room и пользовательских status/form surfaces.
 
 ## Как обновлять документы
 

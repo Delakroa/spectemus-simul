@@ -1997,7 +1997,8 @@ a {
   opacity: 0.56;
 }
 
-/* WT-620: the room is a focused workspace, not a dashboard of equal cards. */
+/* WT-623: entry and active room share one private-review visual system. */
+.app-shell:has(.home--entry),
 .app-shell:has(.home--room) {
   color: #f6f1ff;
   background:
@@ -2005,6 +2006,8 @@ a {
     radial-gradient(circle at 92% 8%, rgb(247 87 154 / 10%), transparent 28rem), #09080f;
 }
 
+.app-shell:has(.home--entry) .app-header,
+.app-shell:has(.home--entry) .app-footer,
 .app-shell:has(.home--room) .app-header,
 .app-shell:has(.home--room) .app-footer {
   width: min(1480px, calc(100% - 48px));
@@ -2012,23 +2015,289 @@ a {
   color: #f6f1ff;
 }
 
+.app-shell:has(.home--entry) .app-main,
 .app-shell:has(.home--room) .app-main {
   width: min(1480px, calc(100% - 48px));
 }
 
+.app-shell:has(.home--entry) .brand,
+.app-shell:has(.home--entry) .app-nav__link,
 .app-shell:has(.home--room) .brand,
 .app-shell:has(.home--room) .app-nav__link {
   color: #f6f1ff;
 }
 
+.app-shell:has(.home--entry) .brand__mark,
 .app-shell:has(.home--room) .brand__mark {
   color: #17131f;
   background: linear-gradient(135deg, #ffc746, #ff7b62 58%, #bf63ff);
 }
 
+.app-shell:has(.home--entry) .app-footer,
 .app-shell:has(.home--room) .app-footer {
   color: #aaa1bc;
 }
+
+.home--entry {
+  padding: 48px 0 56px;
+}
+
+.home--entry .hero {
+  min-height: 470px;
+  gap: 64px;
+}
+
+.home--entry .eyebrow {
+  color: #b693ff;
+  letter-spacing: 0.06em;
+}
+
+.home--entry .hero h1,
+.home--entry .room-workspace h2,
+.home--entry :is(.feedback-panel, .system-panel) h2 {
+  color: #f6f1ff;
+}
+
+.home--entry .hero__lead,
+.home--entry .service-status {
+  color: #bcb1d0;
+}
+
+.home--entry .service-status--online {
+  color: #91e9bb;
+}
+
+.home--entry .service-status--error {
+  color: #ffaaa8;
+}
+
+.home--entry .service-status__indicator {
+  background: #ffd06a;
+  box-shadow: 0 0 0 4px rgb(255 208 106 / 14%);
+}
+
+.home--entry .service-status--online .service-status__indicator {
+  background: #79e6af;
+  box-shadow: 0 0 0 4px rgb(121 230 175 / 14%);
+}
+
+.home--entry .service-status--error .service-status__indicator {
+  background: #ff9a9a;
+  box-shadow: 0 0 0 4px rgb(255 154 154 / 14%);
+}
+
+.home--entry .watch-stage {
+  border-color: #3d2b5c;
+  border-radius: 18px;
+  background: radial-gradient(circle at 50% 50%, rgb(126 81 255 / 13%), transparent 19rem), #08070d;
+  box-shadow: 0 22px 58px rgb(0 0 0 / 32%);
+}
+
+.home--entry .watch-stage__topline {
+  color: #aaa1bc;
+}
+
+.home--entry .watch-stage__state {
+  color: #e5dcf2;
+}
+
+.home--entry .watch-stage__icon {
+  border-color: #7654b8;
+  color: #ffc746;
+  background: #171124;
+  box-shadow: 0 0 0 8px rgb(139 91 255 / 8%);
+}
+
+.home--entry .watch-stage__timeline {
+  background: #39304e;
+}
+
+.home--entry .watch-stage__timeline span {
+  background: linear-gradient(100deg, #ffc746, #ff7b62 48%, #c26bf3);
+}
+
+.home--entry .room-workspace {
+  margin-top: 42px;
+  padding: 28px;
+  border: 1px solid #2b243d;
+  border-radius: 18px;
+  background: #15111f;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
+}
+
+.home--entry .room-workspace__heading {
+  padding-bottom: 20px;
+  border-bottom: 1px solid #2b243d;
+}
+
+.home--entry .room-actions {
+  margin-top: 20px;
+  gap: 14px;
+}
+
+.home--entry .room-form label,
+.home--entry .feedback-field span,
+.home--entry .feedback-checkbox span {
+  color: #bdb2cc;
+}
+
+.home--entry .room-form input,
+.home--entry .feedback-field select,
+.home--entry .feedback-field textarea {
+  border-color: #3a3150;
+  color: #f6f1ff;
+  background: #201a2d;
+}
+
+.home--entry .room-form input:focus,
+.home--entry .feedback-field select:focus,
+.home--entry .feedback-field textarea:focus {
+  border-color: #b693ff;
+  outline-color: rgb(182 147 255 / 24%);
+}
+
+.home--entry .room-form input::placeholder,
+.home--entry .feedback-field textarea::placeholder {
+  color: #827995;
+}
+
+.home--entry .button {
+  border: 1px solid #39304e;
+  color: #f6f1ff;
+  background: #211b30;
+}
+
+.home--entry .button:hover:not(:disabled) {
+  border-color: #7654b8;
+  background: #2a213a;
+}
+
+.home--entry .button--primary {
+  border-color: transparent;
+  color: #17111f;
+  background: linear-gradient(100deg, #ffc746, #ff7b62 48%, #c26bf3);
+  box-shadow: 0 8px 21px rgb(185 89 231 / 20%);
+}
+
+.home--entry .button--primary:hover:not(:disabled) {
+  border-color: transparent;
+  background: linear-gradient(100deg, #ffcf62, #ff8d72 48%, #cf7dff);
+}
+
+.home--entry .button--danger {
+  border-color: rgb(255 148 148 / 42%);
+  color: #ffe6e6;
+  background: #6d283a;
+}
+
+.home--entry .button--danger:hover:not(:disabled) {
+  border-color: rgb(255 148 148 / 60%);
+  background: #833246;
+}
+
+.home--entry .room-card,
+.home--entry .feedback-form {
+  border-color: #2b243d;
+  border-radius: 14px;
+  color: #f6f1ff;
+  background: #15111f;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 14%);
+}
+
+.home--entry .room-card h3,
+.home--entry .room-metrics dd,
+.home--entry .participant-row strong,
+.home--entry .chat-message__meta strong,
+.home--entry .chat-message__text,
+.home--entry .room-copy-field a,
+.home--entry .room-copy-field code {
+  color: #f6f1ff;
+}
+
+.home--entry .room-pill,
+.home--entry .room-count,
+.home--entry .room-metrics dt,
+.home--entry .participant-row div > span,
+.home--entry .event-list time,
+.home--entry .room-card__empty,
+.home--entry .feedback-panel__receipt {
+  color: #aaa1bc;
+}
+
+.home--entry .feedback-panel,
+.home--entry .system-panel {
+  margin-top: 42px;
+  padding-top: 28px;
+  border-top-color: #29223b;
+}
+
+.home--entry .feedback-form {
+  margin-top: 18px;
+}
+
+.home--entry .feedback-checkbox input {
+  accent-color: #c26bf3;
+}
+
+.home--entry .system-details {
+  border-color: #29223b;
+}
+
+.home--entry .system-details > div {
+  border-color: #29223b;
+}
+
+.home--entry .system-details dt {
+  color: #aaa1bc;
+}
+
+.home--entry .system-details dd {
+  color: #f6f1ff;
+}
+
+.home--entry .system-details > div:first-child dd,
+.home--entry .feedback-form__status,
+.home--entry .feedback-panel__receipt {
+  color: #79e6af;
+}
+
+.home--entry .icon-button {
+  border-color: #39304e;
+  color: #e5dcf2;
+  background: #211b30;
+}
+
+.home--entry .icon-button:hover:not(:disabled) {
+  border-color: #7654b8;
+  background: #2a213a;
+}
+
+.home--entry .system-message {
+  border-color: rgb(255 148 148 / 30%);
+  color: #ffaaa8;
+  background: rgb(104 31 44 / 34%);
+}
+
+.home--entry .system-message span,
+.home--entry .system-message__meta {
+  color: #edc5cb;
+}
+
+.home--entry .system-message--warning {
+  border-color: rgb(255 208 106 / 30%);
+  color: #ffd06a;
+  background: rgb(104 76 25 / 34%);
+}
+
+.home--entry .system-message--warning span {
+  color: #f3cf7d;
+}
+
+.app-shell:has(.home--entry) :is(.icon-button, .button, .brand, .app-nav__link):focus-visible {
+  outline-color: rgb(182 147 255 / 58%);
+}
+
+/* WT-620: the room is a focused workspace, not a dashboard of equal cards. */
 
 .home--room {
   padding: 24px 0 44px;
@@ -2699,6 +2968,9 @@ a {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .app-shell:has(.home--entry) .app-header,
+  .app-shell:has(.home--entry) .app-main,
+  .app-shell:has(.home--entry) .app-footer,
   .app-shell:has(.home--room) .app-header,
   .app-shell:has(.home--room) .app-main,
   .app-shell:has(.home--room) .app-footer {

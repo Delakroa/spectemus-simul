@@ -80,6 +80,7 @@ P0 технически подтверждён.
 - WT-619 формализует browser-native поддержку локальных MP4/M4V и WebM: явный file picker policy, runtime diagnostics и честные границы codec support без загрузки файла на backend.
 - WT-621 делает LAN-проверку комнаты понятнее: читаемые события, честная HTTPS-граница голоса и предупреждение для `localhost` invite.
 - WT-622 устраняет ручную LAN-настройку: host автоматически получает private IPv4, а doctor проверяет Windows → Mac gateway, LiveKit endpoint и TCP fallback до создания комнаты.
+- WT-623 объединяет entry и private room в один тёмный review-интерфейс; `/operator` остаётся отдельным светлым служебным инструментом.
 
 P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. P7 beta iteration закрыт repo-side: WT-603 готовит evidence-прогон, WT-604 закрыл телеметрию для метрики успешности сессии, WT-605 добавил управляемый feedback triage, WT-606 — security/rate-limit hardening, WT-607 — media QoS/cost benchmark kit. WT-608/WT-609 (P8) закрывают repo-side evidence refresh и operator feedback UI; P9 начинается с предсказуемой media compatibility policy. Оставшийся гейт расширения beta — реальный staging-прогон.
 
@@ -227,6 +228,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-619 native media capability foundation](docs/WT-619_NATIVE_MEDIA_CAPABILITY_FOUNDATION.md)
 - [WT-621 LAN room usability](docs/WT-621_LAN_ROOM_USABILITY.md)
 - [WT-622 Cross-platform LAN setup](docs/WT-622_CROSS_PLATFORM_LAN_SETUP.md)
+- [WT-623 Unified review theme](docs/WT-623_UNIFIED_REVIEW_THEME.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation
