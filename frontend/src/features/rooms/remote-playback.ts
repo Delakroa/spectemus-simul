@@ -25,6 +25,7 @@ export type RemotePlaybackElements = {
 
 export type RemotePlaybackController = {
   disconnect: () => void;
+  resumeAudio: () => Promise<void>;
   setElements: (elements: RemotePlaybackElements) => void;
 };
 
@@ -76,6 +77,22 @@ export function createRemotePlaybackController(
     });
   };
 
+  const resumeAudio = async (): Promise<void> => {
+    if (!audioTrack || !audioElement) {
+      return;
+    }
+
+    try {
+      await audioElement.play();
+      emitState();
+    } catch (error) {
+      emitState({
+        error: error instanceof Error ? error.message : "Не удалось воспроизвести звук.",
+        status: "error",
+      });
+    }
+  };
+
   const attachVideo = () => {
     if (!videoTrack || !videoElement) {
       return;
@@ -100,12 +117,7 @@ export function createRemotePlaybackController(
 
     audioElement.autoplay = true;
     audioTrack.attach(audioElement);
-    void audioElement.play().catch((error: unknown) => {
-      emitState({
-        error: error instanceof Error ? error.message : "Не удалось воспроизвести звук.",
-        status: "error",
-      });
-    });
+    void resumeAudio();
   };
 
   const detachCurrentTracks = () => {
@@ -220,6 +232,7 @@ export function createRemotePlaybackController(
       detachCurrentTracks();
       handlers.onStateChange(idleState);
     },
+    resumeAudio,
     setElements: (elements) => {
       detachCurrentTracks();
       audioElement = elements.audioElement;

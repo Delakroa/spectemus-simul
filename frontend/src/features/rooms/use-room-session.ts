@@ -401,6 +401,10 @@ export function useRoomSession(routeRoomId?: string) {
     playbackStateReceiverRef.current?.setVideoElement(elements.videoElement);
   }, []);
 
+  const resumeRemotePlaybackAudio = useCallback(async () => {
+    await remotePlaybackControllerRef.current?.resumeAudio();
+  }, []);
+
   const detachHostPreview = useCallback((videoElement: HTMLVideoElement | null) => {
     if (!videoElement) {
       return;
@@ -1843,6 +1847,7 @@ export function useRoomSession(routeRoomId?: string) {
     retryLastRoomAction,
     retryLiveKitConnection,
     retryRoomConnection,
+    resumeRemotePlaybackAudio,
     restore,
     routeRoomId,
     selectFile,

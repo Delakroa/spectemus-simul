@@ -36,6 +36,8 @@ import {
   Share2,
   Square,
   Users,
+  Volume2,
+  VolumeX,
   Wifi,
   WifiOff,
   X,
@@ -196,6 +198,8 @@ export function HomePage() {
   const [inviteQrError, setInviteQrError] = useState(false);
   const [roomIdCopied, setRoomIdCopied] = useState(false);
   const [seekBarValue, setSeekBarValue] = useState<number | null>(null);
+  const [playbackMuted, setPlaybackMuted] = useState(false);
+  const [playbackVolume, setPlaybackVolume] = useState(100);
   const [chatDraft, setChatDraft] = useState("");
   const [feedbackOutcome, setFeedbackOutcome] = useState<FeedbackOutcome>("WORKED");
   const [feedbackReason, setFeedbackReason] = useState<FeedbackReason>("SUCCESS");
@@ -241,6 +245,10 @@ export function HomePage() {
     ? toHostWatchPlaybackStatus(roomSession.filePublicationStatus)
     : roomSession.remotePlaybackStatus;
   const showWatchSurface = !roomClosed && (isHost ? canStopFilePublication : !isHost);
+  const hasPlaybackAudio = isHost
+    ? roomSession.filePublicationTrackCount > 1
+    : roomSession.remotePlaybackAudioTrackName !== null;
+  const isPlaybackSoundMuted = playbackMuted || playbackVolume === 0;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hostPreviewVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
@@ -277,11 +285,62 @@ export function HomePage() {
   }, [isHost, room?.roomId, roomClosed, roomSession.filePublicationStatus, setHostPreviewElement]);
 
   useEffect(() => {
+    const mediaElement = isHost ? hostPreviewVideoRef.current : remoteAudioRef.current;
+    if (!mediaElement) {
+      return;
+    }
+
+    mediaElement.muted = isPlaybackSoundMuted;
+    mediaElement.volume = playbackVolume / 100;
+  }, [
+    isHost,
+    isPlaybackSoundMuted,
+    playbackVolume,
+    room?.roomId,
+    roomSession.remotePlaybackAudioTrackName,
+    showWatchSurface,
+  ]);
+
+  useEffect(() => {
     const node = chatEndRef.current;
     if (node && typeof node.scrollIntoView === "function") {
       node.scrollIntoView({ block: "nearest" });
     }
   }, [chatMessageCount]);
+
+  const applyPlaybackAudioSettings = (muted: boolean, volume: number) => {
+    const mediaElement = isHost ? hostPreviewVideoRef.current : remoteAudioRef.current;
+    if (!mediaElement) {
+      return;
+    }
+
+    mediaElement.muted = muted || volume === 0;
+    mediaElement.volume = volume / 100;
+  };
+
+  const handlePlaybackVolumeChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const volume = Number(event.target.value);
+    const muted = volume === 0;
+    setPlaybackMuted(muted);
+    setPlaybackVolume(volume);
+    applyPlaybackAudioSettings(muted, volume);
+
+    if (!muted && !isHost) {
+      void roomSession.resumeRemotePlaybackAudio();
+    }
+  };
+
+  const handlePlaybackSoundToggle = () => {
+    const muted = !isPlaybackSoundMuted;
+    const volume = muted ? playbackVolume : Math.max(playbackVolume, 50);
+    setPlaybackMuted(muted);
+    setPlaybackVolume(volume);
+    applyPlaybackAudioSettings(muted, volume);
+
+    if (!muted && !isHost) {
+      void roomSession.resumeRemotePlaybackAudio();
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -921,6 +980,7 @@ export function HomePage() {
                       ref={hostPreviewVideoRef}
                       className="remote-player__video"
                       autoPlay
+                      muted={isPlaybackSoundMuted}
                       playsInline
                     />
                   ) : (
@@ -931,7 +991,7 @@ export function HomePage() {
                         autoPlay
                         playsInline
                       />
-                      <audio ref={remoteAudioRef} autoPlay />
+                      <audio ref={remoteAudioRef} autoPlay muted={isPlaybackSoundMuted} />
                     </>
                   )}
 
@@ -960,6 +1020,41 @@ export function HomePage() {
                   >
                     <Maximize2 size={18} aria-hidden="true" />
                   </button>
+
+                  <div className="remote-player__sound-controls" aria-label="Звук просмотра">
+                    <button
+                      className="remote-player__sound-toggle"
+                      type="button"
+                      disabled={!hasPlaybackAudio}
+                      onClick={handlePlaybackSoundToggle}
+                      aria-label={
+                        !hasPlaybackAudio
+                          ? "В файле нет аудиодорожки"
+                          : isPlaybackSoundMuted
+                            ? "Включить звук"
+                            : "Выключить звук"
+                      }
+                      title={!hasPlaybackAudio ? "В файле нет аудиодорожки" : undefined}
+                    >
+                      {isPlaybackSoundMuted ? (
+                        <VolumeX size={18} aria-hidden="true" />
+                      ) : (
+                        <Volume2 size={18} aria-hidden="true" />
+                      )}
+                    </button>
+                    <input
+                      className="remote-player__volume"
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={playbackVolume}
+                      disabled={!hasPlaybackAudio}
+                      onChange={handlePlaybackVolumeChange}
+                      aria-label="Громкость просмотра"
+                    />
+                    <output aria-live="polite">{playbackVolume}%</output>
+                  </div>
                 </div>
 
                 <div className="remote-player__meta">
