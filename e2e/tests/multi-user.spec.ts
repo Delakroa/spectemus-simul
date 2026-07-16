@@ -44,3 +44,48 @@ test("host and two guests: presence and chat propagate across all clients", asyn
     await closeContexts(hostContext, guestOneContext, guestTwoContext);
   }
 });
+
+test("long chat history does not stretch the host workspace rail", async ({
+  browser,
+}) => {
+  const hostContext = await browser.newContext();
+
+  try {
+    const host = await hostContext.newPage();
+    await createRoom(host, "Host");
+
+    const chatRail = host.locator(".room-card--chat");
+    await expect(chatRail).toBeVisible();
+    const initialBox = await chatRail.boundingBox();
+    if (!initialBox) {
+      throw new Error("Chat rail was not rendered");
+    }
+
+    const longMessage = "Проверка устойчивой раскладки чата ".repeat(24).trim();
+    for (const suffix of ["один", "два"]) {
+      const message = `${longMessage} — ${suffix}`;
+      await sendChat(host, message);
+      await expect(host.getByText(message, { exact: true })).toBeVisible();
+    }
+
+    const finalBox = await chatRail.boundingBox();
+    if (!finalBox) {
+      throw new Error("Chat rail disappeared after messages");
+    }
+    expect(Math.abs(finalBox.height - initialBox.height)).toBeLessThanOrEqual(
+      1,
+    );
+
+    const chatListMetrics = await host
+      .locator(".chat-list")
+      .evaluate((element) => ({
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+      }));
+    expect(chatListMetrics.scrollHeight).toBeGreaterThan(
+      chatListMetrics.clientHeight,
+    );
+  } finally {
+    await closeContexts(hostContext);
+  }
+});

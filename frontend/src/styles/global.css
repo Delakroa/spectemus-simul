@@ -2503,6 +2503,23 @@ a {
   grid-area: chat;
 }
 
+/*
+ * The chat card spans several rows of the desktop workspace grid. Keep its
+ * height independent from the message history, otherwise a long message makes
+ * the grid redistribute the height of the video, voice and diagnostics cards.
+ */
+.room-workspace--active .room-card--chat {
+  display: flex;
+  min-block-size: 0;
+  block-size: clamp(360px, 56vh, 520px);
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.room-workspace--active .room-card--chat .room-card__empty {
+  flex: 1 1 auto;
+}
+
 .workspace-diagnostics {
   grid-area: diagnostics;
   overflow: hidden;
@@ -2641,7 +2658,9 @@ a {
 }
 
 .room-workspace--active .chat-list {
-  max-height: min(42vh, 430px);
+  min-block-size: 0;
+  max-height: none;
+  flex: 1 1 auto;
 }
 
 .room-rail-tabs {
@@ -3000,7 +3019,12 @@ a {
   }
 
   .room-workspace--active .chat-list {
+    flex: 0 1 auto;
     max-height: 280px;
+  }
+
+  .room-workspace--active .room-card--chat {
+    block-size: auto;
   }
 
   .invite-share-sheet__content {
