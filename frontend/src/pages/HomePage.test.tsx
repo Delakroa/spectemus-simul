@@ -1018,6 +1018,18 @@ describe("HomePage", () => {
     expect(videoTrack.attach).toHaveBeenCalledWith(expect.any(HTMLVideoElement));
     expect(audioTrack.attach).toHaveBeenCalledWith(expect.any(HTMLAudioElement));
 
+    const remoteAudio = document.querySelector(".remote-player audio") as HTMLAudioElement;
+    expect(remoteAudio.muted).toBe(false);
+    expect(remoteAudio.volume).toBe(1);
+    await user.click(screen.getByRole("button", { name: "Выключить звук" }));
+    expect(remoteAudio.muted).toBe(true);
+    expect(screen.getByRole("button", { name: "Включить звук" })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("slider", { name: "Громкость просмотра" }), {
+      target: { value: "40" },
+    });
+    expect(remoteAudio.muted).toBe(false);
+    expect(remoteAudio.volume).toBeCloseTo(0.4);
+
     await act(async () => {
       liveKitMock.rooms[0]?.emit(
         "dataReceived",
@@ -1302,6 +1314,13 @@ describe("HomePage", () => {
     const hostPreview = document.querySelector(".remote-player__video") as HTMLVideoElement;
     expect(hostPreview.srcObject).toBe(publishStream);
     expect(hostPreview.muted).toBe(false);
+    await user.click(screen.getByRole("button", { name: "Выключить звук" }));
+    expect(hostPreview.muted).toBe(true);
+    fireEvent.change(screen.getByRole("slider", { name: "Громкость просмотра" }), {
+      target: { value: "65" },
+    });
+    expect(hostPreview.muted).toBe(false);
+    expect(hostPreview.volume).toBeCloseTo(0.65);
     expect(liveKitMock.rooms[0]?.localParticipant.publishTrack).toHaveBeenCalledWith(
       videoTrack,
       expect.objectContaining({ name: "movie-video", source: "camera" }),

@@ -142,6 +142,43 @@ describe("createRemotePlaybackController", () => {
     controller.disconnect();
   });
 
+  it("повторяет воспроизведение аудио по явному действию пользователя", async () => {
+    const audioTrack = createTrack("audio", "movie-audio-track");
+    const audioPublication = createPublication(audioTrack, "movie-audio");
+    const participant = createParticipant();
+    const room = createRoom(participant);
+    const onStateChange = vi.fn();
+    const audioElement = document.createElement("audio");
+    vi.spyOn(audioElement, "play")
+      .mockRejectedValueOnce(new Error("Autoplay blocked"))
+      .mockResolvedValueOnce(undefined);
+
+    const controller = createRemotePlaybackController(room as never, { onStateChange });
+    controller.setElements({ audioElement, videoElement: null });
+
+    room.emit("trackSubscribed", audioTrack, audioPublication, participant);
+    await vi.waitFor(() =>
+      expect(onStateChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          error: "Autoplay blocked",
+          status: "error",
+        }),
+      ),
+    );
+
+    await controller.resumeAudio();
+
+    expect(audioElement.play).toHaveBeenCalledTimes(2);
+    expect(onStateChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        error: null,
+        status: "receiving",
+      }),
+    );
+
+    controller.disconnect();
+  });
+
   it("игнорирует microphone audio tracks, чтобы не смешивать голос с фильмом", () => {
     const voiceTrack = createTrack("audio", "voice-track");
     const voicePublication = createPublication(voiceTrack, "voice-microphone", "microphone");
