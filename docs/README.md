@@ -98,6 +98,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [WT-622_CROSS_PLATFORM_LAN_SETUP.md](WT-622_CROSS_PLATFORM_LAN_SETUP.md) — автоматическая LAN-конфигурация Windows/Mac, корректный LiveKit endpoint и проверка host → guest.
 - [WT-623_UNIFIED_REVIEW_THEME.md](WT-623_UNIFIED_REVIEW_THEME.md) — единая тёмная private-review тема для entry, room и пользовательских status/form surfaces.
 - [WT-624_WINDOWS_LAN_BOOTSTRAP.md](WT-624_WINDOWS_LAN_BOOTSTRAP.md) — одна Windows-команда с ограниченными Private firewall-правилами, Docker startup и LAN doctor.
+- [WT-625_STABLE_CHAT_RAIL.md](WT-625_STABLE_CHAT_RAIL.md) — фиксированный desktop chat rail: история прокручивается внутри панели и не меняет сетку комнаты.
 
 ## Как обновлять документы
 
