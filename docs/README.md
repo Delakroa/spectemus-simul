@@ -102,6 +102,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [WT-626_MEDIA_AUDIO_CONTROLS.md](WT-626_MEDIA_AUDIO_CONTROLS.md) — локальные громкость и mute/unmute для просмотра, плюс recovery аудио после autoplay-block у guest.
 - [WT-627_STAGE_CONTROLS_AND_STABLE_SEEK.md](WT-627_STAGE_CONTROLS_AND_STABLE_SEEK.md) — единый auto-hide glass-слой controls и последовательная host-перемотка без визуального рывка progress bar.
 - [WT-628_PLAYBACK_RECOVERY.md](WT-628_PLAYBACK_RECOVERY.md) — host recovery выбранного файла: restart tracks без потери позиции или состояния паузы, включая LiveKit reconnect.
+- [WT-629_GUEST_RECOVERY_SIGNAL.md](WT-629_GUEST_RECOVERY_SIGNAL.md) — guest сообщает host-у о зависшем видео через privacy-safe LiveKit data message; host сам подтверждает recovery.
 
 ## Как обновлять документы
 

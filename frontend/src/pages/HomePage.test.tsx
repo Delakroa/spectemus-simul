@@ -1031,6 +1031,9 @@ describe("HomePage", () => {
     expect(
       screen.queryByRole("button", { name: "Перезапустить трансляцию с текущей позиции" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Сообщить host, что видео зависло" }),
+    ).toBeInTheDocument();
     expect(remoteAudio.muted).toBe(false);
     expect(remoteAudio.volume).toBe(1);
     await user.click(screen.getByRole("button", { name: "Выключить звук" }));
@@ -1326,6 +1329,9 @@ describe("HomePage", () => {
     expect(
       screen.getByRole("button", { name: "Перезапустить трансляцию с текущей позиции" }),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Сообщить host, что видео зависло" }),
+    ).not.toBeInTheDocument();
     const hostPreview = document.querySelector(".remote-player__video") as HTMLVideoElement;
     expect(hostPreview.srcObject).toBe(publishStream);
     expect(hostPreview.muted).toBe(false);

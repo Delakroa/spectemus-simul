@@ -223,6 +223,11 @@ export function HomePage() {
   const canUseNativeShare = typeof (navigator as NavigatorWithWebShare).share === "function";
   const roomClosed = room?.status === "CLOSED" || room?.status === "EXPIRED";
   const isHost = participant?.role === "HOST";
+  const mediaRecoveryRequester = roomSession.mediaRecoveryAlert
+    ? (room?.participants.find(
+        (item) => item.participantId === roomSession.mediaRecoveryAlert?.participantIdentity,
+      )?.displayName ?? "Гость")
+    : null;
   const isRoomActionPending = roomSession.pendingAction !== null;
   const isFilePublishing =
     roomSession.filePublicationStatus === "publishing" ||
@@ -1114,6 +1119,21 @@ export function HomePage() {
                     </div>
                   )}
 
+                  {isHost && roomSession.mediaRecoveryAlert && (
+                    <div className="remote-player__recovery-alert" role="status">
+                      <AlertTriangle size={18} aria-hidden="true" />
+                      <span>{mediaRecoveryRequester} сообщает: видео зависло</span>
+                      <button
+                        className="button button--primary remote-player__recovery-action"
+                        type="button"
+                        onClick={() => void roomSession.restartFilePublication()}
+                      >
+                        <RefreshCw size={16} aria-hidden="true" />
+                        Восстановить
+                      </button>
+                    </div>
+                  )}
+
                   <div
                     className={`remote-player__stage-controls${
                       isStageControlsShown ? "" : " remote-player__stage-controls--hidden"
@@ -1158,6 +1178,29 @@ export function HomePage() {
                     </div>
 
                     <div className="remote-player__stage-actions">
+                      {!isHost && roomSession.liveKitStatus === "connected" && (
+                        <button
+                          className="icon-button remote-player__recovery-request"
+                          type="button"
+                          disabled={
+                            roomSession.mediaRecoveryRequestStatus === "sending" ||
+                            roomSession.mediaRecoveryRequestStatus === "sent"
+                          }
+                          aria-label={
+                            roomSession.mediaRecoveryRequestStatus === "sent"
+                              ? "Host уведомлён о проблеме с видео"
+                              : "Сообщить host, что видео зависло"
+                          }
+                          title={
+                            roomSession.mediaRecoveryRequestStatus === "sent"
+                              ? "Host уведомлён"
+                              : "Видео зависло"
+                          }
+                          onClick={() => void roomSession.requestMediaRecovery()}
+                        >
+                          <AlertTriangle size={18} aria-hidden="true" />
+                        </button>
+                      )}
                       {isHost && roomSession.filePublicationStatus === "live" && (
                         <button
                           className="icon-button remote-player__restart"
@@ -1180,6 +1223,20 @@ export function HomePage() {
                       </button>
                     </div>
                   </div>
+                  {!isHost && roomSession.mediaRecoveryRequestStatus !== "idle" && (
+                    <p
+                      className="visually-hidden"
+                      role={roomSession.mediaRecoveryRequestStatus === "error" ? "alert" : "status"}
+                    >
+                      {roomSession.mediaRecoveryRequestStatus === "sending" &&
+                        "Отправляем сигнал host-у."}
+                      {roomSession.mediaRecoveryRequestStatus === "sent" &&
+                        "Host уведомлён о проблеме с видео."}
+                      {roomSession.mediaRecoveryRequestStatus === "error" &&
+                        (roomSession.mediaRecoveryRequestError ??
+                          "Не удалось отправить сигнал host-у.")}
+                    </p>
+                  )}
                 </div>
 
                 <div className="remote-player__meta">

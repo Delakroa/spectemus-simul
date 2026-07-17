@@ -62,6 +62,11 @@ import {
   type PlaybackEvent,
   type PlaybackStatus,
 } from "./playback-state";
+import {
+  createMediaRecoverySignalController,
+  type MediaRecoveryRequest,
+  type MediaRecoverySignalController,
+} from "./media-recovery-signal";
 import { createHostSeekController, type HostSeekController } from "./host-seek-controller";
 import {
   createQualityIndicatorController,
@@ -101,6 +106,7 @@ export type RoomActionStatus = "create" | "join" | "restore" | "leave" | "close"
 export type FileStatus = "idle" | "checking" | "ready" | "error";
 export type FilePublicationStatus = "idle" | "publishing" | "restarting" | "live" | "error";
 export type HostPlaybackStatus = "idle" | "playing" | "paused" | "ended";
+export type MediaRecoveryRequestStatus = "idle" | "sending" | "sent" | "error";
 export type RoomUserErrorArea = "room" | "websocket" | "livekit";
 export type RoomUserErrorAction = "retry-room-action" | "retry-websocket" | "retry-livekit";
 
@@ -184,6 +190,9 @@ export type RoomSessionState = {
   invitePath: string | null;
   liveKitError: string | null;
   liveKitStatus: LiveKitConnectionStatus;
+  mediaRecoveryAlert: MediaRecoveryRequest | null;
+  mediaRecoveryRequestError: string | null;
+  mediaRecoveryRequestStatus: MediaRecoveryRequestStatus;
   participant: Participant | null;
   pendingAction: RoomActionStatus;
   playbackSyncCurrentTime: number;
@@ -233,6 +242,9 @@ const initialState: RoomSessionState = {
   invitePath: null,
   liveKitError: null,
   liveKitStatus: "idle",
+  mediaRecoveryAlert: null,
+  mediaRecoveryRequestError: null,
+  mediaRecoveryRequestStatus: "idle",
   participant: null,
   pendingAction: null,
   playbackSyncCurrentTime: 0,
@@ -279,6 +291,7 @@ export function useRoomSession(routeRoomId?: string) {
   const heartbeatTimerRef = useRef<number | null>(null);
   const liveKitConnectionRef = useRef<LiveKitConnection | null>(null);
   const liveKitRequestIdRef = useRef(0);
+  const mediaRecoverySignalControllerRef = useRef<MediaRecoverySignalController | null>(null);
   const lastRoomActionRef = useRef<LastRoomAction | null>(null);
   const participantRef = useRef<Participant | null>(null);
   const pendingActionRef = useRef<RoomActionStatus>(null);
@@ -420,6 +433,19 @@ export function useRoomSession(routeRoomId?: string) {
     }));
   }, []);
 
+  const disconnectMediaRecoverySignals = useCallback(() => {
+    const controller = mediaRecoverySignalControllerRef.current;
+    mediaRecoverySignalControllerRef.current = null;
+    controller?.disconnect();
+
+    setState((current) => ({
+      ...current,
+      mediaRecoveryAlert: null,
+      mediaRecoveryRequestError: null,
+      mediaRecoveryRequestStatus: "idle",
+    }));
+  }, []);
+
   const setRemotePlaybackElements = useCallback((elements: RemotePlaybackElements) => {
     remotePlaybackElementsRef.current = elements;
     remotePlaybackControllerRef.current?.setElements(elements);
@@ -428,6 +454,43 @@ export function useRoomSession(routeRoomId?: string) {
 
   const resumeRemotePlaybackAudio = useCallback(async () => {
     await remotePlaybackControllerRef.current?.resumeAudio();
+  }, []);
+
+  const requestMediaRecovery = useCallback(async () => {
+    if (participantRef.current?.role !== "GUEST") {
+      return;
+    }
+
+    const controller = mediaRecoverySignalControllerRef.current;
+    if (!controller) {
+      setState((current) => ({
+        ...current,
+        mediaRecoveryRequestError: "Подключение к просмотру ещё не готово.",
+        mediaRecoveryRequestStatus: "error",
+      }));
+      return;
+    }
+
+    setState((current) => ({
+      ...current,
+      mediaRecoveryRequestError: null,
+      mediaRecoveryRequestStatus: "sending",
+    }));
+
+    try {
+      await controller.requestRecovery();
+      setState((current) => ({
+        ...current,
+        mediaRecoveryRequestError: null,
+        mediaRecoveryRequestStatus: "sent",
+      }));
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        mediaRecoveryRequestError: getErrorMessage(error),
+        mediaRecoveryRequestStatus: "error",
+      }));
+    }
   }, []);
 
   const detachHostPreview = useCallback((videoElement: HTMLVideoElement | null) => {
@@ -798,6 +861,7 @@ export function useRoomSession(routeRoomId?: string) {
       return;
     }
 
+    setState((current) => ({ ...current, mediaRecoveryAlert: null }));
     await publishFile({
       checkpoint: createHostPlaybackCheckpoint(publication.videoElement),
       status: "restarting",
@@ -815,6 +879,7 @@ export function useRoomSession(routeRoomId?: string) {
       disconnectRemoteVoice();
       disconnectPlaybackStateReceiver();
       disconnectQualityIndicators();
+      disconnectMediaRecoverySignals();
       const connection = liveKitConnectionRef.current;
       liveKitConnectionRef.current = null;
 
@@ -837,6 +902,7 @@ export function useRoomSession(routeRoomId?: string) {
     },
     [
       disconnectQualityIndicators,
+      disconnectMediaRecoverySignals,
       disconnectPlaybackStateReceiver,
       disconnectRemotePlayback,
       disconnectRemoteVoice,
@@ -933,6 +999,7 @@ export function useRoomSession(routeRoomId?: string) {
               disconnectRemoteVoice();
               disconnectPlaybackStateReceiver();
               disconnectQualityIndicators();
+              disconnectMediaRecoverySignals();
               telemetryTrackerRef.current?.reset();
             }
 
@@ -991,6 +1058,19 @@ export function useRoomSession(routeRoomId?: string) {
           },
         });
         remoteVoiceControllerRef.current = voiceController;
+        mediaRecoverySignalControllerRef.current = createMediaRecoverySignalController(
+          connection.room,
+          {
+            isHost: participantRef.current?.role === "HOST",
+            onRecoveryRequested: (request) => {
+              if (liveKitRequestIdRef.current !== requestId) {
+                return;
+              }
+
+              setState((current) => ({ ...current, mediaRecoveryAlert: request }));
+            },
+          },
+        );
 
         if (participantRef.current?.role === "GUEST") {
           const playbackController = createRemotePlaybackController(connection.room, {
@@ -1058,6 +1138,7 @@ export function useRoomSession(routeRoomId?: string) {
     },
     [
       disconnectQualityIndicators,
+      disconnectMediaRecoverySignals,
       disconnectPlaybackStateReceiver,
       disconnectRemotePlayback,
       disconnectRemoteVoice,
@@ -1840,6 +1921,22 @@ export function useRoomSession(routeRoomId?: string) {
   );
 
   useEffect(() => {
+    if (state.mediaRecoveryRequestStatus !== "sent") {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setState((current) =>
+        current.mediaRecoveryRequestStatus === "sent"
+          ? { ...current, mediaRecoveryRequestStatus: "idle" }
+          : current,
+      );
+    }, 10_000);
+
+    return () => window.clearTimeout(timer);
+  }, [state.mediaRecoveryRequestStatus]);
+
+  useEffect(() => {
     if (!hostPublicationRecoveryRequestedRef.current) {
       return;
     }
@@ -1900,6 +1997,7 @@ export function useRoomSession(routeRoomId?: string) {
     hostPlay,
     hostSeek,
     restartFilePublication,
+    requestMediaRecovery,
     inviteUrl,
     join,
     leave,

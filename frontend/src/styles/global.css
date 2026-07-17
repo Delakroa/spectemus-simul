@@ -1009,7 +1009,8 @@ a {
 }
 
 .remote-player__fullscreen,
-.remote-player__restart {
+.remote-player__restart,
+.remote-player__recovery-request {
   flex: 0 0 auto;
   border-color: rgb(255 255 255 / 18%);
   color: #ffffff;
@@ -1019,14 +1020,57 @@ a {
 }
 
 .remote-player__fullscreen:hover,
-.remote-player__restart:hover {
+.remote-player__restart:hover,
+.remote-player__recovery-request:hover:not(:disabled) {
   background: rgb(26 30 42 / 82%);
 }
 
 .remote-player__fullscreen:focus-visible,
-.remote-player__restart:focus-visible {
+.remote-player__restart:focus-visible,
+.remote-player__recovery-request:focus-visible {
   outline: 3px solid rgb(255 255 255 / 34%);
   outline-offset: 3px;
+}
+
+.remote-player__recovery-request {
+  color: #ffd08a;
+}
+
+.remote-player__recovery-request:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.remote-player__recovery-alert {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 3;
+  display: inline-flex;
+  max-width: calc(100% - 28px);
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid rgb(255 178 94 / 52%);
+  border-radius: 11px;
+  color: #fff8ec;
+  background: rgb(55 37 24 / 80%);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 30%);
+  backdrop-filter: blur(12px) saturate(1.2);
+  font-size: 13px;
+  font-weight: 710;
+}
+
+.remote-player__recovery-alert svg {
+  flex: 0 0 auto;
+  color: #ffbc68;
+}
+
+.remote-player__recovery-action {
+  min-height: 30px;
+  margin-left: 3px;
+  padding: 5px 9px;
+  font-size: 12px;
 }
 
 .remote-player__sound-controls {
