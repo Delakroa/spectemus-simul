@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { publishFileToLiveKit, stopFilePublication } from "./file-publication";
 import { useRoomSession } from "./use-room-session";
+import { submitTelemetry } from "../telemetry/telemetry-api";
 
 const { liveKitHandlers, mockGuestSnapshot, mockVideoElement, mockRoomSnapshot } = vi.hoisted(
   () => {
@@ -164,6 +165,10 @@ vi.mock("./file-publication", () => ({
   stopFilePublication: vi.fn(),
 }));
 
+vi.mock("../telemetry/telemetry-api", () => ({
+  submitTelemetry: vi.fn().mockResolvedValue({}),
+}));
+
 vi.mock("./playback-state", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./playback-state")>();
   return {
@@ -261,6 +266,9 @@ function HostControlsHarness() {
       </button>
       <button type="button" onClick={() => void session.restartFilePublication()}>
         Восстановить
+      </button>
+      <button type="button" onClick={() => void session.requestMediaRecovery()}>
+        Сигнал о зависании
       </button>
 
       <span data-testid="pub-status">{session.filePublicationStatus}</span>
@@ -436,6 +444,13 @@ describe("useRoomSession host playback controls", () => {
       { startAtSeconds: 87, startPaused: true },
     );
     expect(screen.getByTestId("pub-status")).toHaveTextContent("live");
+    await waitFor(() => {
+      const recoveryTypes = vi
+        .mocked(submitTelemetry)
+        .mock.calls.map(([request]) => request.events[0]?.type)
+        .filter((type) => type?.startsWith("RECOVERY_"));
+      expect(recoveryTypes).toEqual(["RECOVERY_STARTED", "RECOVERY_SUCCEEDED"]);
+    });
   });
 
   it("останавливает публикацию и playback tracking при unmount", async () => {
@@ -478,5 +493,28 @@ describe("useRoomSession host playback controls", () => {
       "Публиковать файл может только host.",
     );
     expect(publishFileToLiveKit).not.toHaveBeenCalled();
+  });
+
+  it("фиксирует сигнал guest-а только после отправки через LiveKit", async () => {
+    const user = userEvent.setup();
+    render(<HostControlsHarness />);
+
+    vi.stubGlobal("WebSocket", MockWebSocket);
+    await user.click(screen.getByRole("button", { name: "Войти" }));
+    await waitFor(() => expect(screen.getByTestId("pub-status")).toHaveTextContent("idle"));
+    MockWebSocket.instances[0]?.onopen?.(new Event("open"));
+
+    await user.click(screen.getByRole("button", { name: "Сигнал о зависании" }));
+
+    await waitFor(() => {
+      expect(submitTelemetry).toHaveBeenCalledWith({
+        events: [
+          expect.objectContaining({
+            role: "GUEST",
+            type: "RECOVERY_REQUESTED",
+          }),
+        ],
+      });
+    });
   });
 });

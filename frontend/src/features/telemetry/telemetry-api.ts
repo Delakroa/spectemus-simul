@@ -8,6 +8,10 @@ export const telemetryEventTypeSchema = z.enum([
   "PUBLISH_START",
   "PUBLISH_FAILURE",
   "QUALITY_SUMMARY",
+  "RECOVERY_REQUESTED",
+  "RECOVERY_STARTED",
+  "RECOVERY_SUCCEEDED",
+  "RECOVERY_FAILURE",
 ]);
 
 export const telemetryQualityStatusSchema = z.enum(["GOOD", "WARNING", "POOR", "LOST", "UNKNOWN"]);

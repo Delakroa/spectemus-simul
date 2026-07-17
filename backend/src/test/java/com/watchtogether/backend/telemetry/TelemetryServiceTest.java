@@ -41,16 +41,36 @@ class TelemetryServiceTest {
                                 null,
                                 null,
                                 TelemetryQualityStatus.WARNING,
-                                null))),
+                                null),
+                        new TelemetryEvent(
+                                TelemetryEventType.RECOVERY_REQUESTED,
+                                null,
+                                null,
+                                null,
+                                null),
+                        new TelemetryEvent(
+                                TelemetryEventType.RECOVERY_STARTED, null, null, null, null),
+                        new TelemetryEvent(
+                                TelemetryEventType.RECOVERY_SUCCEEDED, null, null, null, null),
+                        new TelemetryEvent(
+                                TelemetryEventType.RECOVERY_FAILURE,
+                                null,
+                                null,
+                                null,
+                                "captureStream failed"))),
                 "corr-1");
 
-        assertThat(response.accepted()).isEqualTo(4);
+        assertThat(response.accepted()).isEqualTo(8);
         assertThat(response.receivedAt()).isEqualTo(Instant.parse("2026-07-12T12:00:00Z"));
         assertThat(registry.get("wt.telemetry.publish_start").counter().count()).isEqualTo(1.0);
         assertThat(registry.get("wt.telemetry.first_frame").counter().count()).isEqualTo(1.0);
         assertThat(registry.get("wt.telemetry.playback_error").counter().count()).isEqualTo(1.0);
         assertThat(registry.get("wt.telemetry.quality").tag("status", "WARNING").counter().count())
                 .isEqualTo(1.0);
+        assertThat(registry.get("wt.telemetry.recovery_requested").counter().count()).isEqualTo(1.0);
+        assertThat(registry.get("wt.telemetry.recovery_started").counter().count()).isEqualTo(1.0);
+        assertThat(registry.get("wt.telemetry.recovery_succeeded").counter().count()).isEqualTo(1.0);
+        assertThat(registry.get("wt.telemetry.recovery_failure").counter().count()).isEqualTo(1.0);
     }
 
     @Test

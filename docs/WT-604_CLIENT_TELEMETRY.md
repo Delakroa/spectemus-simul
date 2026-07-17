@@ -13,9 +13,10 @@ Telemetry не персистит историю и не хранит идент
 ## Поведение
 
 - Клиент отправляет `POST /api/v1/telemetry` с батчем `events` (1–50). Ответ — `202 Accepted`, `Cache-Control: no-store` и correlation-friendly receipt `{telemetryId, correlationId, receivedAt, accepted}`.
-- Типы событий: `FIRST_FRAME` (гость получил первый видеокадр), `PLAYBACK_ERROR` (ошибка воспроизведения у гостя), `PUBLISH_START` / `PUBLISH_FAILURE` (публикация файла host-ом), `QUALITY_SUMMARY` (грубый статус качества).
+- Типы событий: `FIRST_FRAME` (гость получил первый видеокадр), `PLAYBACK_ERROR` (ошибка воспроизведения у гостя), `PUBLISH_START` / `PUBLISH_FAILURE` (публикация файла host-ом), `QUALITY_SUMMARY` (грубый статус качества) и recovery funnel из WT-630: `RECOVERY_REQUESTED`, `RECOVERY_STARTED`, `RECOVERY_SUCCEEDED`, `RECOVERY_FAILURE`.
 - Каждое событие может нести `roomId`, `role`, `detail` — они используются **только** для log-корреляции при triage и никогда не становятся метрик-тегами. Единственный метрик-тег — `qualityStatus` (низкая кардинальность: `GOOD/WARNING/POOR/LOST/UNKNOWN`).
 - Backend инкрементирует Micrometer counters `wt.telemetry.first_frame`, `wt.telemetry.publish_start`, `wt.telemetry.publish_failure`, `wt.telemetry.playback_error` и `wt.telemetry.quality{status}`. Они видны на том же actuator `metrics`/`prometheus` surface, что и WT-506, за security-цепочкой.
+- Recovery funnel даёт четыре отдельных counter: `wt.telemetry.recovery_requested`, `wt.telemetry.recovery_started`, `wt.telemetry.recovery_succeeded`, `wt.telemetry.recovery_failure`. Он не создаёт per-room историю и не связывает действия guest/host между собой.
 - Невалидный payload (пустой `events`, событие без `type`, битые поля) возвращает `422 VALIDATION_FAILED` через общий `ApiExceptionHandler` и соединение не закрывает.
 - Frontend: session-scoped tracker переводит сигналы, которые хук сессии уже получает (`remote-playback`, `quality-indicators`, `file-publication`), в telemetry-события. One-shot события (`FIRST_FRAME`, `PUBLISH_START`) дедуплицируются, `QUALITY_SUMMARY` отправляется только при смене грубого статуса, а на disconnect tracker сбрасывается. Отправка best-effort: ошибка beacon-а проглатывается и никогда не всплывает в UX.
 
@@ -25,6 +26,7 @@ Telemetry не персистит историю и не хранит идент
 
 - Watch success (guest) ≈ `wt.telemetry.first_frame / (wt.telemetry.first_frame + wt.telemetry.playback_error)`.
 - Publish success (host) ≈ `wt.telemetry.publish_start / (wt.telemetry.publish_start + wt.telemetry.publish_failure)`.
+- Recovery success (host) ≈ `wt.telemetry.recovery_succeeded / (wt.telemetry.recovery_succeeded + wt.telemetry.recovery_failure)`; `recovery_requested` и `recovery_started` показывают, сколько сигналов дошло до явного действия host-а.
 - Широкий знаменатель для контекста — `wt.room.participants.joined` (WT-506).
 
 Точный per-session rate требует хранения событий с session id и остаётся отдельной будущей задачей, если beta evidence покажет, что агрегированных counters недостаточно.
@@ -39,7 +41,7 @@ Telemetry не персистит историю и не хранит идент
 - `backend/.../config/SecurityConfig.java` — `permitAll` для `POST /api/v1/telemetry` (как feedback).
 - `frontend/src/features/telemetry/telemetry-api.ts` — Zod-схемы и `submitTelemetry`.
 - `frontend/src/features/telemetry/telemetry.ts` — чистый `createRoomTelemetryTracker` (маппинг состояний в события, дедуп, reset).
-- `frontend/src/features/rooms/use-room-session.ts` — tracker подключён к quality/remote-playback `onStateChange`, publish success/failure и disconnect-reset; отправка через `submitTelemetry` best-effort.
+- `frontend/src/features/rooms/use-room-session.ts` — tracker подключён к quality/remote-playback `onStateChange`, publish success/failure, guest recovery request и host recovery result; отправка через `submitTelemetry` best-effort.
 - `scripts/beta-smoke.mjs`, `scripts/check-infra.mjs` — end-to-end проверка telemetry через gateway.
 - Тесты: `TelemetryControllerTest` (контракт + два невалидных случая), `TelemetryServiceTest` (counters + quality tag через `SimpleMeterRegistry`), `telemetry.test.ts` (маппинг/дедуп/reset), `telemetry-api.test.ts` (отправка + problem details).
 
@@ -67,4 +69,4 @@ pnpm infra:up && pnpm infra:check && pnpm beta:smoke
 - Endpoint публичный, батч ограничен 50 событиями и защищён Redis-backed лимитом из WT-606.
 - Raw QoS-числа (RTT, jitter, packet loss, bitrate) telemetry не отправляет — только грубый `qualityStatus`. Детальный QoS/cost benchmark — WT-607.
 - Telemetry не персистится: только counters + logs, без экспорта/retention.
-- Frontend emit покрывает guest first-frame/playback error, host publish start/failure и смену quality-статуса; тайминговые числа (time-to-first-frame, publish latency) вне области WT-604.
+- Frontend emit покрывает guest first-frame/playback error и recovery request, host publish start/failure и recovery result, а также смену quality-статуса; тайминговые числа (time-to-first-frame, publish latency) вне области WT-604.

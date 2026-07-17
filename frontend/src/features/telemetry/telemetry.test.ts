@@ -89,6 +89,28 @@ describe("room telemetry tracker", () => {
     expect(failures[1].detail).toBeUndefined();
   });
 
+  it("emits the recovery funnel without identifiers or media data", () => {
+    const { events: guestEvents, tracker: guestTracker } = setup("GUEST");
+    const { events: hostEvents, tracker: hostTracker } = setup("HOST");
+
+    guestTracker.onRecoveryRequested();
+    hostTracker.onRecoveryStarted();
+    hostTracker.onRecoverySucceeded();
+    hostTracker.onRecoveryFailure("captureStream() failed");
+
+    expect(guestEvents).toEqual([{ type: "RECOVERY_REQUESTED", roomId: ROOM_ID, role: "GUEST" }]);
+    expect(hostEvents).toEqual([
+      { type: "RECOVERY_STARTED", roomId: ROOM_ID, role: "HOST" },
+      { type: "RECOVERY_SUCCEEDED", roomId: ROOM_ID, role: "HOST" },
+      {
+        type: "RECOVERY_FAILURE",
+        roomId: ROOM_ID,
+        role: "HOST",
+        detail: "captureStream() failed",
+      },
+    ]);
+  });
+
   it("reset clears dedupe so a new session re-emits one-shot events", () => {
     const { events, tracker } = setup();
 

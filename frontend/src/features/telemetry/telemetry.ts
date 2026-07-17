@@ -14,6 +14,10 @@ export type RoomTelemetryTracker = {
   onQuality: (state: QualityIndicatorsState) => void;
   onPublishStart: () => void;
   onPublishFailure: (detail?: string) => void;
+  onRecoveryRequested: () => void;
+  onRecoveryStarted: () => void;
+  onRecoverySucceeded: () => void;
+  onRecoveryFailure: (detail?: string) => void;
   reset: () => void;
 };
 
@@ -82,6 +86,18 @@ export function createRoomTelemetryTracker(
     },
     onPublishFailure: (detail) => {
       params.emit(buildEvent("PUBLISH_FAILURE", { detail: detail ?? undefined }));
+    },
+    onRecoveryRequested: () => {
+      params.emit(buildEvent("RECOVERY_REQUESTED"));
+    },
+    onRecoveryStarted: () => {
+      params.emit(buildEvent("RECOVERY_STARTED"));
+    },
+    onRecoverySucceeded: () => {
+      params.emit(buildEvent("RECOVERY_SUCCEEDED"));
+    },
+    onRecoveryFailure: (detail) => {
+      params.emit(buildEvent("RECOVERY_FAILURE", { detail: detail ?? undefined }));
     },
     reset: () => {
       firstFrameSent = false;

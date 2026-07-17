@@ -19,6 +19,10 @@ class TelemetryMetrics {
     private final Counter publishStart;
     private final Counter publishFailure;
     private final Counter playbackError;
+    private final Counter recoveryRequested;
+    private final Counter recoveryStarted;
+    private final Counter recoverySucceeded;
+    private final Counter recoveryFailure;
 
     TelemetryMetrics(MeterRegistry registry) {
         this.registry = registry;
@@ -34,6 +38,18 @@ class TelemetryMetrics {
         this.playbackError = Counter.builder("wt.telemetry.playback_error")
                 .description("Guest playback errors")
                 .register(registry);
+        this.recoveryRequested = Counter.builder("wt.telemetry.recovery_requested")
+                .description("Guest requests for host media recovery")
+                .register(registry);
+        this.recoveryStarted = Counter.builder("wt.telemetry.recovery_started")
+                .description("Host media recovery attempts")
+                .register(registry);
+        this.recoverySucceeded = Counter.builder("wt.telemetry.recovery_succeeded")
+                .description("Host media recovery attempts that published fresh tracks")
+                .register(registry);
+        this.recoveryFailure = Counter.builder("wt.telemetry.recovery_failure")
+                .description("Host media recovery attempts that failed to publish fresh tracks")
+                .register(registry);
     }
 
     void record(TelemetryEventType type, TelemetryQualityStatus qualityStatus) {
@@ -43,6 +59,10 @@ class TelemetryMetrics {
             case PUBLISH_FAILURE -> publishFailure.increment();
             case PLAYBACK_ERROR -> playbackError.increment();
             case QUALITY_SUMMARY -> quality(qualityStatus);
+            case RECOVERY_REQUESTED -> recoveryRequested.increment();
+            case RECOVERY_STARTED -> recoveryStarted.increment();
+            case RECOVERY_SUCCEEDED -> recoverySucceeded.increment();
+            case RECOVERY_FAILURE -> recoveryFailure.increment();
         }
     }
 

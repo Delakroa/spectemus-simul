@@ -48,7 +48,7 @@ class TelemetryControllerTest {
                         TELEMETRY_ID,
                         "22222222-2222-4222-8222-222222222222",
                         Instant.parse("2026-07-12T12:00:00Z"),
-                        2));
+                        3));
 
         mockMvc.perform(post("/api/v1/telemetry")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -64,6 +64,10 @@ class TelemetryControllerTest {
                                       "type": "QUALITY_SUMMARY",
                                       "role": "GUEST",
                                       "qualityStatus": "WARNING"
+                                    },
+                                    {
+                                      "type": "RECOVERY_STARTED",
+                                      "role": "HOST"
                                     }
                                   ]
                                 }
@@ -75,19 +79,21 @@ class TelemetryControllerTest {
                 .andExpect(jsonPath("$.correlationId").value(
                         "22222222-2222-4222-8222-222222222222"))
                 .andExpect(jsonPath("$.receivedAt").value("2026-07-12T12:00:00Z"))
-                .andExpect(jsonPath("$.accepted").value(2));
+                .andExpect(jsonPath("$.accepted").value(3));
 
         ArgumentCaptor<TelemetryRequest> requestCaptor =
                 ArgumentCaptor.forClass(TelemetryRequest.class);
         verify(telemetryService).record(requestCaptor.capture(), anyString());
         TelemetryRequest request = requestCaptor.getValue();
-        org.assertj.core.api.Assertions.assertThat(request.events()).hasSize(2);
+        org.assertj.core.api.Assertions.assertThat(request.events()).hasSize(3);
         org.assertj.core.api.Assertions.assertThat(request.events().get(0).type())
                 .isEqualTo(TelemetryEventType.FIRST_FRAME);
         org.assertj.core.api.Assertions.assertThat(request.events().get(0).roomId())
                 .isEqualTo(ROOM_ID);
         org.assertj.core.api.Assertions.assertThat(request.events().get(1).qualityStatus())
                 .isEqualTo(TelemetryQualityStatus.WARNING);
+        org.assertj.core.api.Assertions.assertThat(request.events().get(2).type())
+                .isEqualTo(TelemetryEventType.RECOVERY_STARTED);
     }
 
     @Test

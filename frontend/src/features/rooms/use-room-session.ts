@@ -479,6 +479,7 @@ export function useRoomSession(routeRoomId?: string) {
 
     try {
       await controller.requestRecovery();
+      telemetryTrackerRef.current?.onRecoveryRequested();
       setState((current) => ({
         ...current,
         mediaRecoveryRequestError: null,
@@ -827,6 +828,9 @@ export function useRoomSession(routeRoomId?: string) {
           filePublicationTrackCount: publication.tracks.length,
         }));
         telemetryTrackerRef.current?.onPublishStart();
+        if (options.status === "restarting") {
+          telemetryTrackerRef.current?.onRecoverySucceeded();
+        }
       } catch (error) {
         if (filePublicationRequestIdRef.current !== requestId) {
           return;
@@ -844,6 +848,9 @@ export function useRoomSession(routeRoomId?: string) {
           filePublicationTrackCount: 0,
         }));
         telemetryTrackerRef.current?.onPublishFailure(message);
+        if (options.status === "restarting") {
+          telemetryTrackerRef.current?.onRecoveryFailure(message);
+        }
       }
     },
     [
@@ -862,6 +869,7 @@ export function useRoomSession(routeRoomId?: string) {
     }
 
     setState((current) => ({ ...current, mediaRecoveryAlert: null }));
+    telemetryTrackerRef.current?.onRecoveryStarted();
     await publishFile({
       checkpoint: createHostPlaybackCheckpoint(publication.videoElement),
       status: "restarting",

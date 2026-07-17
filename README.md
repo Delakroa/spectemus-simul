@@ -87,6 +87,7 @@ P0 технически подтверждён.
 - WT-627 объединяет stage controls в автоисчезающий glass-слой и делает частую host-перемотку последовательной, без визуального отката бегунка к старому времени.
 - WT-628 добавляет безопасное восстановление показа: restart выбранного файла и LiveKit-дорожек сохраняет позицию и паузу, включая reconnect host-а.
 - WT-629 добавляет guest recovery signal: кнопка «Видео зависло» уведомляет host-а через private LiveKit data message и предлагает осознанно восстановить поток.
+- WT-630 добавляет privacy-safe recovery telemetry: агрегированные counters показывают путь от guest signal до успешного или неуспешного восстановления, без сохранения истории сессии.
 
 P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. P7 beta iteration закрыт repo-side: WT-603 готовит evidence-прогон, WT-604 закрыл телеметрию для метрики успешности сессии, WT-605 добавил управляемый feedback triage, WT-606 — security/rate-limit hardening, WT-607 — media QoS/cost benchmark kit. WT-608/WT-609 (P8) закрывают repo-side evidence refresh и operator feedback UI; P9 начинается с предсказуемой media compatibility policy. Оставшийся гейт расширения beta — реальный staging-прогон.
 
@@ -241,6 +242,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-627 Stage controls and stable seek](docs/WT-627_STAGE_CONTROLS_AND_STABLE_SEEK.md)
 - [WT-628 Playback recovery](docs/WT-628_PLAYBACK_RECOVERY.md)
 - [WT-629 Guest recovery signal](docs/WT-629_GUEST_RECOVERY_SIGNAL.md)
+- [WT-630 Playback recovery telemetry](docs/WT-630_PLAYBACK_RECOVERY_TELEMETRY.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation
