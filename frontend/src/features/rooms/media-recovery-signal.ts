@@ -4,27 +4,47 @@ import type { RemoteParticipant, Room as LiveKitRoom } from "livekit-client";
 export const MEDIA_RECOVERY_SIGNAL_TOPIC = "wt.media-recovery.v1";
 
 const MEDIA_RECOVERY_REQUEST_COOLDOWN_MS = 10_000;
-const mediaRecoveryPayloadSchema = z.object({
+const mediaRecoveryRequestSchema = z.object({
   requestedAt: z.iso.datetime(),
   schemaVersion: z.literal(1),
   type: z.literal("media.recovery.request"),
 });
+const mediaRecoveryStatusSchema = z.object({
+  occurredAt: z.iso.datetime(),
+  schemaVersion: z.literal(1),
+  status: z.enum(["started", "succeeded", "failed"]),
+  type: z.literal("media.recovery.status"),
+});
+const mediaRecoveryPayloadSchema = z.discriminatedUnion("type", [
+  mediaRecoveryRequestSchema,
+  mediaRecoveryStatusSchema,
+]);
 
 export type MediaRecoveryRequest = {
   participantIdentity: string;
   requestedAt: string;
 };
 
+export type MediaRecoveryStatus = z.infer<typeof mediaRecoveryStatusSchema>["status"];
+export type MediaRecoveryStatusUpdate = {
+  occurredAt: string;
+  status: MediaRecoveryStatus;
+};
+type MediaRecoverySignalPayload = z.infer<typeof mediaRecoveryPayloadSchema>;
+
 export type MediaRecoverySignalController = {
   disconnect: () => void;
   requestRecovery: () => Promise<void>;
+  sendRecoveryStatus: (recipientIdentity: string, status: MediaRecoveryStatus) => Promise<void>;
 };
 
 export function createMediaRecoverySignalController(
   room: LiveKitRoom,
   options: {
+    expectedHostIdentity?: string;
     isHost: boolean;
-    onRecoveryRequested: (request: MediaRecoveryRequest) => void;
+    onRecoveryRequested?: (request: MediaRecoveryRequest) => void;
+    onRecoveryStatus?: (update: MediaRecoveryStatusUpdate) => void;
   },
 ): MediaRecoverySignalController {
   let disconnected = false;
@@ -37,12 +57,28 @@ export function createMediaRecoverySignalController(
     _kind?: unknown,
     topic?: string,
   ) => {
-    if (!options.isHost || topic !== MEDIA_RECOVERY_SIGNAL_TOPIC || !participant) {
+    if (topic !== MEDIA_RECOVERY_SIGNAL_TOPIC || !participant) {
       return;
     }
 
     try {
       const message = decodeMediaRecoverySignal(payload);
+      if (
+        !options.isHost &&
+        message.type === "media.recovery.status" &&
+        participant.identity === options.expectedHostIdentity
+      ) {
+        options.onRecoveryStatus?.({
+          occurredAt: message.occurredAt,
+          status: message.status,
+        });
+        return;
+      }
+
+      if (!options.isHost || message.type !== "media.recovery.request") {
+        return;
+      }
+
       const now = Date.now();
       const previousReceivedAt = recentlyReceivedFrom.get(participant.identity) ?? 0;
       if (now - previousReceivedAt < MEDIA_RECOVERY_REQUEST_COOLDOWN_MS) {
@@ -50,7 +86,7 @@ export function createMediaRecoverySignalController(
       }
 
       recentlyReceivedFrom.set(participant.identity, now);
-      options.onRecoveryRequested({
+      options.onRecoveryRequested?.({
         participantIdentity: participant.identity,
         requestedAt: message.requestedAt,
       });
@@ -59,16 +95,12 @@ export function createMediaRecoverySignalController(
     }
   };
 
-  if (options.isHost) {
-    room.on("dataReceived", handleDataReceived);
-  }
+  room.on("dataReceived", handleDataReceived);
 
   return {
     disconnect: () => {
       disconnected = true;
-      if (options.isHost) {
-        room.off("dataReceived", handleDataReceived);
-      }
+      room.off("dataReceived", handleDataReceived);
       recentlyReceivedFrom.clear();
     },
     requestRecovery: async () => {
@@ -94,14 +126,32 @@ export function createMediaRecoverySignalController(
       );
       lastRequestSentAt = now;
     },
+    sendRecoveryStatus: async (recipientIdentity, status) => {
+      if (disconnected) {
+        throw new Error("LiveKit не подключён.");
+      }
+      if (!options.isHost) {
+        throw new Error("Статус восстановления может отправить только host.");
+      }
+
+      await room.localParticipant.publishData(
+        encodeMediaRecoverySignal({
+          occurredAt: new Date().toISOString(),
+          schemaVersion: 1,
+          status,
+          type: "media.recovery.status",
+        }),
+        {
+          destinationIdentities: [recipientIdentity],
+          reliable: true,
+          topic: MEDIA_RECOVERY_SIGNAL_TOPIC,
+        },
+      );
+    },
   };
 }
 
-export function encodeMediaRecoverySignal(payload: {
-  requestedAt: string;
-  schemaVersion: 1;
-  type: "media.recovery.request";
-}): Uint8Array {
+export function encodeMediaRecoverySignal(payload: MediaRecoverySignalPayload): Uint8Array {
   return new TextEncoder().encode(JSON.stringify(mediaRecoveryPayloadSchema.parse(payload)));
 }
 
