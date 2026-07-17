@@ -62,6 +62,7 @@ import {
   type PlaybackEvent,
   type PlaybackStatus,
 } from "./playback-state";
+import { createHostSeekController, type HostSeekController } from "./host-seek-controller";
 import {
   createQualityIndicatorController,
   idleQualityIndicatorsState,
@@ -247,6 +248,7 @@ export function useRoomSession(routeRoomId?: string) {
   const fileDiagnosticsRequestIdRef = useRef(0);
   const fileObjectUrlRef = useRef<string | null>(null);
   const hostPlaybackCleanupRef = useRef<(() => void) | null>(null);
+  const hostSeekControllerRef = useRef<HostSeekController | null>(null);
   const hostPreviewElementRef = useRef<HTMLVideoElement | null>(null);
   const hostPublicationRecoveryRequestedRef = useRef(false);
   const filePublicationRef = useRef<FilePublication | null>(null);
@@ -455,6 +457,9 @@ export function useRoomSession(routeRoomId?: string) {
   );
 
   const stopHostPlaybackTracking = useCallback(() => {
+    const seekController = hostSeekControllerRef.current;
+    hostSeekControllerRef.current = null;
+    seekController?.dispose();
     const cleanup = hostPlaybackCleanupRef.current;
     hostPlaybackCleanupRef.current = null;
     cleanup?.();
@@ -565,6 +570,9 @@ export function useRoomSession(routeRoomId?: string) {
   );
 
   const startHostPlaybackTracking = useCallback((videoElement: HTMLVideoElement) => {
+    const previousSeekController = hostSeekControllerRef.current;
+    hostSeekControllerRef.current = null;
+    previousSeekController?.dispose();
     const previousCleanup = hostPlaybackCleanupRef.current;
     hostPlaybackCleanupRef.current = null;
     previousCleanup?.();
@@ -601,8 +609,14 @@ export function useRoomSession(routeRoomId?: string) {
     videoElement.addEventListener("ended", handleEnded);
     videoElement.addEventListener("timeupdate", handleTimeUpdate);
     videoElement.addEventListener("durationchange", handleDurationChange);
+    const seekController = createHostSeekController(videoElement);
+    hostSeekControllerRef.current = seekController;
 
     hostPlaybackCleanupRef.current = () => {
+      seekController.dispose();
+      if (hostSeekControllerRef.current === seekController) {
+        hostSeekControllerRef.current = null;
+      }
       videoElement.removeEventListener("play", handlePlay);
       videoElement.removeEventListener("pause", handlePause);
       videoElement.removeEventListener("ended", handleEnded);
@@ -650,13 +664,8 @@ export function useRoomSession(routeRoomId?: string) {
     filePublicationRef.current?.videoElement.pause();
   }, []);
 
-  const hostSeek = useCallback((seconds: number) => {
-    const publication = filePublicationRef.current;
-    if (!publication || !Number.isFinite(seconds)) {
-      return;
-    }
-
-    publication.videoElement.currentTime = Math.max(0, seconds);
+  const hostSeek = useCallback((seconds: number, onComplete?: () => void) => {
+    hostSeekControllerRef.current?.seek(seconds, onComplete);
   }, []);
 
   const publishFile = useCallback(async () => {

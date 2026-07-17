@@ -84,6 +84,7 @@ P0 технически подтверждён.
 - WT-624 превращает Windows LAN-setup в одну безопасную команду с UAC только для Private firewall-правил, Docker startup и local doctor.
 - WT-625 фиксирует desktop chat rail: длинная переписка прокручивается внутри правой панели и больше не растягивает рабочую раскладку комнаты.
 - WT-626 добавляет управление звуком просмотра для host и guest: громкость, mute/unmute и явный повтор audio playback после browser autoplay-block.
+- WT-627 объединяет stage controls в автоисчезающий glass-слой и делает частую host-перемотку последовательной, без визуального отката бегунка к старому времени.
 
 P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. P7 beta iteration закрыт repo-side: WT-603 готовит evidence-прогон, WT-604 закрыл телеметрию для метрики успешности сессии, WT-605 добавил управляемый feedback triage, WT-606 — security/rate-limit hardening, WT-607 — media QoS/cost benchmark kit. WT-608/WT-609 (P8) закрывают repo-side evidence refresh и operator feedback UI; P9 начинается с предсказуемой media compatibility policy. Оставшийся гейт расширения beta — реальный staging-прогон.
 

@@ -381,6 +381,10 @@ describe("useRoomSession host playback controls", () => {
     await user.click(screen.getByRole("button", { name: "Seek 30" }));
     expect(mockVideoElement.currentTime).toBe(30);
 
+    act(() => {
+      mockVideoElement.emit("seeked");
+    });
+
     await user.click(screen.getByRole("button", { name: "Seek negative" }));
     expect(mockVideoElement.currentTime).toBe(0);
   });

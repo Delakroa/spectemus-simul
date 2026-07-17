@@ -2,6 +2,7 @@ import {
   type ChangeEvent,
   type DragEvent,
   type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
   useEffect,
   useRef,
   useState,
@@ -144,6 +145,8 @@ type NavigatorWithNetworkInformation = Navigator & {
   webkitConnection?: NetworkInformationSnapshot;
 };
 
+const STAGE_CONTROLS_HIDE_DELAY_MS = 2_600;
+
 async function toggleFullscreen(element: HTMLElement | null) {
   if (!element) {
     return;
@@ -200,6 +203,7 @@ export function HomePage() {
   const [seekBarValue, setSeekBarValue] = useState<number | null>(null);
   const [playbackMuted, setPlaybackMuted] = useState(false);
   const [playbackVolume, setPlaybackVolume] = useState(100);
+  const [areStageControlsVisible, setAreStageControlsVisible] = useState(true);
   const [chatDraft, setChatDraft] = useState("");
   const [feedbackOutcome, setFeedbackOutcome] = useState<FeedbackOutcome>("WORKED");
   const [feedbackReason, setFeedbackReason] = useState<FeedbackReason>("SUCCESS");
@@ -249,11 +253,20 @@ export function HomePage() {
     ? roomSession.filePublicationTrackCount > 1
     : roomSession.remotePlaybackAudioTrackName !== null;
   const isPlaybackSoundMuted = playbackMuted || playbackVolume === 0;
+  const shouldAutoHideStageControls =
+    showWatchSurface &&
+    (isHost
+      ? roomSession.hostPlaybackStatus === "playing"
+      : roomSession.remotePlaybackStatus === "receiving" &&
+        roomSession.playbackSyncStatus === "playing");
+  const isStageControlsShown = !shouldAutoHideStageControls || areStageControlsVisible;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hostPreviewVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const watchPlayerRef = useRef<HTMLDivElement>(null);
+  const stageControlsHideTimerRef = useRef<number | null>(null);
+  const stageControlsPointerInsideRef = useRef(false);
   const chatEndRef = useRef<HTMLLIElement>(null);
   const chatMessageCount = roomSession.chatMessages.length;
 
@@ -308,6 +321,33 @@ export function HomePage() {
     }
   }, [chatMessageCount]);
 
+  useEffect(() => {
+    if (!shouldAutoHideStageControls) {
+      if (stageControlsHideTimerRef.current !== null) {
+        window.clearTimeout(stageControlsHideTimerRef.current);
+        stageControlsHideTimerRef.current = null;
+      }
+      return undefined;
+    }
+
+    const showTimer = window.setTimeout(() => {
+      setAreStageControlsVisible(true);
+    }, 0);
+    stageControlsHideTimerRef.current = window.setTimeout(() => {
+      if (!stageControlsPointerInsideRef.current) {
+        setAreStageControlsVisible(false);
+      }
+    }, STAGE_CONTROLS_HIDE_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(showTimer);
+      if (stageControlsHideTimerRef.current !== null) {
+        window.clearTimeout(stageControlsHideTimerRef.current);
+        stageControlsHideTimerRef.current = null;
+      }
+    };
+  }, [shouldAutoHideStageControls]);
+
   const applyPlaybackAudioSettings = (muted: boolean, volume: number) => {
     const mediaElement = isHost ? hostPreviewVideoRef.current : remoteAudioRef.current;
     if (!mediaElement) {
@@ -341,6 +381,58 @@ export function HomePage() {
       void roomSession.resumeRemotePlaybackAudio();
     }
   };
+
+  function revealStageControls() {
+    setAreStageControlsVisible(true);
+
+    if (stageControlsHideTimerRef.current !== null) {
+      window.clearTimeout(stageControlsHideTimerRef.current);
+      stageControlsHideTimerRef.current = null;
+    }
+
+    if (!shouldAutoHideStageControls || stageControlsPointerInsideRef.current) {
+      return;
+    }
+
+    stageControlsHideTimerRef.current = window.setTimeout(() => {
+      if (!stageControlsPointerInsideRef.current) {
+        setAreStageControlsVisible(false);
+      }
+    }, STAGE_CONTROLS_HIDE_DELAY_MS);
+  }
+
+  function handleStageControlsPointerEnter() {
+    stageControlsPointerInsideRef.current = true;
+    revealStageControls();
+  }
+
+  function handleStageControlsPointerLeave() {
+    stageControlsPointerInsideRef.current = false;
+    revealStageControls();
+  }
+
+  function commitHostSeek(seconds: number) {
+    roomSession.hostSeek(seconds, () => setSeekBarValue(null));
+  }
+
+  function handleSeekBarKeyUp(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (
+      ![
+        "ArrowDown",
+        "ArrowLeft",
+        "ArrowRight",
+        "ArrowUp",
+        "End",
+        "Home",
+        "PageDown",
+        "PageUp",
+      ].includes(event.key)
+    ) {
+      return;
+    }
+
+    commitHostSeek(Number(event.currentTarget.value));
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -944,9 +1036,12 @@ export function HomePage() {
                       aria-label="Перемотка"
                       onChange={(e) => setSeekBarValue(Number(e.target.value))}
                       onPointerUp={(e) => {
-                        roomSession.hostSeek(Number((e.target as HTMLInputElement).value));
+                        commitHostSeek(Number((e.target as HTMLInputElement).value));
+                      }}
+                      onPointerCancel={() => {
                         setSeekBarValue(null);
                       }}
+                      onKeyUp={handleSeekBarKeyUp}
                     />
 
                     {roomSession.hostPlaybackError && (
@@ -974,7 +1069,12 @@ export function HomePage() {
                   </span>
                 </div>
 
-                <div className="remote-player" ref={watchPlayerRef}>
+                <div
+                  className="remote-player"
+                  ref={watchPlayerRef}
+                  onPointerDown={revealStageControls}
+                  onPointerMove={revealStageControls}
+                >
                   {isHost ? (
                     <video
                       ref={hostPreviewVideoRef}
@@ -1011,49 +1111,58 @@ export function HomePage() {
                     </div>
                   )}
 
-                  <button
-                    className="icon-button remote-player__fullscreen"
-                    type="button"
-                    aria-label="Развернуть видео на весь экран"
-                    title="На весь экран"
-                    onClick={handleToggleWatchFullscreen}
+                  <div
+                    className={`remote-player__stage-controls${
+                      isStageControlsShown ? "" : " remote-player__stage-controls--hidden"
+                    }`}
+                    onFocusCapture={revealStageControls}
+                    onPointerEnter={handleStageControlsPointerEnter}
+                    onPointerLeave={handleStageControlsPointerLeave}
                   >
-                    <Maximize2 size={18} aria-hidden="true" />
-                  </button>
+                    <div className="remote-player__sound-controls" aria-label="Звук просмотра">
+                      <button
+                        className="remote-player__sound-toggle"
+                        type="button"
+                        disabled={!hasPlaybackAudio}
+                        onClick={handlePlaybackSoundToggle}
+                        aria-label={
+                          !hasPlaybackAudio
+                            ? "В файле нет аудиодорожки"
+                            : isPlaybackSoundMuted
+                              ? "Включить звук"
+                              : "Выключить звук"
+                        }
+                        title={!hasPlaybackAudio ? "В файле нет аудиодорожки" : undefined}
+                      >
+                        {isPlaybackSoundMuted ? (
+                          <VolumeX size={18} aria-hidden="true" />
+                        ) : (
+                          <Volume2 size={18} aria-hidden="true" />
+                        )}
+                      </button>
+                      <input
+                        className="remote-player__volume"
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value={playbackVolume}
+                        disabled={!hasPlaybackAudio}
+                        onChange={handlePlaybackVolumeChange}
+                        aria-label="Громкость просмотра"
+                      />
+                      <output aria-live="polite">{playbackVolume}%</output>
+                    </div>
 
-                  <div className="remote-player__sound-controls" aria-label="Звук просмотра">
                     <button
-                      className="remote-player__sound-toggle"
+                      className="icon-button remote-player__fullscreen"
                       type="button"
-                      disabled={!hasPlaybackAudio}
-                      onClick={handlePlaybackSoundToggle}
-                      aria-label={
-                        !hasPlaybackAudio
-                          ? "В файле нет аудиодорожки"
-                          : isPlaybackSoundMuted
-                            ? "Включить звук"
-                            : "Выключить звук"
-                      }
-                      title={!hasPlaybackAudio ? "В файле нет аудиодорожки" : undefined}
+                      aria-label="Развернуть видео на весь экран"
+                      title="На весь экран"
+                      onClick={handleToggleWatchFullscreen}
                     >
-                      {isPlaybackSoundMuted ? (
-                        <VolumeX size={18} aria-hidden="true" />
-                      ) : (
-                        <Volume2 size={18} aria-hidden="true" />
-                      )}
+                      <Maximize2 size={18} aria-hidden="true" />
                     </button>
-                    <input
-                      className="remote-player__volume"
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="1"
-                      value={playbackVolume}
-                      disabled={!hasPlaybackAudio}
-                      onChange={handlePlaybackVolumeChange}
-                      aria-label="Громкость просмотра"
-                    />
-                    <output aria-live="polite">{playbackVolume}%</output>
                   </div>
                 </div>
 

@@ -1019,6 +1019,15 @@ describe("HomePage", () => {
     expect(audioTrack.attach).toHaveBeenCalledWith(expect.any(HTMLAudioElement));
 
     const remoteAudio = document.querySelector(".remote-player audio") as HTMLAudioElement;
+    const stageControls = document.querySelector(
+      ".remote-player__stage-controls",
+    ) as HTMLDivElement;
+    expect(stageControls).toContainElement(
+      screen.getByRole("slider", { name: "Громкость просмотра" }),
+    );
+    expect(stageControls).toContainElement(
+      screen.getByRole("button", { name: "Развернуть видео на весь экран" }),
+    );
     expect(remoteAudio.muted).toBe(false);
     expect(remoteAudio.volume).toBe(1);
     await user.click(screen.getByRole("button", { name: "Выключить звук" }));
