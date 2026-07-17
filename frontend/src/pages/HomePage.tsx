@@ -228,6 +228,16 @@ export function HomePage() {
         (item) => item.participantId === roomSession.mediaRecoveryAlert?.participantIdentity,
       )?.displayName ?? "Гость")
     : null;
+  const mediaRecoveryGuestStatus = isHost
+    ? null
+    : formatMediaRecoveryGuestStatus(
+        roomSession.mediaRecoveryRequestStatus,
+        roomSession.mediaRecoveryRequestError,
+        roomSession.mediaRecoveryHostStatus,
+      );
+  const isMediaRecoveryGuestError =
+    roomSession.mediaRecoveryRequestStatus === "error" ||
+    roomSession.mediaRecoveryHostStatus === "failed";
   const isRoomActionPending = roomSession.pendingAction !== null;
   const isFilePublishing =
     roomSession.filePublicationStatus === "publishing" ||
@@ -1223,18 +1233,14 @@ export function HomePage() {
                       </button>
                     </div>
                   </div>
-                  {!isHost && roomSession.mediaRecoveryRequestStatus !== "idle" && (
+                  {mediaRecoveryGuestStatus && (
                     <p
-                      className="visually-hidden"
-                      role={roomSession.mediaRecoveryRequestStatus === "error" ? "alert" : "status"}
+                      className={`remote-player__recovery-status${
+                        isMediaRecoveryGuestError ? " remote-player__recovery-status--error" : ""
+                      }`}
+                      role={isMediaRecoveryGuestError ? "alert" : "status"}
                     >
-                      {roomSession.mediaRecoveryRequestStatus === "sending" &&
-                        "Отправляем сигнал host-у."}
-                      {roomSession.mediaRecoveryRequestStatus === "sent" &&
-                        "Host уведомлён о проблеме с видео."}
-                      {roomSession.mediaRecoveryRequestStatus === "error" &&
-                        (roomSession.mediaRecoveryRequestError ??
-                          "Не удалось отправить сигнал host-у.")}
+                      {mediaRecoveryGuestStatus}
                     </p>
                   )}
                 </div>
@@ -2459,6 +2465,32 @@ function formatHostWatchPlaybackHint(status: FilePublicationStatus) {
   };
 
   return labels[status];
+}
+
+function formatMediaRecoveryGuestStatus(
+  requestStatus: "idle" | "sending" | "sent" | "error",
+  requestError: string | null,
+  hostStatus: "idle" | "started" | "succeeded" | "failed",
+) {
+  if (hostStatus === "started") {
+    return "Host запускает восстановление трансляции…";
+  }
+  if (hostStatus === "succeeded") {
+    return "Host обновил трансляцию. Ждём видео…";
+  }
+  if (hostStatus === "failed") {
+    return "Host пока не смог восстановить трансляцию.";
+  }
+  if (requestStatus === "sending") {
+    return "Отправляем сигнал host-у…";
+  }
+  if (requestStatus === "sent") {
+    return "Host уведомлён о проблеме с видео.";
+  }
+  if (requestStatus === "error") {
+    return requestError ?? "Не удалось отправить сигнал host-у.";
+  }
+  return null;
 }
 
 function formatRemotePlaybackStatus(status: RemotePlaybackStatus) {

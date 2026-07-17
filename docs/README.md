@@ -104,6 +104,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [WT-628_PLAYBACK_RECOVERY.md](WT-628_PLAYBACK_RECOVERY.md) — host recovery выбранного файла: restart tracks без потери позиции или состояния паузы, включая LiveKit reconnect.
 - [WT-629_GUEST_RECOVERY_SIGNAL.md](WT-629_GUEST_RECOVERY_SIGNAL.md) — guest сообщает host-у о зависшем видео через privacy-safe LiveKit data message; host сам подтверждает recovery.
 - [WT-630_PLAYBACK_RECOVERY_TELEMETRY.md](WT-630_PLAYBACK_RECOVERY_TELEMETRY.md) — privacy-safe агрегированные метрики guest signal → host recovery start → success/failure, без истории сессии или media данных.
+- [WT-631_RECOVERY_ACKNOWLEDGEMENT.md](WT-631_RECOVERY_ACKNOWLEDGEMENT.md) — адресное подтверждение guest-у о старте и результате recovery без раскрытия контента и без автоматического действия.
 
 ## Как обновлять документы
 

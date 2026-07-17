@@ -66,6 +66,7 @@ import {
   createMediaRecoverySignalController,
   type MediaRecoveryRequest,
   type MediaRecoverySignalController,
+  type MediaRecoveryStatus,
 } from "./media-recovery-signal";
 import { createHostSeekController, type HostSeekController } from "./host-seek-controller";
 import {
@@ -107,6 +108,7 @@ export type FileStatus = "idle" | "checking" | "ready" | "error";
 export type FilePublicationStatus = "idle" | "publishing" | "restarting" | "live" | "error";
 export type HostPlaybackStatus = "idle" | "playing" | "paused" | "ended";
 export type MediaRecoveryRequestStatus = "idle" | "sending" | "sent" | "error";
+export type MediaRecoveryHostStatus = "idle" | MediaRecoveryStatus;
 export type RoomUserErrorArea = "room" | "websocket" | "livekit";
 export type RoomUserErrorAction = "retry-room-action" | "retry-websocket" | "retry-livekit";
 
@@ -166,6 +168,7 @@ type HostPlaybackCheckpoint = {
 
 type PublishFileOptions = {
   checkpoint?: HostPlaybackCheckpoint;
+  recoveryRecipientIdentity?: string;
   status?: Extract<FilePublicationStatus, "publishing" | "restarting">;
 };
 
@@ -191,6 +194,7 @@ export type RoomSessionState = {
   liveKitError: string | null;
   liveKitStatus: LiveKitConnectionStatus;
   mediaRecoveryAlert: MediaRecoveryRequest | null;
+  mediaRecoveryHostStatus: MediaRecoveryHostStatus;
   mediaRecoveryRequestError: string | null;
   mediaRecoveryRequestStatus: MediaRecoveryRequestStatus;
   participant: Participant | null;
@@ -243,6 +247,7 @@ const initialState: RoomSessionState = {
   liveKitError: null,
   liveKitStatus: "idle",
   mediaRecoveryAlert: null,
+  mediaRecoveryHostStatus: "idle",
   mediaRecoveryRequestError: null,
   mediaRecoveryRequestStatus: "idle",
   participant: null,
@@ -441,6 +446,7 @@ export function useRoomSession(routeRoomId?: string) {
     setState((current) => ({
       ...current,
       mediaRecoveryAlert: null,
+      mediaRecoveryHostStatus: "idle",
       mediaRecoveryRequestError: null,
       mediaRecoveryRequestStatus: "idle",
     }));
@@ -473,6 +479,7 @@ export function useRoomSession(routeRoomId?: string) {
 
     setState((current) => ({
       ...current,
+      mediaRecoveryHostStatus: "idle",
       mediaRecoveryRequestError: null,
       mediaRecoveryRequestStatus: "sending",
     }));
@@ -830,6 +837,11 @@ export function useRoomSession(routeRoomId?: string) {
         telemetryTrackerRef.current?.onPublishStart();
         if (options.status === "restarting") {
           telemetryTrackerRef.current?.onRecoverySucceeded();
+          if (options.recoveryRecipientIdentity) {
+            void mediaRecoverySignalControllerRef.current
+              ?.sendRecoveryStatus(options.recoveryRecipientIdentity, "succeeded")
+              .catch(() => {});
+          }
         }
       } catch (error) {
         if (filePublicationRequestIdRef.current !== requestId) {
@@ -850,6 +862,11 @@ export function useRoomSession(routeRoomId?: string) {
         telemetryTrackerRef.current?.onPublishFailure(message);
         if (options.status === "restarting") {
           telemetryTrackerRef.current?.onRecoveryFailure(message);
+          if (options.recoveryRecipientIdentity) {
+            void mediaRecoverySignalControllerRef.current
+              ?.sendRecoveryStatus(options.recoveryRecipientIdentity, "failed")
+              .catch(() => {});
+          }
         }
       }
     },
@@ -868,13 +885,20 @@ export function useRoomSession(routeRoomId?: string) {
       return;
     }
 
+    const recoveryRecipientIdentity = state.mediaRecoveryAlert?.participantIdentity;
     setState((current) => ({ ...current, mediaRecoveryAlert: null }));
     telemetryTrackerRef.current?.onRecoveryStarted();
+    if (recoveryRecipientIdentity) {
+      void mediaRecoverySignalControllerRef.current
+        ?.sendRecoveryStatus(recoveryRecipientIdentity, "started")
+        .catch(() => {});
+    }
     await publishFile({
       checkpoint: createHostPlaybackCheckpoint(publication.videoElement),
+      recoveryRecipientIdentity,
       status: "restarting",
     });
-  }, [publishFile]);
+  }, [publishFile, state.mediaRecoveryAlert]);
 
   const disconnectLiveKit = useCallback(
     (nextStatus: LiveKitConnectionStatus = "idle") => {
@@ -1069,6 +1093,7 @@ export function useRoomSession(routeRoomId?: string) {
         mediaRecoverySignalControllerRef.current = createMediaRecoverySignalController(
           connection.room,
           {
+            expectedHostIdentity: room.hostParticipantId ?? undefined,
             isHost: participantRef.current?.role === "HOST",
             onRecoveryRequested: (request) => {
               if (liveKitRequestIdRef.current !== requestId) {
@@ -1076,6 +1101,16 @@ export function useRoomSession(routeRoomId?: string) {
               }
 
               setState((current) => ({ ...current, mediaRecoveryAlert: request }));
+            },
+            onRecoveryStatus: (update) => {
+              if (liveKitRequestIdRef.current !== requestId) {
+                return;
+              }
+
+              setState((current) => ({
+                ...current,
+                mediaRecoveryHostStatus: update.status,
+              }));
             },
           },
         );
@@ -1943,6 +1978,22 @@ export function useRoomSession(routeRoomId?: string) {
 
     return () => window.clearTimeout(timer);
   }, [state.mediaRecoveryRequestStatus]);
+
+  useEffect(() => {
+    if (state.mediaRecoveryHostStatus === "idle") {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setState((current) =>
+        current.mediaRecoveryHostStatus === state.mediaRecoveryHostStatus
+          ? { ...current, mediaRecoveryHostStatus: "idle" }
+          : current,
+      );
+    }, 10_000);
+
+    return () => window.clearTimeout(timer);
+  }, [state.mediaRecoveryHostStatus]);
 
   useEffect(() => {
     if (!hostPublicationRecoveryRequestedRef.current) {
