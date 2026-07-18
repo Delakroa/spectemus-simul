@@ -2468,7 +2468,7 @@ function formatHostWatchPlaybackHint(status: FilePublicationStatus) {
 }
 
 function formatMediaRecoveryGuestStatus(
-  requestStatus: "idle" | "sending" | "sent" | "error",
+  requestStatus: "idle" | "sending" | "sent" | "unanswered" | "error",
   requestError: string | null,
   hostStatus: "idle" | "started" | "succeeded" | "failed",
 ) {
@@ -2486,6 +2486,9 @@ function formatMediaRecoveryGuestStatus(
   }
   if (requestStatus === "sent") {
     return "Host уведомлён о проблеме с видео.";
+  }
+  if (requestStatus === "unanswered") {
+    return "Host пока не ответил. Можно отправить сигнал ещё раз.";
   }
   if (requestStatus === "error") {
     return requestError ?? "Не удалось отправить сигнал host-у.";

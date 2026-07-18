@@ -277,6 +277,8 @@ function HostControlsHarness() {
       <span data-testid="pb-time">{session.hostPlaybackCurrentTime}</span>
       <span data-testid="pb-duration">{String(session.hostPlaybackDuration)}</span>
       <span data-testid="pb-error">{session.hostPlaybackError ?? ""}</span>
+      <span data-testid="recovery-request-status">{session.mediaRecoveryRequestStatus}</span>
+      <span data-testid="recovery-host-status">{session.mediaRecoveryHostStatus}</span>
     </>
   );
 }
@@ -315,6 +317,32 @@ afterEach(() => {
 });
 
 describe("useRoomSession host playback controls", () => {
+  it("показывает unanswered, если host не подтвердил recovery request", async () => {
+    const user = userEvent.setup();
+    render(<HostControlsHarness />);
+    vi.stubGlobal("WebSocket", MockWebSocket);
+
+    await user.click(screen.getByRole("button", { name: "Войти" }));
+    MockWebSocket.instances[0]?.onopen?.(new Event("open"));
+    await waitFor(() => expect(liveKitHandlers).toHaveLength(1));
+    const nativeSetTimeout = window.setTimeout.bind(window);
+    let unansweredCallback: (() => void) | undefined;
+    const timeoutSpy = vi.spyOn(window, "setTimeout").mockImplementation((handler, timeout) => {
+      if (timeout === 10_000 && typeof handler === "function") {
+        unansweredCallback = handler;
+        return 1 as unknown as ReturnType<typeof setTimeout>;
+      }
+      return nativeSetTimeout(handler, timeout) as unknown as ReturnType<typeof setTimeout>;
+    });
+    await user.click(screen.getByRole("button", { name: "Сигнал о зависании" }));
+    expect(screen.getByTestId("recovery-request-status")).toHaveTextContent("sent");
+
+    act(() => unansweredCallback?.());
+
+    expect(screen.getByTestId("recovery-request-status")).toHaveTextContent("unanswered");
+    timeoutSpy.mockRestore();
+  });
+
   it("DOM события play и pause обновляют hostPlaybackStatus", async () => {
     const user = userEvent.setup();
     await setupLivePublication(user);

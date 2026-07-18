@@ -107,7 +107,7 @@ export type RoomActionStatus = "create" | "join" | "restore" | "leave" | "close"
 export type FileStatus = "idle" | "checking" | "ready" | "error";
 export type FilePublicationStatus = "idle" | "publishing" | "restarting" | "live" | "error";
 export type HostPlaybackStatus = "idle" | "playing" | "paused" | "ended";
-export type MediaRecoveryRequestStatus = "idle" | "sending" | "sent" | "error";
+export type MediaRecoveryRequestStatus = "idle" | "sending" | "sent" | "unanswered" | "error";
 export type MediaRecoveryHostStatus = "idle" | MediaRecoveryStatus;
 export type RoomUserErrorArea = "room" | "websocket" | "livekit";
 export type RoomUserErrorAction = "retry-room-action" | "retry-websocket" | "retry-livekit";
@@ -168,6 +168,7 @@ type HostPlaybackCheckpoint = {
 
 type PublishFileOptions = {
   checkpoint?: HostPlaybackCheckpoint;
+  recoveryRequestId?: string;
   recoveryRecipientIdentity?: string;
   status?: Extract<FilePublicationStatus, "publishing" | "restarting">;
 };
@@ -839,7 +840,11 @@ export function useRoomSession(routeRoomId?: string) {
           telemetryTrackerRef.current?.onRecoverySucceeded();
           if (options.recoveryRecipientIdentity) {
             void mediaRecoverySignalControllerRef.current
-              ?.sendRecoveryStatus(options.recoveryRecipientIdentity, "succeeded")
+              ?.sendRecoveryStatus(
+                options.recoveryRecipientIdentity,
+                "succeeded",
+                options.recoveryRequestId,
+              )
               .catch(() => {});
           }
         }
@@ -864,7 +869,11 @@ export function useRoomSession(routeRoomId?: string) {
           telemetryTrackerRef.current?.onRecoveryFailure(message);
           if (options.recoveryRecipientIdentity) {
             void mediaRecoverySignalControllerRef.current
-              ?.sendRecoveryStatus(options.recoveryRecipientIdentity, "failed")
+              ?.sendRecoveryStatus(
+                options.recoveryRecipientIdentity,
+                "failed",
+                options.recoveryRequestId,
+              )
               .catch(() => {});
           }
         }
@@ -886,15 +895,17 @@ export function useRoomSession(routeRoomId?: string) {
     }
 
     const recoveryRecipientIdentity = state.mediaRecoveryAlert?.participantIdentity;
+    const recoveryRequestId = state.mediaRecoveryAlert?.requestId;
     setState((current) => ({ ...current, mediaRecoveryAlert: null }));
     telemetryTrackerRef.current?.onRecoveryStarted();
     if (recoveryRecipientIdentity) {
       void mediaRecoverySignalControllerRef.current
-        ?.sendRecoveryStatus(recoveryRecipientIdentity, "started")
+        ?.sendRecoveryStatus(recoveryRecipientIdentity, "started", recoveryRequestId)
         .catch(() => {});
     }
     await publishFile({
       checkpoint: createHostPlaybackCheckpoint(publication.videoElement),
+      recoveryRequestId,
       recoveryRecipientIdentity,
       status: "restarting",
     });
@@ -1110,6 +1121,7 @@ export function useRoomSession(routeRoomId?: string) {
               setState((current) => ({
                 ...current,
                 mediaRecoveryHostStatus: update.status,
+                mediaRecoveryRequestStatus: "idle",
               }));
             },
           },
@@ -1970,8 +1982,8 @@ export function useRoomSession(routeRoomId?: string) {
 
     const timer = window.setTimeout(() => {
       setState((current) =>
-        current.mediaRecoveryRequestStatus === "sent"
-          ? { ...current, mediaRecoveryRequestStatus: "idle" }
+        current.mediaRecoveryRequestStatus === "sent" && current.mediaRecoveryHostStatus === "idle"
+          ? { ...current, mediaRecoveryRequestStatus: "unanswered" }
           : current,
       );
     }, 10_000);

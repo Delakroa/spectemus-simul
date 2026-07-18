@@ -5,12 +5,14 @@ export const MEDIA_RECOVERY_SIGNAL_TOPIC = "wt.media-recovery.v1";
 
 const MEDIA_RECOVERY_REQUEST_COOLDOWN_MS = 10_000;
 const mediaRecoveryRequestSchema = z.object({
+  requestId: z.uuid().optional(),
   requestedAt: z.iso.datetime(),
   schemaVersion: z.literal(1),
   type: z.literal("media.recovery.request"),
 });
 const mediaRecoveryStatusSchema = z.object({
   occurredAt: z.iso.datetime(),
+  requestId: z.uuid().optional(),
   schemaVersion: z.literal(1),
   status: z.enum(["started", "succeeded", "failed"]),
   type: z.literal("media.recovery.status"),
@@ -22,20 +24,26 @@ const mediaRecoveryPayloadSchema = z.discriminatedUnion("type", [
 
 export type MediaRecoveryRequest = {
   participantIdentity: string;
+  requestId?: string;
   requestedAt: string;
 };
 
 export type MediaRecoveryStatus = z.infer<typeof mediaRecoveryStatusSchema>["status"];
 export type MediaRecoveryStatusUpdate = {
   occurredAt: string;
+  requestId?: string;
   status: MediaRecoveryStatus;
 };
 type MediaRecoverySignalPayload = z.infer<typeof mediaRecoveryPayloadSchema>;
 
 export type MediaRecoverySignalController = {
   disconnect: () => void;
-  requestRecovery: () => Promise<void>;
-  sendRecoveryStatus: (recipientIdentity: string, status: MediaRecoveryStatus) => Promise<void>;
+  requestRecovery: () => Promise<string>;
+  sendRecoveryStatus: (
+    recipientIdentity: string,
+    status: MediaRecoveryStatus,
+    requestId?: string,
+  ) => Promise<void>;
 };
 
 export function createMediaRecoverySignalController(
@@ -49,6 +57,7 @@ export function createMediaRecoverySignalController(
 ): MediaRecoverySignalController {
   let disconnected = false;
   let lastRequestSentAt = 0;
+  let latestRequestId: string | undefined;
   const recentlyReceivedFrom = new Map<string, number>();
 
   const handleDataReceived = (
@@ -66,10 +75,12 @@ export function createMediaRecoverySignalController(
       if (
         !options.isHost &&
         message.type === "media.recovery.status" &&
-        participant.identity === options.expectedHostIdentity
+        participant.identity === options.expectedHostIdentity &&
+        (!message.requestId || message.requestId === latestRequestId)
       ) {
         options.onRecoveryStatus?.({
           occurredAt: message.occurredAt,
+          requestId: message.requestId,
           status: message.status,
         });
         return;
@@ -88,6 +99,7 @@ export function createMediaRecoverySignalController(
       recentlyReceivedFrom.set(participant.identity, now);
       options.onRecoveryRequested?.({
         participantIdentity: participant.identity,
+        requestId: message.requestId,
         requestedAt: message.requestedAt,
       });
     } catch {
@@ -113,20 +125,32 @@ export function createMediaRecoverySignalController(
         throw new Error("Запрос уже отправлен. Попробуйте ещё раз через несколько секунд.");
       }
 
-      await room.localParticipant.publishData(
-        encodeMediaRecoverySignal({
-          requestedAt: new Date(now).toISOString(),
-          schemaVersion: 1,
-          type: "media.recovery.request",
-        }),
-        {
-          reliable: true,
-          topic: MEDIA_RECOVERY_SIGNAL_TOPIC,
-        },
-      );
+      const requestId = globalThis.crypto.randomUUID();
+      const previousRequestId = latestRequestId;
+      latestRequestId = requestId;
+      try {
+        await room.localParticipant.publishData(
+          encodeMediaRecoverySignal({
+            requestId,
+            requestedAt: new Date(now).toISOString(),
+            schemaVersion: 1,
+            type: "media.recovery.request",
+          }),
+          {
+            reliable: true,
+            topic: MEDIA_RECOVERY_SIGNAL_TOPIC,
+          },
+        );
+      } catch (error) {
+        if (latestRequestId === requestId) {
+          latestRequestId = previousRequestId;
+        }
+        throw error;
+      }
       lastRequestSentAt = now;
+      return requestId;
     },
-    sendRecoveryStatus: async (recipientIdentity, status) => {
+    sendRecoveryStatus: async (recipientIdentity, status, requestId) => {
       if (disconnected) {
         throw new Error("LiveKit не подключён.");
       }
@@ -137,6 +161,7 @@ export function createMediaRecoverySignalController(
       await room.localParticipant.publishData(
         encodeMediaRecoverySignal({
           occurredAt: new Date().toISOString(),
+          requestId,
           schemaVersion: 1,
           status,
           type: "media.recovery.status",

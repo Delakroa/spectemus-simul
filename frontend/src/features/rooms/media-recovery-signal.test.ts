@@ -40,6 +40,7 @@ describe("media-recovery-signal", () => {
       decodeMediaRecoverySignal(room.localParticipant.publishData.mock.calls[0]?.[0] as Uint8Array),
     ).toEqual(
       expect.objectContaining({
+        requestId: expect.any(String),
         schemaVersion: 1,
         type: "media.recovery.request",
       }),
@@ -53,7 +54,8 @@ describe("media-recovery-signal", () => {
       onRecoveryRequested: vi.fn(),
     });
 
-    await controller.sendRecoveryStatus("guest-1", "started");
+    const requestId = "93a6a58b-41b7-45a1-8306-761791afaf2f";
+    await controller.sendRecoveryStatus("guest-1", "started", requestId);
 
     expect(room.localParticipant.publishData).toHaveBeenCalledWith(
       expect.anything(),
@@ -67,6 +69,7 @@ describe("media-recovery-signal", () => {
       decodeMediaRecoverySignal(room.localParticipant.publishData.mock.calls[0]?.[0] as Uint8Array),
     ).toEqual(
       expect.objectContaining({
+        requestId,
         schemaVersion: 1,
         status: "started",
         type: "media.recovery.status",
@@ -84,6 +87,7 @@ describe("media-recovery-signal", () => {
       onRecoveryRequested,
     });
     const payload = encodeMediaRecoverySignal({
+      requestId: "93a6a58b-41b7-45a1-8306-761791afaf2f",
       requestedAt: "2026-07-17T08:00:00.000Z",
       schemaVersion: 1,
       type: "media.recovery.request",
@@ -107,6 +111,7 @@ describe("media-recovery-signal", () => {
     expect(onRecoveryRequested).toHaveBeenCalledTimes(1);
     expect(onRecoveryRequested).toHaveBeenCalledWith({
       participantIdentity: "guest-1",
+      requestId: "93a6a58b-41b7-45a1-8306-761791afaf2f",
       requestedAt: "2026-07-17T08:00:00.000Z",
     });
 
@@ -147,7 +152,55 @@ describe("media-recovery-signal", () => {
     expect(onRecoveryStatus).toHaveBeenCalledTimes(1);
     expect(onRecoveryStatus).toHaveBeenCalledWith({
       occurredAt: "2026-07-17T08:01:00.000Z",
+      requestId: undefined,
       status: "succeeded",
+    });
+  });
+
+  it("guest игнорирует запоздавший status предыдущего recovery request", async () => {
+    const room = createRoom();
+    const onRecoveryStatus = vi.fn();
+    const controller = createMediaRecoverySignalController(room as never, {
+      expectedHostIdentity: "host-1",
+      isHost: false,
+      onRecoveryStatus,
+    });
+    const currentRequestId = await controller.requestRecovery();
+    const stalePayload = encodeMediaRecoverySignal({
+      occurredAt: "2026-07-17T08:01:00.000Z",
+      requestId: "93a6a58b-41b7-45a1-8306-761791afaf2f",
+      schemaVersion: 1,
+      status: "succeeded",
+      type: "media.recovery.status",
+    });
+    const currentPayload = encodeMediaRecoverySignal({
+      occurredAt: "2026-07-17T08:01:01.000Z",
+      requestId: currentRequestId,
+      schemaVersion: 1,
+      status: "started",
+      type: "media.recovery.status",
+    });
+
+    room.emit(
+      "dataReceived",
+      stalePayload,
+      { identity: "host-1" },
+      undefined,
+      MEDIA_RECOVERY_SIGNAL_TOPIC,
+    );
+    room.emit(
+      "dataReceived",
+      currentPayload,
+      { identity: "host-1" },
+      undefined,
+      MEDIA_RECOVERY_SIGNAL_TOPIC,
+    );
+
+    expect(onRecoveryStatus).toHaveBeenCalledTimes(1);
+    expect(onRecoveryStatus).toHaveBeenCalledWith({
+      occurredAt: "2026-07-17T08:01:01.000Z",
+      requestId: currentRequestId,
+      status: "started",
     });
   });
 

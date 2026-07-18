@@ -89,6 +89,8 @@ P0 технически подтверждён.
 - WT-629 добавляет guest recovery signal: кнопка «Видео зависло» уведомляет host-а через private LiveKit data message и предлагает осознанно восстановить поток.
 - WT-630 добавляет privacy-safe recovery telemetry: агрегированные counters показывают путь от guest signal до успешного или неуспешного восстановления, без сохранения истории сессии.
 - WT-631 закрывает feedback-loop recovery: guest видит, что host начал восстановление и успешно ли обновился поток; уведомление адресное и не содержит данных фильма.
+- WT-632 связывает recovery request и адресные host status случайным UUID, чтобы запоздавший результат предыдущей попытки не перезаписывал новую.
+- WT-633 завершает ожидание recovery acknowledgement понятным unanswered-состоянием и разрешает guest-у повторить сигнал.
 
 P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. P7 beta iteration закрыт repo-side: WT-603 готовит evidence-прогон, WT-604 закрыл телеметрию для метрики успешности сессии, WT-605 добавил управляемый feedback triage, WT-606 — security/rate-limit hardening, WT-607 — media QoS/cost benchmark kit. WT-608/WT-609 (P8) закрывают repo-side evidence refresh и operator feedback UI; P9 начинается с предсказуемой media compatibility policy. Оставшийся гейт расширения beta — реальный staging-прогон.
 
@@ -245,6 +247,8 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-629 Guest recovery signal](docs/WT-629_GUEST_RECOVERY_SIGNAL.md)
 - [WT-630 Playback recovery telemetry](docs/WT-630_PLAYBACK_RECOVERY_TELEMETRY.md)
 - [WT-631 Recovery acknowledgement](docs/WT-631_RECOVERY_ACKNOWLEDGEMENT.md)
+- [WT-632 Recovery request correlation](docs/WT-632_RECOVERY_REQUEST_CORRELATION.md)
+- [WT-633 Recovery response timeout](docs/WT-633_RECOVERY_RESPONSE_TIMEOUT.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation
