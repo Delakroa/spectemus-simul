@@ -2172,6 +2172,110 @@ a {
     radial-gradient(circle at 92% 8%, rgb(247 87 154 / 10%), transparent 28rem), #09080f;
 }
 
+/* WT-643: operator tools belong to the same private-review product surface. */
+html:has(.operator-page) {
+  background: #09080f;
+}
+
+.app-shell:has(.operator-page) {
+  color: #f6f1ff;
+  background:
+    radial-gradient(circle at 18% -20%, rgb(115 63 255 / 19%), transparent 34rem),
+    radial-gradient(circle at 92% 8%, rgb(247 87 154 / 10%), transparent 28rem), #09080f;
+  --surface: #17131f;
+  --surface-subtle: #221c2f;
+  --ink: #f6f1ff;
+  --muted: #aaa1bc;
+  --line: #342a48;
+  --success: #91e9bb;
+  --warning: #ffc746;
+  --danger: #ff9d97;
+}
+
+.app-shell:has(.operator-page) .app-header,
+.app-shell:has(.operator-page) .app-footer {
+  width: min(1480px, calc(100% - 48px));
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+.app-shell:has(.operator-page) .app-main {
+  width: min(1480px, calc(100% - 48px));
+}
+
+.app-shell:has(.operator-page) :is(.brand, .app-nav__link) {
+  color: #f6f1ff;
+}
+
+.app-shell:has(.operator-page) .brand__mark {
+  color: #17131f;
+  background: linear-gradient(135deg, #ffc746, #ff7b62 58%, #bf63ff);
+}
+
+.operator-page .eyebrow {
+  color: #b693ff;
+  letter-spacing: 0.06em;
+}
+
+.operator-page :is(.operator-panel, .operator-detail, .operator-metric) {
+  background: rgb(23 19 31 / 88%);
+  box-shadow: 0 14px 36px rgb(0 0 0 / 18%);
+}
+
+.operator-page .operator-token__field input,
+.operator-page .operator-filter,
+.operator-page .button:not(.button--primary):not(.button--danger) {
+  border: 1px solid var(--line);
+  color: #f6f1ff;
+  background: rgb(34 28 47 / 92%);
+}
+
+.operator-page .operator-filter:hover,
+.operator-page .button:not(.button--primary):not(.button--danger):hover:not(:disabled) {
+  border-color: #76648f;
+  background: rgb(53 44 72 / 96%);
+}
+
+.operator-page .operator-filter--active,
+.operator-page .button--primary {
+  border: 0;
+  color: #17131f;
+  background: linear-gradient(135deg, #ffc746, #ff7b62 58%, #bf63ff);
+}
+
+.operator-page .button--primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ffd569, #ff9079 58%, #cf7bff);
+}
+
+.operator-page .operator-row--selected td {
+  background: rgb(133 96 204 / 18%);
+}
+
+.operator-page .operator-badge--accent {
+  color: #ffbfad;
+  background: rgb(255 123 98 / 16%);
+}
+
+.operator-page .operator-badge--danger {
+  color: #ffb5af;
+  background: rgb(255 101 91 / 16%);
+}
+
+.operator-page .operator-badge--neutral {
+  color: #d0c6de;
+  background: rgb(190 169 221 / 14%);
+}
+
+.operator-page .operator-badge--success {
+  color: #aaf0c8;
+  background: rgb(86 209 144 / 14%);
+}
+
+.operator-page .operator-badge--warning {
+  color: #ffd98b;
+  background: rgb(255 199 70 / 14%);
+}
+
 .app-shell:has(.home--entry) .app-header,
 .app-shell:has(.home--entry) .app-footer,
 .app-shell:has(.home--room) .app-header,
