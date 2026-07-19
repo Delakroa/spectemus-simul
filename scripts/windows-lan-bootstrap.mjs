@@ -1,5 +1,8 @@
 import { spawn } from "node:child_process";
-import { platform } from "node:process";
+import { env, platform } from "node:process";
+
+import { isPrivateIpv4 } from "./lan-config.mjs";
+import { buildWindowsPnpmInvocation } from "./windows-command.mjs";
 
 const argument = process.argv.slice(2);
 
@@ -21,15 +24,17 @@ const ipArgumentIndex = argument.indexOf("--ip");
 if (ipArgumentIndex !== -1 && !argument[ipArgumentIndex + 1]) {
   throw new Error("После --ip укажите private IPv4 Windows host-компьютера.");
 }
+if (ipArgumentIndex !== -1 && !isPrivateIpv4(argument[ipArgumentIndex + 1])) {
+  throw new Error("После --ip нужен private IPv4 Windows host-компьютера.");
+}
 
-const pnpmCommand = "pnpm.cmd";
 const setupArguments = ["infra:lan:setup"];
 if (ipArgumentIndex !== -1) {
   setupArguments.push("--", "--ip", argument[ipArgumentIndex + 1]);
 }
 
 await run("docker.exe", ["version", "--format", "{{.Server.Version}}"]);
-await run(pnpmCommand, setupArguments);
+await runPnpm(setupArguments);
 await run("powershell.exe", [
   "-NoProfile",
   "-ExecutionPolicy",
@@ -37,8 +42,8 @@ await run("powershell.exe", [
   "-File",
   "scripts/windows-lan-firewall.ps1",
 ]);
-await run(pnpmCommand, ["infra:lan:up"]);
-await run(pnpmCommand, ["infra:lan:doctor"]);
+await runPnpm(["infra:lan:up"]);
+await runPnpm(["infra:lan:doctor"]);
 
 console.log(
   "[ok] Windows LAN host готов. На Mac запустите doctor с Windows IPv4.",
@@ -64,4 +69,9 @@ function run(command, args) {
       reject(new Error(`${command} завершился с кодом ${code ?? "unknown"}.`));
     });
   });
+}
+
+function runPnpm(args) {
+  const invocation = buildWindowsPnpmInvocation(args, env.ComSpec ?? "cmd.exe");
+  return run(invocation.command, invocation.args);
 }
