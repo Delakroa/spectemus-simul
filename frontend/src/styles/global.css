@@ -1004,32 +1004,36 @@ a {
 
 .remote-player__stage-actions {
   display: inline-flex;
+  min-height: 38px;
   align-items: center;
-  gap: 8px;
-}
-
-.remote-player__fullscreen,
-.remote-player__restart,
-.remote-player__recovery-request {
-  flex: 0 0 auto;
-  border-color: rgb(255 255 255 / 18%);
+  gap: 3px;
+  padding: 5px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 10px;
   color: #ffffff;
   background: rgb(13 16 24 / 58%);
   box-shadow: 0 8px 24px rgb(0 0 0 / 28%);
   backdrop-filter: blur(12px) saturate(1.25);
 }
 
-.remote-player__fullscreen:hover,
-.remote-player__restart:hover,
-.remote-player__recovery-request:hover:not(:disabled) {
-  background: rgb(26 30 42 / 82%);
+.remote-player__stage-actions .icon-button {
+  width: 32px;
+  height: 28px;
+  border: 0;
+  border-radius: 7px;
+  color: inherit;
+  background: transparent;
+  box-shadow: none;
 }
 
-.remote-player__fullscreen:focus-visible,
-.remote-player__restart:focus-visible,
-.remote-player__recovery-request:focus-visible {
+.remote-player__stage-actions .icon-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: rgb(255 255 255 / 14%);
+}
+
+.remote-player__stage-actions .icon-button:focus-visible {
   outline: 3px solid rgb(255 255 255 / 34%);
-  outline-offset: 3px;
+  outline-offset: 2px;
 }
 
 .remote-player__recovery-request {
