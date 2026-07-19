@@ -1,7 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 import { createAppQueryClient } from "../app/query-client";
 import { PLAYBACK_STATE_TOPIC } from "../features/rooms/playback-state";
@@ -104,6 +104,7 @@ function renderPage(initialEntries = ["/"]) {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={initialEntries}>
+        <LocationProbe />
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/rooms/:roomId" element={<HomePage />} />
@@ -111,6 +112,12 @@ function renderPage(initialEntries = ["/"]) {
       </MemoryRouter>
     </QueryClientProvider>,
   );
+}
+
+function LocationProbe() {
+  const location = useLocation();
+
+  return <output data-testid="location-path">{location.pathname}</output>;
 }
 
 describe("HomePage", () => {
@@ -188,6 +195,57 @@ describe("HomePage", () => {
     expect(screen.getByText(/Chrome или Edge на desktop/)).toBeInTheDocument();
     expect(screen.getByText(`http://localhost:3000/rooms/${roomId}`)).toBeInTheDocument();
     expect(screen.queryByText("LiveKit: подключён")).not.toBeInTheDocument();
+  });
+
+  it("очищает устаревший invite route после ответа ROOM_UNAVAILABLE", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+      const url = String(input);
+
+      if (url.endsWith("/health")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ status: "UP", checkedAt: "2026-07-19T10:00:00Z" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url.endsWith("/version")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              name: "watch-together-backend",
+              version: "0.1.0",
+              buildTime: "2026-07-19T10:00:00Z",
+              apiVersion: "v1",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      if (url.endsWith(`/api/v1/rooms/${roomId}`)) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              title: "Комната недоступна",
+              status: 404,
+              code: "ROOM_UNAVAILABLE",
+              detail: "Комната не найдена, закрыта или срок её действия истёк.",
+              retryable: false,
+            }),
+            { status: 404 },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response(null, { status: 404 }));
+    });
+
+    renderPage([`/rooms/${roomId}`]);
+
+    expect(await screen.findByText("Комната недоступна")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("location-path")).toHaveTextContent("/"));
+    expect(screen.getByLabelText("Invite-ссылка или ID комнаты")).toHaveValue("");
   });
 
   it("отправляет beta feedback с техническим контекстом", async () => {

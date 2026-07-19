@@ -43,7 +43,7 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 import {
   type FeedbackClientMetadata,
@@ -186,6 +186,7 @@ async function toggleFullscreen(element: HTMLElement | null) {
 
 export function HomePage() {
   const { roomId: routeRoomId } = useParams();
+  const navigate = useNavigate();
   const isMobileInviteHandoff = useMobileInviteHandoff(Boolean(routeRoomId));
   const { health, version, isPending, isError, refetch } = useSystemStatus();
   const roomSession = useRoomSession(isMobileInviteHandoff ? undefined : routeRoomId);
@@ -223,6 +224,16 @@ export function HomePage() {
   const canUseNativeShare = typeof (navigator as NavigatorWithWebShare).share === "function";
   const roomClosed = room?.status === "CLOSED" || room?.status === "EXPIRED";
   const isHost = participant?.role === "HOST";
+
+  useEffect(() => {
+    if (
+      routeRoomId &&
+      roomSession.userError?.area === "room" &&
+      roomSession.userError.status === 404
+    ) {
+      navigate("/", { replace: true });
+    }
+  }, [navigate, roomSession.userError, routeRoomId]);
   const mediaRecoveryRequester = roomSession.mediaRecoveryAlert
     ? (room?.participants.find(
         (item) => item.participantId === roomSession.mediaRecoveryAlert?.participantIdentity,
