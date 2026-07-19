@@ -226,7 +226,11 @@ export function HomePage() {
   const isHost = participant?.role === "HOST";
 
   useEffect(() => {
-    if (routeRoomId && roomSession.userError?.area === "room" && roomSession.userError.status === 404) {
+    if (
+      routeRoomId &&
+      roomSession.userError?.area === "room" &&
+      roomSession.userError.status === 404
+    ) {
       navigate("/", { replace: true });
     }
   }, [navigate, roomSession.userError, routeRoomId]);
