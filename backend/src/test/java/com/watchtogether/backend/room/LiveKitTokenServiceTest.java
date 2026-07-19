@@ -75,7 +75,7 @@ class LiveKitTokenServiceTest {
     }
 
     @Test
-    void mintsGuestTokenWithVoicePublishGrant() throws Exception {
+    void mintsGuestTokenWithVoiceAndRecoveryDataGrants() throws Exception {
         LiveKitTokenService service =
                 service(new FakeRealtimeStore(AuthenticationResult.authenticated(room(), GUEST_ID)));
 
@@ -84,13 +84,13 @@ class LiveKitTokenServiceTest {
 
         assertThat(response.role()).isEqualTo(ParticipantRole.GUEST);
         assertThat(response.canPublish()).isTrue();
-        assertThat(response.canPublishData()).isFalse();
+        assertThat(response.canPublishData()).isTrue();
         assertThat(payload)
                 .contains("\"sub\":\"" + GUEST_ID + "\"")
                 .contains("\"name\":\"Guest\"")
                 .contains("\"canSubscribe\":true")
                 .contains("\"canPublish\":true")
-                .contains("\"canPublishData\":false");
+                .contains("\"canPublishData\":true");
         assertValidSignature(response.token());
     }
 

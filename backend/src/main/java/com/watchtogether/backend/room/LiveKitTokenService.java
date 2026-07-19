@@ -64,7 +64,9 @@ class LiveKitTokenService {
 
         boolean host = participant.role() == ParticipantRole.HOST;
         boolean canPublish = true;
-        boolean canPublishData = host;
+        // Guests send the recovery request through LiveKit data packets; the client accepts only
+        // the validated recovery schema and the recipient is still constrained to this room.
+        boolean canPublishData = true;
         String participantIdentity = participant.participantId().toString();
         Instant issuedAt = clock.instant();
         Instant expiresAt = issuedAt.plus(properties.tokenTtl());
