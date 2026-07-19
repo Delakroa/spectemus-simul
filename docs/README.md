@@ -109,6 +109,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [WT-633_RECOVERY_RESPONSE_TIMEOUT.md](WT-633_RECOVERY_RESPONSE_TIMEOUT.md) — guest получает явный unanswered после таймаута ответа host-а и может повторить recovery request.
 - [WT-634_RECOVERY_RESULT_TIMEOUT.md](WT-634_RECOVERY_RESULT_TIMEOUT.md) — started получает конечный timed_out, если итоговый recovery status не дошёл до guest-а.
 - [WT-635_WINDOWS_NODE24_PNPM_SPAWN.md](WT-635_WINDOWS_NODE24_PNPM_SPAWN.md) — Windows bootstrap запускает pnpm через ComSpec и не падает с spawn EINVAL на Node.js 24.
+- [WT-636_LAN_RECOVERY_UUID_FALLBACK.md](WT-636_LAN_RECOVERY_UUID_FALLBACK.md) — HTTP LAN fallback создаёт recovery UUID без crypto.randomUUID().
 
 ## Как обновлять документы
 

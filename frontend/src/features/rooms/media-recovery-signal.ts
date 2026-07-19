@@ -125,7 +125,7 @@ export function createMediaRecoverySignalController(
         throw new Error("Запрос уже отправлен. Попробуйте ещё раз через несколько секунд.");
       }
 
-      const requestId = globalThis.crypto.randomUUID();
+      const requestId = createRecoveryRequestId();
       const previousRequestId = latestRequestId;
       latestRequestId = requestId;
       try {
@@ -182,4 +182,21 @@ export function encodeMediaRecoverySignal(payload: MediaRecoverySignalPayload): 
 
 export function decodeMediaRecoverySignal(payload: Uint8Array) {
   return mediaRecoveryPayloadSchema.parse(JSON.parse(new TextDecoder().decode(payload)));
+}
+
+export function createRecoveryRequestId() {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+
+  if (typeof globalThis.crypto?.getRandomValues !== "function") {
+    throw new Error("Браузер не поддерживает генерацию recovery request ID.");
+  }
+
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }

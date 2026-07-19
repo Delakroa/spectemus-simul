@@ -93,6 +93,7 @@ P0 технически подтверждён.
 - WT-633 завершает ожидание recovery acknowledgement понятным unanswered-состоянием и разрешает guest-у повторить сигнал.
 - WT-634 завершает зависший started-сценарий локальным result timeout и позволяет guest-у безопасно повторить запрос.
 - WT-635 исправляет `spawn EINVAL` в Windows LAN bootstrap на Node.js 24: `.cmd`-шаги безопасно проходят через ComSpec.
+- WT-636 позволяет guest отправлять recovery signal в HTTP LAN, даже когда browser не предоставляет `crypto.randomUUID()`.
 
 P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. P7 beta iteration закрыт repo-side: WT-603 готовит evidence-прогон, WT-604 закрыл телеметрию для метрики успешности сессии, WT-605 добавил управляемый feedback triage, WT-606 — security/rate-limit hardening, WT-607 — media QoS/cost benchmark kit. WT-608/WT-609 (P8) закрывают repo-side evidence refresh и operator feedback UI; P9 начинается с предсказуемой media compatibility policy. Оставшийся гейт расширения beta — реальный staging-прогон.
 
@@ -253,6 +254,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-633 Recovery response timeout](docs/WT-633_RECOVERY_RESPONSE_TIMEOUT.md)
 - [WT-634 Recovery result timeout](docs/WT-634_RECOVERY_RESULT_TIMEOUT.md)
 - [WT-635 Windows Node.js 24 pnpm spawn](docs/WT-635_WINDOWS_NODE24_PNPM_SPAWN.md)
+- [WT-636 LAN recovery UUID fallback](docs/WT-636_LAN_RECOVERY_UUID_FALLBACK.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation

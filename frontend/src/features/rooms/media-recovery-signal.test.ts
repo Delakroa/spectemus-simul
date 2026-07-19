@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   MEDIA_RECOVERY_SIGNAL_TOPIC,
+  createRecoveryRequestId,
   createMediaRecoverySignalController,
   decodeMediaRecoverySignal,
   encodeMediaRecoverySignal,
@@ -9,10 +10,22 @@ import {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
 describe("media-recovery-signal", () => {
+  it("создаёт UUID через getRandomValues в HTTP LAN без randomUUID", () => {
+    vi.stubGlobal("crypto", {
+      getRandomValues: (bytes: Uint8Array) => {
+        bytes.set([...Array(16).keys()]);
+        return bytes;
+      },
+    });
+
+    expect(createRecoveryRequestId()).toBe("00010203-0405-4607-8809-0a0b0c0d0e0f");
+  });
+
   it("кодирует и декодирует privacy-safe recovery request", () => {
     const payload = {
       requestedAt: "2026-07-17T08:00:00.000Z",
