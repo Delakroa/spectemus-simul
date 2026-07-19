@@ -3,7 +3,29 @@ import { execFile } from "node:child_process";
 import test from "node:test";
 import { promisify } from "node:util";
 
+import { buildWindowsPnpmInvocation } from "./windows-command.mjs";
+
 const execute = promisify(execFile);
+
+test("Windows pnpm запускается через ComSpec без прямого spawn .cmd", () => {
+  assert.deepEqual(
+    buildWindowsPnpmInvocation(
+      ["infra:lan:setup", "--", "--ip", "192.168.1.42"],
+      "cmd.exe",
+    ),
+    {
+      args: ["/d", "/s", "/c", "pnpm.cmd infra:lan:setup -- --ip 192.168.1.42"],
+      command: "cmd.exe",
+    },
+  );
+});
+
+test("Windows pnpm отклоняет shell metacharacters", () => {
+  assert.throws(
+    () => buildWindowsPnpmInvocation(["infra:lan:setup", "&", "whoami"]),
+    /недопустимый аргумент/,
+  );
+});
 
 test("Windows bootstrap показывает help на любой OS", async () => {
   const { stdout } = await execute(process.execPath, [
