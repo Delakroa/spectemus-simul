@@ -112,6 +112,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [WT-636_LAN_RECOVERY_UUID_FALLBACK.md](WT-636_LAN_RECOVERY_UUID_FALLBACK.md) — HTTP LAN fallback создаёт recovery UUID без crypto.randomUUID().
 - [WT-644_MACOS_HOST_LAUNCHER.md](WT-644_MACOS_HOST_LAUNCHER.md) — запуск host-а двойным кликом на macOS с проверкой Docker и LAN doctor.
 - [WT-645_MACOS_DOCKER_AUTOSTART.md](WT-645_MACOS_DOCKER_AUTOSTART.md) — Mac launcher сам открывает Docker Desktop и ждёт его готовности.
+- [WT-646_WINDOWS_DOCKER_AUTOSTART.md](WT-646_WINDOWS_DOCKER_AUTOSTART.md) — Windows launcher сам открывает Docker Desktop и ждёт его готовности.
 
 ## Как обновлять документы
 

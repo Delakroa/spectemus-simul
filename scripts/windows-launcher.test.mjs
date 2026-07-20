@@ -13,8 +13,14 @@ test("Windows launcher запускает только безопасный LAN 
   assert.doesNotMatch(launcher, /cloud/i);
 });
 
-test("Windows launcher оставляет ошибку видимой вместо молчаливого закрытия", () => {
+test("Windows launcher запускает Docker Desktop и оставляет ошибку видимой", () => {
   assert.match(launcher, /:missing_pnpm/);
   assert.match(launcher, /:missing_docker/);
+  assert.match(launcher, /%ProgramFiles%\\Docker\\Docker\\Docker Desktop\.exe/);
+  assert.match(launcher, /%LOCALAPPDATA%\\Docker\\Docker Desktop\.exe/);
+  assert.match(launcher, /start "" "%SPECTEMUS_DOCKER_DESKTOP%"/);
+  assert.match(launcher, /SPECTEMUS_DOCKER_ATTEMPT% GEQ 60/);
+  assert.match(launcher, /timeout \/t 2 \/nobreak/);
+  assert.match(launcher, /:docker_timeout/);
   assert.match(launcher, /pause/);
 });
