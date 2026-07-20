@@ -90,9 +90,31 @@ PostgreSQL и Redis используют named volumes:
 комнату между Windows и Mac в **той же приватной домашней сети**, не меняйте
 `compose.yaml` и не открывайте router port forwarding.
 
-На компьютере, где запущен Docker (например, Windows host), сначала создайте
-LAN-конфигурацию. Команда выберет единственный физический private IPv4 и
-соберёт `infra/lan.env`; адрес не нужно вписывать в файл вручную:
+На компьютере host-а с Docker Desktop используйте одну команду. Она выберет
+private IPv4, поднимет LAN-стек и выполнит doctor; на Windows также запросит
+UAC только для узких firewall-правил Private-профиля:
+
+```bash
+pnpm host:lan:start
+```
+
+На Windows эту же команду можно запустить без терминала: дважды кликните
+[`Start-Spectemus-Simul.cmd`](../Start-Spectemus-Simul.cmd) в корне проекта.
+После готовности он сам откроет браузер с адресом host-а; при ошибке окно
+останется открытым с понятной причиной. Однократно до первого запуска всё ещё
+нужны установленные Node.js/pnpm и Docker Desktop, а Docker Desktop должен
+быть запущен.
+
+Если у host-а два физических подключения, укажите адрес домашней сети явно:
+
+```bash
+pnpm host:lan:start -- --ip 192.168.1.42
+```
+
+Команда не предназначена для публичного IP, проброса портов на router, VPN
+exit node или облачной VM. Для ручного восстановления остаётся прежняя
+последовательность — она создаёт `infra/lan.env`; адрес не нужно вписывать в
+файл вручную:
 
 ```bash
 pnpm infra:lan:setup
@@ -111,9 +133,10 @@ pnpm infra:lan:setup -- --ip 192.168.1.42
 создаёт короткоживущую test-room, чтобы убедиться: backend отдаёт в token
 `ws://<IPv4-host>:7880`, а не `localhost` или адрес другого компьютера.
 
-На Windows host можно выполнить все локальные шаги и открыть только нужные
-private-LAN порты одной командой. Она запросит стандартный UAC для двух узких
-firewall-правил, не меняет router и не действует для Public/Domain profile:
+На Windows `host:lan:start` вызывает Windows bootstrap. Его можно запустить
+напрямую, если требуется только повторить Windows-часть: он запросит
+стандартный UAC для двух узких firewall-правил, не меняет router и не действует
+для Public/Domain profile:
 
 ```bash
 pnpm infra:lan:windows

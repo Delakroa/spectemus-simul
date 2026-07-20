@@ -37,7 +37,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
           <AlertTriangle size={28} />
         </div>
         <p className="eyebrow">Ошибка приложения</p>
-        <h1>Не удалось открыть Watch Together</h1>
+        <h1>Не удалось открыть Spectemus Simul</h1>
         <p>Обновите страницу. Если ошибка повторится, попробуйте вернуться немного позже.</p>
         <button className="button button--primary" type="button" onClick={this.reload}>
           <RotateCcw size={18} aria-hidden="true" />

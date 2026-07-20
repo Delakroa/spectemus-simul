@@ -1,6 +1,6 @@
 <svg width="1280" height="360" viewBox="0 0 1280 360" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
-  <title id="title">Watch Together - CouchSync Stack</title>
-  <desc id="desc">A dark GitHub README banner for Watch Together, a private co-watch stack for local movies.</desc>
+  <title id="title">Spectemus Simul - by Delakroa</title>
+  <desc id="desc">A dark GitHub README banner for Spectemus Simul, a private co-watch stack for local movies.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="360" gradientUnits="userSpaceOnUse">
       <stop stop-color="#090D14"/>
@@ -41,9 +41,9 @@
     <circle cx="67" cy="25" r="8" fill="#A855F7"/>
   </g>
 
-  <text x="214" y="108" fill="#F8FAFC" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="58" font-weight="800" letter-spacing="0">Watch Together</text>
-  <text x="214" y="164" fill="#38BDF8" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="38" font-weight="800" letter-spacing="0">CouchSync Stack</text>
-  <text x="216" y="207" fill="#CBD5E1" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="24" font-weight="500" letter-spacing="0">Private watch rooms. No upload. Live sync.</text>
+  <text x="214" y="96" fill="#38BDF8" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="22" font-weight="800" letter-spacing="0.5">S² · by Delakroa</text>
+  <text x="214" y="155" fill="#F8FAFC" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="46" font-weight="800" letter-spacing="0">Spectemus Simul</text>
+  <text x="216" y="201" fill="#CBD5E1" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="20" font-weight="500" letter-spacing="0">Watch together. No upload. Live sync.</text>
 
   <g transform="translate(216 236)">
     <rect width="126" height="34" rx="17" fill="#0B2A1A" stroke="#22C55E" stroke-width="1"/>

@@ -1,11 +1,11 @@
 <p align="center">
-  <img src=".github/assets/watch-together-banner.svg" alt="Watch Together — CouchSync Stack" width="100%" />
+  <img src=".github/assets/watch-together-banner.svg" alt="Spectemus Simul — by Delakroa" width="100%" />
 </p>
 
-<h1 align="center">Watch Together</h1>
+<h1 align="center">S² · Spectemus Simul</h1>
 
 <p align="center">
-  <strong>CouchSync Stack</strong> — приватные watch rooms для локальных фильмов. Файл остаётся у host; гости получают синхронный просмотр, чат, voice и reconnect через LiveKit-backed media plane.
+  <strong>by Delakroa</strong> · Смотри вместе. Приватные комнаты для совместного просмотра: файл остаётся у host, а гости получают синхронное видео, чат, голос и восстановление соединения через LiveKit.
 </p>
 
 <p align="center">
@@ -17,13 +17,13 @@
 
 ## Repository Card
 
-**GitHub About:** CouchSync: private co-watch rooms for local movies — no uploads, just shared playback.
+**GitHub About:** Spectemus Simul: private co-watch rooms for local movies — no uploads, just shared playback.
 
 **Topics:** `watch-party`, `co-watch`, `couchsync`, `webrtc`, `livekit`, `synchronized-playback`, `local-media`, `private-rooms`, `spring-boot`, `react`, `redis`, `websocket`, `closed-beta`.
 
 ## Что это
 
-Watch Together — MVP для приватного синхронного просмотра. Host выбирает локальный видеофайл, создаёт приватную комнату и приглашает гостей одной ссылкой. Приложение не является видеохостингом: байты фильма остаются на машине host.
+Spectemus Simul — MVP для приватного синхронного просмотра. Host выбирает локальный видеофайл, создаёт приватную комнату и приглашает гостей одной ссылкой. Приложение не является видеохостингом: байты фильма остаются на машине host.
 
 ## Текущий статус
 
