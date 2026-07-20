@@ -10,14 +10,41 @@ pause_on_error() {
   read -r
 }
 
+docker_is_ready() {
+  docker version --format '{{.Server.Version}}' >/dev/null 2>&1
+}
+
+start_docker_desktop_if_needed() {
+  if docker_is_ready; then
+    return 0
+  fi
+
+  printf '%s\n' 'Открываем Docker Desktop и ждём его готовности…'
+  if ! open -a Docker >/dev/null 2>&1; then
+    printf '%s\n' 'Не удалось открыть Docker Desktop. Установите его и повторите запуск.'
+    return 1
+  fi
+
+  for ((attempt = 1; attempt <= 60; attempt++)); do
+    if docker_is_ready; then
+      printf '%s\n' 'Docker Desktop готов.'
+      return 0
+    fi
+
+    sleep 2
+  done
+
+  printf '%s\n' 'Docker Desktop не успел запуститься за две минуты. Проверьте его окно и повторите запуск.'
+  return 1
+}
+
 if ! command -v pnpm >/dev/null 2>&1; then
   printf '%s\n' 'Не найден pnpm. Один раз установите Node.js LTS и pnpm, затем повторите запуск.'
   pause_on_error
   exit 1
 fi
 
-if ! docker version --format '{{.Server.Version}}' >/dev/null 2>&1; then
-  printf '%s\n' 'Docker Desktop не запущен. Откройте Docker Desktop, дождитесь статуса Running и повторите запуск.'
+if ! start_docker_desktop_if_needed; then
   pause_on_error
   exit 1
 fi

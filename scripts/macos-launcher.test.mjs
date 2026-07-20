@@ -15,8 +15,11 @@ test("macOS launcher запускает только безопасный LAN ho
   assert.doesNotMatch(launcher, /cloud/i);
 });
 
-test("macOS launcher оставляет ошибку видимой вместо молчаливого закрытия", () => {
+test("macOS launcher запускает Docker Desktop и оставляет ошибку видимой", () => {
   assert.match(launcher, /command -v pnpm/);
+  assert.match(launcher, /open -a Docker/);
   assert.match(launcher, /docker version/);
+  assert.match(launcher, /attempt <= 60/);
+  assert.match(launcher, /sleep 2/);
   assert.match(launcher, /pause_on_error/);
 });

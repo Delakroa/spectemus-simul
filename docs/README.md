@@ -111,6 +111,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [WT-635_WINDOWS_NODE24_PNPM_SPAWN.md](WT-635_WINDOWS_NODE24_PNPM_SPAWN.md) — Windows bootstrap запускает pnpm через ComSpec и не падает с spawn EINVAL на Node.js 24.
 - [WT-636_LAN_RECOVERY_UUID_FALLBACK.md](WT-636_LAN_RECOVERY_UUID_FALLBACK.md) — HTTP LAN fallback создаёт recovery UUID без crypto.randomUUID().
 - [WT-644_MACOS_HOST_LAUNCHER.md](WT-644_MACOS_HOST_LAUNCHER.md) — запуск host-а двойным кликом на macOS с проверкой Docker и LAN doctor.
+- [WT-645_MACOS_DOCKER_AUTOSTART.md](WT-645_MACOS_DOCKER_AUTOSTART.md) — Mac launcher сам открывает Docker Desktop и ждёт его готовности.
 
 ## Как обновлять документы
 
