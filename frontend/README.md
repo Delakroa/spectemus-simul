@@ -1,6 +1,6 @@
 # Frontend
 
-React-приложение Watch Together, созданное в WT-103.
+React-приложение Spectemus Simul, созданное в WT-103.
 
 ## Стек
 

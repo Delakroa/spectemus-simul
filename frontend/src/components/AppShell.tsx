@@ -1,15 +1,18 @@
-import { Film, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 
 export function AppShell() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <Link className="brand" to="/" aria-label="Watch Together, на главную">
+        <Link className="brand" to="/" aria-label="Spectemus Simul, by Delakroa, на главную">
           <span className="brand__mark" aria-hidden="true">
-            <Film size={20} strokeWidth={2.2} />
+            S<sup>2</sup>
           </span>
-          <span>Watch Together</span>
+          <span className="brand__identity">
+            <span>Spectemus Simul</span>
+            <span className="brand__byline">by Delakroa</span>
+          </span>
         </Link>
 
         <nav className="app-nav" aria-label="Основная навигация">
@@ -25,8 +28,10 @@ export function AppShell() {
       </main>
 
       <footer className="app-footer">
-        <span>Watch Together</span>
-        <span>Совместный просмотр без загрузки видео на сервер</span>
+        <span>
+          Spectemus Simul <span className="app-footer__byline">by Delakroa</span>
+        </span>
+        <span>Смотри вместе</span>
       </footer>
     </div>
   );

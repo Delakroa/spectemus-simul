@@ -17,7 +17,7 @@ describe("ErrorBoundary", () => {
     );
 
     expect(
-      screen.getByRole("heading", { name: "Не удалось открыть Watch Together" }),
+      screen.getByRole("heading", { name: "Не удалось открыть Spectemus Simul" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Обновить страницу" })).toBeInTheDocument();
   });

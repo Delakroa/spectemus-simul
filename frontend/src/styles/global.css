@@ -87,6 +87,33 @@ a {
   border-radius: 7px;
   color: #ffffff;
   background: var(--ink);
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: -0.08em;
+}
+
+.brand__mark sup {
+  margin-left: 1px;
+  font-size: 0.58em;
+  line-height: 1;
+}
+
+.brand__identity {
+  display: grid;
+  gap: 1px;
+  line-height: 1.1;
+}
+
+.brand__byline,
+.app-footer__byline {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.03em;
+}
+
+.app-footer__byline {
+  margin-left: 4px;
 }
 
 .app-nav {
