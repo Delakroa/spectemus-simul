@@ -113,6 +113,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [WT-644_MACOS_HOST_LAUNCHER.md](WT-644_MACOS_HOST_LAUNCHER.md) — запуск host-а двойным кликом на macOS с проверкой Docker и LAN doctor.
 - [WT-645_MACOS_DOCKER_AUTOSTART.md](WT-645_MACOS_DOCKER_AUTOSTART.md) — Mac launcher сам открывает Docker Desktop и ждёт его готовности.
 - [WT-646_WINDOWS_DOCKER_AUTOSTART.md](WT-646_WINDOWS_DOCKER_AUTOSTART.md) — Windows launcher сам открывает Docker Desktop и ждёт его готовности.
+- [WT-647_DESKTOP_HOST_ARCHITECTURE.md](WT-647_DESKTOP_HOST_ARCHITECTURE.md) — решение и поэтапный план обычного desktop host без Docker.
 
 ## Как обновлять документы
 

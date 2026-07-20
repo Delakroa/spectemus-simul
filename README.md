@@ -97,6 +97,7 @@ P0 технически подтверждён.
 - WT-644 даёт Mac host-у запуск двойным кликом через `Start-Spectemus-Simul.command`: проверяются Docker Desktop и LAN, затем автоматически открывается адрес комнаты.
 - WT-645 убирает ручной старт Docker Desktop на Mac: запускатор сам открывает его и ждёт готовности до двух минут.
 - WT-646 выравнивает Windows: `.cmd` launcher сам открывает Docker Desktop и ждёт готовности до двух минут.
+- WT-647 фиксирует путь к обычному desktop-приложению: Electron host без Docker и установленного Node.js, с отдельным native-media этапом для расширения форматов.
 
 P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. P7 beta iteration закрыт repo-side: WT-603 готовит evidence-прогон, WT-604 закрыл телеметрию для метрики успешности сессии, WT-605 добавил управляемый feedback triage, WT-606 — security/rate-limit hardening, WT-607 — media QoS/cost benchmark kit. WT-608/WT-609 (P8) закрывают repo-side evidence refresh и operator feedback UI; P9 начинается с предсказуемой media compatibility policy. Оставшийся гейт расширения beta — реальный staging-прогон.
 
@@ -274,6 +275,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-644 macOS Host launcher](docs/WT-644_MACOS_HOST_LAUNCHER.md)
 - [WT-645 macOS Docker Desktop autostart](docs/WT-645_MACOS_DOCKER_AUTOSTART.md)
 - [WT-646 Windows Docker Desktop autostart](docs/WT-646_WINDOWS_DOCKER_AUTOSTART.md)
+- [WT-647 desktop host architecture](docs/WT-647_DESKTOP_HOST_ARCHITECTURE.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation
