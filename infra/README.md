@@ -98,11 +98,14 @@ UAC только для узких firewall-правил Private-профиля:
 pnpm host:lan:start
 ```
 
-На Windows эту же команду можно запустить без терминала: дважды кликните
-[`Start-Spectemus-Simul.cmd`](../Start-Spectemus-Simul.cmd) в корне проекта.
-После готовности он сам откроет браузер с адресом host-а; при ошибке окно
-останется открытым с понятной причиной. Однократно до первого запуска всё ещё
-нужны установленные Node.js/pnpm и Docker Desktop, а Docker Desktop должен
+Запуск без терминала доступен в корне проекта:
+
+- Windows — дважды кликните [`Start-Spectemus-Simul.cmd`](../Start-Spectemus-Simul.cmd).
+- macOS — дважды кликните [`Start-Spectemus-Simul.command`](../Start-Spectemus-Simul.command).
+
+После готовности запускатор сам откроет браузер с адресом host-а; при ошибке
+окно останется открытым с понятной причиной. Однократно до первого запуска всё
+ещё нужны установленные Node.js/pnpm и Docker Desktop, а Docker Desktop должен
 быть запущен.
 
 Если у host-а два физических подключения, укажите адрес домашней сети явно:
