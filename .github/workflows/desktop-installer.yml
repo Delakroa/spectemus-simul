@@ -38,7 +38,7 @@ jobs:
           java-version: 25
       - uses: actions/setup-go@v6
         with:
-          go-version: 1.25.0
+          go-version: 1.26.0
       - name: Установить зависимости
         run: pnpm install --frozen-lockfile
       - name: Собрать закреплённый LiveKit sidecar
