@@ -101,6 +101,7 @@ P0 технически подтверждён.
 - WT-648 добавляет отдельный single-process backend profile: desktop host работает без Redis, сохраняя room, presence и rate-limit contracts.
 - WT-649 собирает Electron host proof: React UI, desktop backend, local LiveKit и LAN gateway запускаются без Docker; installer и подпись остаются следующим этапом.
 - WT-650 добавляет packaging foundation для DMG/NSIS и строгий release gate для подписи; выпуск блокируют только Apple/Windows credentials и чистый install smoke.
+- WT-651 фиксирует native-media POC: сначала локальная нормализация common movie formats в совместимую временную копию, измерения и лицензирование; LiveKit Ingress не добавляется в desktop runtime.
 
 P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. P7 beta iteration закрыт repo-side: WT-603 готовит evidence-прогон, WT-604 закрыл телеметрию для метрики успешности сессии, WT-605 добавил управляемый feedback triage, WT-606 — security/rate-limit hardening, WT-607 — media QoS/cost benchmark kit. WT-608/WT-609 (P8) закрывают repo-side evidence refresh и operator feedback UI; P9 начинается с предсказуемой media compatibility policy. Оставшийся гейт расширения beta — реальный staging-прогон.
 
@@ -282,6 +283,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-648 desktop backend profile](docs/WT-648_DESKTOP_BACKEND_PROFILE.md)
 - [WT-649 Electron host proof](docs/WT-649_ELECTRON_HOST_PROOF.md)
 - [WT-650 desktop installer foundation](docs/WT-650_DESKTOP_INSTALLER_FOUNDATION.md)
+- [WT-651 native media compatibility POC](docs/WT-651_NATIVE_MEDIA_COMPATIBILITY_POC.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation
