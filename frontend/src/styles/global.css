@@ -123,6 +123,38 @@ a {
   gap: 10px;
 }
 
+.desktop-runtime-status {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.desktop-runtime-status--ready {
+  border-color: rgb(22 135 93 / 35%);
+  color: var(--success);
+  background: rgb(22 135 93 / 7%);
+}
+
+.desktop-runtime-status--pending {
+  border-color: rgb(165 106 0 / 35%);
+  color: var(--warning);
+  background: rgb(165 106 0 / 7%);
+}
+
+.desktop-runtime-status--error {
+  border-color: rgb(196 61 55 / 35%);
+  color: var(--danger);
+  background: rgb(196 61 55 / 7%);
+}
+
 .app-nav__link {
   display: inline-flex;
   min-height: 38px;
