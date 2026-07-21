@@ -117,6 +117,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [WT-648_DESKTOP_BACKEND_PROFILE.md](WT-648_DESKTOP_BACKEND_PROFILE.md) — single-process backend profile без Redis для будущего Electron host.
 - [WT-649_ELECTRON_HOST_PROOF.md](WT-649_ELECTRON_HOST_PROOF.md) — Electron supervisor, local sidecars и LAN gateway без Docker.
 - [WT-650_DESKTOP_INSTALLER_FOUNDATION.md](WT-650_DESKTOP_INSTALLER_FOUNDATION.md) — packaging, signed release gate и install smoke для DMG/NSIS.
+- [WT-651_NATIVE_MEDIA_COMPATIBILITY_POC.md](WT-651_NATIVE_MEDIA_COMPATIBILITY_POC.md) — native-media hypothesis, POC harness, license gate и критерии решения.
 
 ## Как обновлять документы
 
