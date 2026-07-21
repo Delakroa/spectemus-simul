@@ -13,6 +13,7 @@ dist/
 **/dist/
 frontend/build/
 desktop/.sidecars/
+desktop/release/
 reports/
 **/reports/
 

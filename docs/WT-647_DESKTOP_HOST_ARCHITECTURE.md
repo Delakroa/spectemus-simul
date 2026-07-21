@@ -118,7 +118,7 @@ Desktop host не отменяет NAT. Для надёжного просмот
 | ------ | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | WT-648 | Desktop backend profile: in-process room/presence/rate-limit store с contract и concurrency tests           | Убирает Redis/PostgreSQL из user runtime                   |
 | WT-649 | Electron host proof: supervisor, локальный LiveKit single-node, UI/gateway и явный start/stop status        | Проверяет запуск существующего product path без Docker     |
-| WT-650 | Подписанные DMG/MSI installers, first-run network/firewall UX и install/update smoke                        | Превращает proof в передачу обычному пользователю          |
+| WT-650 | Подписанные DMG/NSIS installers, first-run network/firewall UX и install/update smoke                       | Превращает proof в передачу обычному пользователю          |
 | WT-651 | Native media compatibility POC: выбранные MP4/MKV samples, decode/transcode, CPU/quality и licensing review | Решение, какие дополнительные форматы реально поддерживать |
 | WT-652 | Internet mode architecture: account, public URL, TLS/TURN, privacy/cost limits                              | Просмотр между городами                                    |
 

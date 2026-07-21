@@ -116,6 +116,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [WT-647_DESKTOP_HOST_ARCHITECTURE.md](WT-647_DESKTOP_HOST_ARCHITECTURE.md) — решение и поэтапный план обычного desktop host без Docker.
 - [WT-648_DESKTOP_BACKEND_PROFILE.md](WT-648_DESKTOP_BACKEND_PROFILE.md) — single-process backend profile без Redis для будущего Electron host.
 - [WT-649_ELECTRON_HOST_PROOF.md](WT-649_ELECTRON_HOST_PROOF.md) — Electron supervisor, local sidecars и LAN gateway без Docker.
+- [WT-650_DESKTOP_INSTALLER_FOUNDATION.md](WT-650_DESKTOP_INSTALLER_FOUNDATION.md) — packaging, signed release gate и install smoke для DMG/NSIS.
 
 ## Как обновлять документы
 

@@ -1,17 +1,74 @@
 {
   "name": "@spectemus-simul/desktop",
   "version": "0.1.0",
+  "description": "Приватный совместный просмотр в локальной сети.",
+  "author": "Дмитрий Халиков",
+  "homepage": "https://github.com/Delakroa/spectemus-simul",
   "private": true,
   "type": "module",
   "main": "src/main/main.mjs",
   "scripts": {
     "dev": "electron .",
-    "format:check": "prettier --check .",
+    "format:check": "prettier --check package.json src",
+    "package:dir": "electron-builder --dir",
+    "package:mac": "electron-builder --mac dmg zip",
+    "package:win": "electron-builder --win nsis",
     "test": "node --test src/main/*.test.mjs",
     "test:ci": "node --test src/main/*.test.mjs"
   },
   "devDependencies": {
     "electron": "43.2.0",
+    "electron-builder": "26.15.3",
     "prettier": "3.9.4"
+  },
+  "build": {
+    "appId": "io.github.delakroa.spectemussimul",
+    "productName": "Spectemus Simul",
+    "artifactName": "Spectemus-Simul-${version}-${os}-${arch}.${ext}",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/main/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../frontend/dist",
+        "to": "frontend"
+      },
+      {
+        "from": "../backend/build/libs/backend-0.1.0-SNAPSHOT.jar",
+        "to": "sidecars/backend/watch-together-backend.jar"
+      },
+      {
+        "from": ".sidecars/runtime",
+        "to": "sidecars/runtime"
+      },
+      {
+        "from": ".sidecars/livekit",
+        "to": "sidecars/livekit"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.entertainment",
+      "hardenedRuntime": true,
+      "forceCodeSigning": true,
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "forceCodeSigning": true,
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    }
   }
 }
