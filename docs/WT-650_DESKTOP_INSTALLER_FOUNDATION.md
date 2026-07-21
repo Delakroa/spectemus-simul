@@ -7,9 +7,9 @@
   sidecar; desktop app не требует Node.js, pnpm, Docker или Redis.
 - Preflight не даёт собрать installer без каждого из четырёх runtime inputs.
 - Manual GitHub Actions workflow собирает отдельные macOS и Windows artifacts:
-  macOS собирает LiveKit из официального тега `v1.13.3` для x64 и Apple
-  Silicon (Go 1.26, как требует pinned source), Windows получает официальный
-  release archive `v1.13.3` с проверкой SHA-256.
+  macOS собирает исполняемый пакет `cmd/server` LiveKit из официального тега
+  `v1.13.3` для x64 и Apple Silicon (Go 1.26, как требует pinned source),
+  Windows получает официальный release archive `v1.13.3` с проверкой SHA-256.
 - Preview artifacts строятся отдельно и явно отключают signing. Они нужны
   только для install smoke, а не для передачи пользователям.
 

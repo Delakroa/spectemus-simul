@@ -45,7 +45,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/livekit"
-          GOBIN="$RUNNER_TEMP/livekit" go install github.com/livekit/livekit-server@v1.13.3
+          GOBIN="$RUNNER_TEMP/livekit" go install github.com/livekit/livekit-server/cmd/server@v1.13.3
+          mv "$RUNNER_TEMP/livekit/server" "$RUNNER_TEMP/livekit/livekit-server"
           "$RUNNER_TEMP/livekit/livekit-server" --version
       - name: Подготовить sidecars
         run: pnpm desktop:sidecars:stage -- --runtime "$JAVA_HOME" --livekit "$RUNNER_TEMP/livekit/livekit-server"
