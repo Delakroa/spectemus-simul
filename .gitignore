@@ -12,6 +12,7 @@ backend/bin/
 dist/
 **/dist/
 frontend/build/
+desktop/.sidecars/
 reports/
 **/reports/
 

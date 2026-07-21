@@ -115,6 +115,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [WT-646_WINDOWS_DOCKER_AUTOSTART.md](WT-646_WINDOWS_DOCKER_AUTOSTART.md) — Windows launcher сам открывает Docker Desktop и ждёт его готовности.
 - [WT-647_DESKTOP_HOST_ARCHITECTURE.md](WT-647_DESKTOP_HOST_ARCHITECTURE.md) — решение и поэтапный план обычного desktop host без Docker.
 - [WT-648_DESKTOP_BACKEND_PROFILE.md](WT-648_DESKTOP_BACKEND_PROFILE.md) — single-process backend profile без Redis для будущего Electron host.
+- [WT-649_ELECTRON_HOST_PROOF.md](WT-649_ELECTRON_HOST_PROOF.md) — Electron supervisor, local sidecars и LAN gateway без Docker.
 
 ## Как обновлять документы
 

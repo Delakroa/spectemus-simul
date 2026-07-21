@@ -99,6 +99,7 @@ P0 технически подтверждён.
 - WT-646 выравнивает Windows: `.cmd` launcher сам открывает Docker Desktop и ждёт готовности до двух минут.
 - WT-647 фиксирует путь к обычному desktop-приложению: Electron host без Docker и установленного Node.js, с отдельным native-media этапом для расширения форматов.
 - WT-648 добавляет отдельный single-process backend profile: desktop host работает без Redis, сохраняя room, presence и rate-limit contracts.
+- WT-649 собирает Electron host proof: React UI, desktop backend, local LiveKit и LAN gateway запускаются без Docker; installer и подпись остаются следующим этапом.
 
 P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. P7 beta iteration закрыт repo-side: WT-603 готовит evidence-прогон, WT-604 закрыл телеметрию для метрики успешности сессии, WT-605 добавил управляемый feedback triage, WT-606 — security/rate-limit hardening, WT-607 — media QoS/cost benchmark kit. WT-608/WT-609 (P8) закрывают repo-side evidence refresh и operator feedback UI; P9 начинается с предсказуемой media compatibility policy. Оставшийся гейт расширения beta — реальный staging-прогон.
 
@@ -278,6 +279,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-646 Windows Docker Desktop autostart](docs/WT-646_WINDOWS_DOCKER_AUTOSTART.md)
 - [WT-647 desktop host architecture](docs/WT-647_DESKTOP_HOST_ARCHITECTURE.md)
 - [WT-648 desktop backend profile](docs/WT-648_DESKTOP_BACKEND_PROFILE.md)
+- [WT-649 Electron host proof](docs/WT-649_ELECTRON_HOST_PROOF.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation
