@@ -122,6 +122,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [WT-653_PUBLIC_ACCESS_CONTRACTS.md](WT-653_PUBLIC_ACCESS_CONTRACTS.md) — planned `/api/v2` account/invite/membership contracts без изменения LAN API.
 - [WT-657_DESKTOP_INSTALL_SMOKE.md](WT-657_DESKTOP_INSTALL_SMOKE.md) — CI монтирует DMG и устанавливает NSIS, затем проверяет runtime-компоненты готового приложения.
 - [WT-658_BROWSER_MEDIA_COMPATIBILITY.md](WT-658_BROWSER_MEDIA_COMPATIBILITY.md) — experimental local decode/capture path для контейнеров за пределами MP4/M4V/WebM без ложного обещания «любой файл».
+- [WT-659_DESKTOP_PREVIEW_EVIDENCE.md](WT-659_DESKTOP_PREVIEW_EVIDENCE.md) — successful three-platform preview build после WT-658 и границы того, что CI ещё не доказывает.
 
 ## Как обновлять документы
 
