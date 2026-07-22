@@ -78,6 +78,7 @@ P0 технически подтверждён.
 - WT-608 повторяет product review после закрытия P7: обновлённый evidence snapshot, статус beta-гейтов и решение CONTINUE к фактическому прогону invite-only beta (реальные user/QoS данные — за внешним прогоном).
 - WT-609 добавляет operator dashboard: `/operator` UI для просмотра feedback reports, фильтров, деталей, export и triage actions поверх WT-605 endpoints.
 - WT-619 формализует browser-native поддержку локальных MP4/M4V и WebM: явный file picker policy, runtime diagnostics и честные границы codec support без загрузки файла на backend.
+- WT-658 позволяет попробовать другие локальные контейнеры (например, MOV/MKV/AVI) через реальный decode/capture preflight; успех помечается как экспериментальный и не является обещанием «любой файл».
 - WT-621 делает LAN-проверку комнаты понятнее: читаемые события, честная HTTPS-граница голоса и предупреждение для `localhost` invite.
 - WT-622 устраняет ручную LAN-настройку: host автоматически получает private IPv4, а doctor проверяет Windows → Mac gateway, LiveKit endpoint и TCP fallback до создания комнаты.
 - WT-623 объединяет entry и private room в один тёмный review-интерфейс; `/operator` остаётся отдельным светлым служебным инструментом.
@@ -287,6 +288,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-652 internet mode architecture](docs/WT-652_INTERNET_MODE_ARCHITECTURE.md)
 - [WT-653 public access contracts](docs/WT-653_PUBLIC_ACCESS_CONTRACTS.md)
 - [WT-657 desktop install smoke](docs/WT-657_DESKTOP_INSTALL_SMOKE.md)
+- [WT-658 browser media compatibility](docs/WT-658_BROWSER_MEDIA_COMPATIBILITY.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation

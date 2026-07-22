@@ -149,6 +149,7 @@ vi.mock("./file-diagnostics", async (importOriginal) => {
   return {
     ...actual,
     diagnoseFile: vi.fn().mockResolvedValue({
+      compatibility: "native",
       displayName: "movie.mp4",
       durationMs: 120000,
       format: "mp4",

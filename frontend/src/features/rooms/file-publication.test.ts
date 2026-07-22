@@ -107,6 +107,7 @@ describe("publishFileToLiveKit", () => {
     const room = createRoom();
 
     const publication = await publishFileToLiveKit(room as never, {
+      compatibility: "native",
       displayName: "movie.mp4",
       durationMs: 120000,
       format: "mp4",
@@ -159,6 +160,7 @@ describe("publishFileToLiveKit", () => {
 
     await expect(
       publishFileToLiveKit(room as never, {
+        compatibility: "native",
         displayName: "audio.mp4",
         durationMs: 120000,
         format: "mp4",
@@ -190,6 +192,7 @@ describe("publishFileToLiveKit", () => {
     await publishFileToLiveKit(
       room as never,
       {
+        compatibility: "native",
         displayName: "movie.mp4",
         durationMs: 120000,
         format: "mp4",

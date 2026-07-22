@@ -972,6 +972,12 @@ a {
   font-weight: 700;
 }
 
+.file-picker__experimental {
+  color: var(--warning);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .file-picker__hint {
   margin: 10px 0 0;
   color: var(--muted);
@@ -2975,6 +2981,10 @@ html:has(.operator-page) {
 
 .room-workspace--active .file-picker__verdict {
   color: #79e6af;
+}
+
+.room-workspace--active .file-picker__experimental {
+  color: #ffca7a;
 }
 
 .room-workspace--active .participant-row__avatar {

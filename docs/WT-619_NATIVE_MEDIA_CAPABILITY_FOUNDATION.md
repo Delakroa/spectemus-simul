@@ -12,17 +12,20 @@
 
 ## Область
 
-| Семейство | Вход file picker                           | Целевые кодеки | Runtime-проверка                               |
-| --------- | ------------------------------------------ | -------------- | ---------------------------------------------- |
-| MP4 / M4V | `.mp4`, `.m4v`, `video/mp4`, `video/x-m4v` | H.264 + AAC    | `canPlayType()` → metadata → `captureStream()` |
-| WebM      | `.webm`, `video/webm`                      | VP8/VP9 + Opus | `canPlayType()` → metadata → `captureStream()` |
+| Уровень          | Семейство                                      | Вход file picker                             | Runtime-проверка                                                |
+| ---------------- | ---------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------- |
+| Базовая гарантия | MP4 / M4V (H.264 + AAC), WebM (VP8/VP9 + Opus) | Явный выбор и drag-and-drop                  | `canPlayType()` → metadata → `captureStream()`                  |
+| Эксперимент      | MOV, MKV, AVI и другой локальный файл          | Любой `video/*` и известные video extensions | metadata → фактический decode первого кадра → `captureStream()` |
 
-Именно runtime-проверка браузера остаётся авторитетной: расширение и MIME определяют policy, а загрузка metadata подтверждает, что конкретный файл и его кодек действительно декодируются в текущем браузере.
+Именно runtime-проверка браузера остаётся авторитетной: базовая policy
+использует расширение и MIME, а экспериментальный путь подтверждает конкретный
+файл фактическим decode/capture в текущем браузере.
 
 ## Не входит в тикет
 
 - обещание поддержки «любого видео»;
-- MKV, AVI, MOV, HEVC/H.265, DTS и другие контейнеры/кодеки вне browser-native policy;
+- обещание, что MOV, MKV, AVI, HEVC/H.265, DTS или любой другой контейнер
+  пройдёт на каждом компьютере;
 - DRM-защищённые фильмы, URL внешних стриминговых сервисов, торренты и каталог контента;
 - отправка или хранение movie bytes на backend;
 - mobile/Safari/Firefox readiness;
@@ -31,11 +34,11 @@
 
 ## Реализация
 
-- `frontend/src/features/rooms/file-diagnostics.ts` содержит единую policy: `LOCAL_MEDIA_FILE_ACCEPT`, формат MP4/M4V или WebM и пользовательскую подсказку.
-- Неизвестный контейнер отклоняется до попытки публикации; допустимый контейнер проходит `canPlayType()`, загрузку metadata, короткий muted decode preview до первого кадра и `captureStream()`.
+- `frontend/src/features/rooms/file-diagnostics.ts` содержит единую policy: `LOCAL_MEDIA_FILE_ACCEPT`, базовые форматы и пользовательскую подсказку.
+- Базовый формат проверяется через `canPlayType()`. Контейнер вне базовой policy не получает ложного отказа по расширению: он проходит загрузку metadata, короткий muted decode preview до первого кадра и `captureStream()`. Успех явно помечается как экспериментальный и привязан к устройству host-а.
 - Preflight требует video track из `captureStream()` и определяет наличие audio track по фактическому stream; все временные tracks останавливаются, а диагностический video element очищается.
 - `FileDiagnosticsResult` несёт нормализованные `format`, `formatLabel`, разрешение, наличие звука и verdict `CAN_STREAM`; карточка выбранного файла показывает их до кнопки публикации.
-- File picker предлагает только MP4/M4V и WebM, но диагностика остаётся вторым уровнем защиты для выбора через «Все файлы» или недостоверного MIME.
+- File picker предлагает все видеофайлы, но диагностика остаётся вторым уровнем защиты: не прошедший decode/capture файл не получает право на публикацию.
 - Ошибка metadata прямо сообщает о повреждённом файле или неподдерживаемом кодеке и даёт путь к совместимым форматам.
 
 ## Проверка
@@ -46,7 +49,7 @@ pnpm --filter @watch-together/frontend typecheck
 pnpm check
 ```
 
-Автотесты покрывают MP4, M4V, WebM, недопустимый контейнер, browser rejection, недоступный `captureStream()`, metadata failure, отсутствие audio/video track в capture preview и отображение policy/verdict в UI.
+Автотесты покрывают MP4, M4V, WebM, экспериментальный MKV без MIME preflight, browser rejection для базового формата, недоступный `captureStream()`, metadata failure, отсутствие audio/video track в capture preview и отображение policy/verdict в UI.
 
 Перед внешним обещанием WebM необходим отдельный staging evidence: Chrome/Edge host + guest, реальный MP4 и реальный WebM, video/audio, play/pause/seek и reconnect. До этого policy означает корректную product boundary и runtime diagnostics, а не готовность всех браузеров и кодеков.
 
@@ -55,4 +58,4 @@ pnpm check
 - `captureStream()` ограничивает поддерживаемые браузеры desktop Chrome/Edge.
 - `canPlayType()` не извлекает codec profile из контейнера; окончательное решение по конкретному файлу дают browser metadata load и короткий decode/capture preflight, но UI не притворяется полноценным codec inspector.
 - Локальный файл остаётся только у host, поэтому его способность декодировать и отправлять поток остаётся частью качества сессии.
-- После завершения WT-619 следующий продуктовый шаг — WT-620: приватный review workspace с большим media stage, правой rail и компактными controls. Расширение за пределы browser-native codecs требует отдельного desktop helper, а не скрытого обхода ограничений web-платформы.
+- WT-658 расширяет вход до experimental decode/capture для контейнеров, которые уже умеет декодировать host Chromium. Расширение до предсказуемой поддержки HEVC, DTS и любого файла всё ещё требует отдельного desktop helper и licensing review, а не скрытого обхода ограничений web-платформы.

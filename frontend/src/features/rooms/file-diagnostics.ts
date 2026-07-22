@@ -1,10 +1,13 @@
-export const LOCAL_MEDIA_FILE_ACCEPT = ".mp4,.m4v,.webm,video/mp4,video/x-m4v,video/webm";
-export const LOCAL_MEDIA_FORMATS_HINT = "Поддерживаются MP4/M4V (H.264/AAC) и WebM (VP8/VP9/Opus).";
+export const LOCAL_MEDIA_FILE_ACCEPT = "video/*,.mkv,.avi,.mov,.mpeg,.mpg,.ts,.m2ts,.wmv,.flv";
+export const LOCAL_MEDIA_FORMATS_HINT =
+  "Надёжный путь: MP4/M4V (H.264/AAC) и WebM (VP8/VP9/Opus). Другие видеофайлы можно проверить на этом устройстве без гарантии поддержки.";
 
-export type SupportedMediaFormat = "mp4" | "webm";
+export type SupportedMediaFormat = "mp4" | "webm" | "experimental";
+export type MediaFileCompatibility = "native" | "experimental";
 export type MediaFileVerdict = "CAN_STREAM";
 
 export type FileDiagnosticsResult = {
+  compatibility: MediaFileCompatibility;
   displayName: string;
   durationMs: number;
   format: SupportedMediaFormat;
@@ -21,6 +24,7 @@ export type FileDiagnosticsResult = {
 
 type MediaFormatProfile = {
   browserMimeType: string;
+  compatibility: MediaFileCompatibility;
   extensions: string[];
   format: SupportedMediaFormat;
   label: string;
@@ -30,6 +34,7 @@ type MediaFormatProfile = {
 const MEDIA_FORMAT_PROFILES: MediaFormatProfile[] = [
   {
     browserMimeType: "video/mp4",
+    compatibility: "native",
     extensions: ["mp4", "m4v"],
     format: "mp4",
     label: "MP4",
@@ -37,6 +42,7 @@ const MEDIA_FORMAT_PROFILES: MediaFormatProfile[] = [
   },
   {
     browserMimeType: "video/webm",
+    compatibility: "native",
     extensions: ["webm"],
     format: "webm",
     label: "WebM",
@@ -51,6 +57,7 @@ type CapturableVideoElement = HTMLVideoElement & {
 };
 
 const CAN_STREAM_VERDICT_LABEL = "Можно транслировать с этого устройства";
+const EXPERIMENTAL_CAN_STREAM_VERDICT_LABEL = "Экспериментально проверено на этом устройстве";
 const DECODE_PREVIEW_TIMEOUT_MS = 4_000;
 
 export class FileDiagnosticsFailure extends Error {
@@ -81,14 +88,10 @@ export async function diagnoseFile(file: File): Promise<FileDiagnosticsResult> {
 
 async function runChecks(file: File, objectUrl: string): Promise<FileDiagnosticsResult> {
   const profile = resolveMediaFormatProfile(file);
-  if (!profile) {
-    throw new FileDiagnosticsFailure("UNSUPPORTED_FORMAT", unsupportedFormatMessage());
-  }
-
   const mimeType = profile.browserMimeType;
   const video = document.createElement("video");
 
-  if (!video.canPlayType(mimeType)) {
+  if (profile.compatibility === "native" && !video.canPlayType(mimeType)) {
     throw new FileDiagnosticsFailure(
       "UNSUPPORTED_FORMAT",
       `Браузер не поддерживает выбранный ${profile.label}. ${LOCAL_MEDIA_FORMATS_HINT}`,
@@ -113,6 +116,7 @@ async function runChecks(file: File, objectUrl: string): Promise<FileDiagnostics
     const capture = await runCapturePreview(videoWithCapture);
 
     return {
+      compatibility: profile.compatibility,
       displayName: file.name,
       durationMs: metadata.durationMs,
       format: profile.format,
@@ -123,7 +127,10 @@ async function runChecks(file: File, objectUrl: string): Promise<FileDiagnostics
       mimeType,
       objectUrl,
       verdict: "CAN_STREAM",
-      verdictLabel: CAN_STREAM_VERDICT_LABEL,
+      verdictLabel:
+        profile.compatibility === "native"
+          ? CAN_STREAM_VERDICT_LABEL
+          : EXPERIMENTAL_CAN_STREAM_VERDICT_LABEL,
       width: metadata.width,
     };
   } finally {
@@ -257,21 +264,40 @@ function cleanupDiagnosticVideo(video: HTMLVideoElement): void {
   video.load();
 }
 
-function resolveMediaFormatProfile(file: File): MediaFormatProfile | null {
+function resolveMediaFormatProfile(file: File): MediaFormatProfile {
   const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
   const mimeType = normalizeMimeType(file.type);
 
-  return (
+  const nativeProfile =
     MEDIA_FORMAT_PROFILES.find((profile) => profile.extensions.includes(extension)) ??
-    MEDIA_FORMAT_PROFILES.find((profile) => profile.mimeTypes.includes(mimeType)) ??
-    null
-  );
+    MEDIA_FORMAT_PROFILES.find((profile) => profile.mimeTypes.includes(mimeType));
+
+  if (nativeProfile) {
+    return nativeProfile;
+  }
+
+  return {
+    browserMimeType: mimeType || "application/octet-stream",
+    compatibility: "experimental",
+    extensions: [],
+    format: "experimental",
+    label: describeExperimentalFormat(extension, mimeType),
+    mimeTypes: [],
+  };
 }
 
 function normalizeMimeType(value: string): string {
   return value.split(";", 1)[0]?.trim().toLowerCase() ?? "";
 }
 
-function unsupportedFormatMessage(): string {
-  return `Этот контейнер пока не поддерживается в браузерной версии. ${LOCAL_MEDIA_FORMATS_HINT}`;
+function describeExperimentalFormat(extension: string, mimeType: string): string {
+  if (extension) {
+    return extension.toUpperCase();
+  }
+
+  if (mimeType.startsWith("video/")) {
+    return mimeType.slice("video/".length).toUpperCase();
+  }
+
+  return "другой формат";
 }

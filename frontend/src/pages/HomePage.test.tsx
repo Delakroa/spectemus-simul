@@ -1324,9 +1324,11 @@ describe("HomePage", () => {
     const file = new File([""], "movie.mp4", { type: "video/mp4" });
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     const dropzone = document.querySelector(".file-picker--dropzone") as HTMLDivElement;
-    expect(input.accept).toBe(".mp4,.m4v,.webm,video/mp4,video/x-m4v,video/webm");
+    expect(input.accept).toBe("video/*,.mkv,.avi,.mov,.mpeg,.mpg,.ts,.m2ts,.wmv,.flv");
     expect(
-      screen.getByText("Поддерживаются MP4/M4V (H.264/AAC) и WebM (VP8/VP9/Opus)."),
+      screen.getByText(
+        "Надёжный путь: MP4/M4V (H.264/AAC) и WebM (VP8/VP9/Opus). Другие видеофайлы можно проверить на этом устройстве без гарантии поддержки.",
+      ),
     ).toBeInTheDocument();
     fireEvent.dragOver(dropzone, { dataTransfer: { dropEffect: "none", files: [file] } });
     expect(dropzone).toHaveClass("file-picker--dropzone-active");
@@ -1551,18 +1553,21 @@ describe("HomePage", () => {
 
     const videoStub: Record<string, unknown> = {
       duration: 0,
+      load: vi.fn(),
+      pause: vi.fn(),
       videoWidth: 0,
       preload: "",
       onloadedmetadata: null,
       onerror: null,
       canPlayType: vi.fn().mockReturnValue(""),
       captureStream: vi.fn(),
+      removeAttribute: vi.fn(),
     };
     Object.defineProperty(videoStub, "src", {
       set(_src: string) {
         void _src;
         Promise.resolve().then(() => {
-          (videoStub.onloadedmetadata as (() => void) | null)?.();
+          (videoStub.onerror as (() => void) | null)?.();
         });
       },
     });
@@ -1588,7 +1593,7 @@ describe("HomePage", () => {
     await waitFor(() => {
       expect(
         screen.getByText(
-          "Этот контейнер пока не поддерживается в браузерной версии. Поддерживаются MP4/M4V (H.264/AAC) и WebM (VP8/VP9/Opus).",
+          "Не удалось декодировать файл. Возможно, он повреждён или использует неподдерживаемый кодек. Надёжный путь: MP4/M4V (H.264/AAC) и WebM (VP8/VP9/Opus). Другие видеофайлы можно проверить на этом устройстве без гарантии поддержки.",
         ),
       ).toBeInTheDocument();
     });

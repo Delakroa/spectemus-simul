@@ -93,6 +93,7 @@ describe("diagnoseFile", () => {
     const result = await diagnoseFile(file);
 
     expect(result.objectUrl).toBe("blob:test-url");
+    expect(result.compatibility).toBe("native");
     expect(result.displayName).toBe("movie.mp4");
     expect(result.format).toBe("mp4");
     expect(result.formatLabel).toBe("MP4");
@@ -147,19 +148,21 @@ describe("diagnoseFile", () => {
     expect(result.hasAudio).toBe(false);
   });
 
-  it("выбрасывает UNSUPPORTED_FORMAT для контейнера вне compatibility policy", async () => {
+  it("проверяет экспериментальный MKV по фактическому decode/capture без MIME preflight", async () => {
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:test-url");
-    const revokeObjectURL = vi.spyOn(URL, "revokeObjectURL");
-    const stub = makeVideoStub({ canPlayTypeResult: "probably" });
+    vi.spyOn(URL, "revokeObjectURL");
+    const stub = makeVideoStub({ canPlayTypeResult: "" });
     vi.spyOn(document, "createElement").mockReturnValue(stub as unknown as HTMLElement);
 
     const file = new File([""], "video.mkv", { type: "video/x-matroska" });
+    const result = await diagnoseFile(file);
 
-    await expect(diagnoseFile(file)).rejects.toSatisfy(
-      (e) => e instanceof FileDiagnosticsFailure && e.code === "UNSUPPORTED_FORMAT",
-    );
+    expect(result.compatibility).toBe("experimental");
+    expect(result.format).toBe("experimental");
+    expect(result.formatLabel).toBe("MKV");
+    expect(result.mimeType).toBe("video/x-matroska");
+    expect(result.verdictLabel).toBe("Экспериментально проверено на этом устройстве");
     expect(stub.canPlayType).not.toHaveBeenCalled();
-    expect(revokeObjectURL).toHaveBeenCalledWith("blob:test-url");
   });
 
   it("выбрасывает UNSUPPORTED_FORMAT, когда браузер не декодирует допустимый контейнер", async () => {

@@ -958,6 +958,12 @@ export function HomePage() {
                       <span className="file-picker__verdict">
                         Проверено: {roomSession.fileResult.verdictLabel}
                       </span>
+                      {roomSession.fileResult.compatibility === "experimental" && (
+                        <span className="file-picker__experimental">
+                          Формат не входит в базовую гарантию: результат зависит от этого
+                          устройства.
+                        </span>
+                      )}
                     </div>
                   )}
 
