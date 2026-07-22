@@ -75,6 +75,18 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - name: Смонтировать и проверить установленный DMG
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifacts=(desktop/release/Spectemus-Simul-*-mac-${{ matrix.arch }}.dmg)
+          test "${#artifacts[@]}" -eq 1
+          test -f "${artifacts[0]}"
+          mountpoint="$RUNNER_TEMP/spectemus-install-smoke"
+          mkdir "$mountpoint"
+          hdiutil attach "${artifacts[0]}" -nobrowse -readonly -mountpoint "$mountpoint"
+          trap 'hdiutil detach "$mountpoint" -quiet || true' EXIT
+          node scripts/desktop-installed-app-smoke.mjs --platform mac --app "$mountpoint/Spectemus Simul.app"
       - uses: actions/upload-artifact@v7
         with:
           name: spectemus-simul-macos-${{ matrix.arch }}-${{ github.run_id }}
@@ -130,6 +142,25 @@ jobs:
         env:
           WIN_CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+      - name: Установить и проверить NSIS
+        shell: pwsh
+        run: |
+          $artifacts = @(Get-ChildItem desktop/release -Filter "Spectemus-Simul-*-win-x64.exe")
+          if ($artifacts.Count -ne 1) { throw "Ожидался один Windows NSIS installer." }
+          $installPath = Join-Path $env:RUNNER_TEMP "Spectemus Simul install smoke"
+          try {
+            & $artifacts[0].FullName "/S" "/D=$installPath"
+            if ($LASTEXITCODE -ne 0) { throw "NSIS installer завершился с кодом $LASTEXITCODE." }
+            node scripts/desktop-installed-app-smoke.mjs --platform win --app $installPath
+          } finally {
+            $uninstaller = Join-Path $installPath "Uninstall Spectemus Simul.exe"
+            if (Test-Path $uninstaller) {
+              & $uninstaller "/S"
+            }
+            if (Test-Path $installPath) {
+              Remove-Item $installPath -Recurse -Force
+            }
+          }
       - uses: actions/upload-artifact@v7
         with:
           name: spectemus-simul-windows-${{ github.run_id }}

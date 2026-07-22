@@ -100,7 +100,7 @@ P0 технически подтверждён.
 - WT-647 фиксирует путь к обычному desktop-приложению: Electron host без Docker и установленного Node.js, с отдельным native-media этапом для расширения форматов.
 - WT-648 добавляет отдельный single-process backend profile: desktop host работает без Redis, сохраняя room, presence и rate-limit contracts.
 - WT-649 собирает Electron host proof: React UI, desktop backend, local LiveKit и LAN gateway запускаются без Docker; installer и подпись остаются следующим этапом.
-- WT-650 добавляет packaging foundation для DMG/NSIS и строгий release gate для подписи; выпуск блокируют только Apple/Windows credentials и чистый install smoke.
+- WT-650 добавляет packaging foundation для DMG/NSIS и строгий release gate для подписи; WT-657 проверяет установку preview DMG/NSIS на GitHub runners. Выпуск всё ещё требует Apple/Windows credentials и живого signed install smoke на чистых компьютерах.
 - WT-651 фиксирует native-media POC: сначала локальная нормализация common movie formats в совместимую временную копию, измерения и лицензирование; LiveKit Ingress не добавляется в desktop runtime.
 
 P1 foundation, P2 room lifecycle, P3 media integration, P4 host UX, P5 stabilization и P6 closed beta readiness завершены repo-side. P7 beta iteration закрыт repo-side: WT-603 готовит evidence-прогон, WT-604 закрыл телеметрию для метрики успешности сессии, WT-605 добавил управляемый feedback triage, WT-606 — security/rate-limit hardening, WT-607 — media QoS/cost benchmark kit. WT-608/WT-609 (P8) закрывают repo-side evidence refresh и operator feedback UI; P9 начинается с предсказуемой media compatibility policy. Оставшийся гейт расширения beta — реальный staging-прогон.
@@ -286,6 +286,7 @@ Media PoC остаётся референсной реализацией в [poc
 - [WT-651 native media compatibility POC](docs/WT-651_NATIVE_MEDIA_COMPATIBILITY_POC.md)
 - [WT-652 internet mode architecture](docs/WT-652_INTERNET_MODE_ARCHITECTURE.md)
 - [WT-653 public access contracts](docs/WT-653_PUBLIC_ACCESS_CONTRACTS.md)
+- [WT-657 desktop install smoke](docs/WT-657_DESKTOP_INSTALL_SMOKE.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
 
 ## Правила foundation
