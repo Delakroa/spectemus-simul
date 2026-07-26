@@ -38,12 +38,12 @@ test("раздаёт SPA и сохраняет Host/Cookie при API proxy", as
   assert.equal(page.body, "<main>S²</main>");
 
   const api = await get(gatewayPort, "/api/v1/health", {
-    Cookie: "watch-together-session=secret",
+    Cookie: "spectemus-simul-session=secret",
     Host: "192.168.1.42:8088",
   });
   assert.equal(api.statusCode, 200);
   assert.equal(receivedHost, "192.168.1.42:8088");
-  assert.equal(receivedCookie, "watch-together-session=secret");
+  assert.equal(receivedCookie, "spectemus-simul-session=secret");
 });
 
 test("проксирует WebSocket upgrade только в локальный backend", async (t) => {
@@ -71,7 +71,7 @@ test("проксирует WebSocket upgrade только в локальный 
 
   const response = await websocketUpgrade(gatewayPort);
   assert.match(response, /101 Switching Protocols/);
-  assert.equal(receivedCookie, "watch-together-session=secret");
+  assert.equal(receivedCookie, "spectemus-simul-session=secret");
 });
 
 function listen(server) {
@@ -108,7 +108,7 @@ function websocketUpgrade(port) {
     let response = "";
     socket.once("connect", () => {
       socket.write(
-        "GET /api/v1/rooms/AbCdEfGhIjKlMnOpQrStUv/events HTTP/1.1\r\nHost: 192.168.1.42:8088\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nCookie: watch-together-session=secret\r\n\r\n",
+        "GET /api/v1/rooms/AbCdEfGhIjKlMnOpQrStUv/events HTTP/1.1\r\nHost: 192.168.1.42:8088\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nCookie: spectemus-simul-session=secret\r\n\r\n",
       );
     });
     socket.on("data", (chunk) => {

@@ -82,7 +82,7 @@ const HEARTBEAT_INTERVAL_MS = 15_000;
 const MAX_EVENT_LOG_ITEMS = 8;
 const MAX_CHAT_MESSAGES = 200;
 const MAX_CHAT_MESSAGE_LENGTH = 1000;
-const HOST_SECRET_STORAGE_PREFIX = "watch-together.host-secret.";
+const HOST_SECRET_STORAGE_PREFIX = "spectemus-simul.host-secret.";
 const MAX_ROOM_RECONNECT_ATTEMPTS = 10;
 const ROOM_RECONNECT_DELAYS_MS = [1_000, 2_000, 5_000, 10_000, 15_000] as const;
 // Server closes the room WebSocket with a normal code (1000) on intentional

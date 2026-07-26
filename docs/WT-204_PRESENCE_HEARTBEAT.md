@@ -12,7 +12,7 @@
 
 - При WebSocket connect backend повторно проверяет room/session и создаёт новый `connectionId`.
 - Последнее соединение одного participant считается актуальным; предыдущее соединение закрывается.
-- Redis presence key хранит актуальный `connectionId` с TTL `watch-together.websocket.presence-ttl`.
+- Redis presence key хранит актуальный `connectionId` с TTL `spectemus-simul.websocket.presence-ttl`.
 - `participant.heartbeat` продлевает Redis presence TTL и подтверждает, что соединение остаётся актуальным.
 - При закрытии актуального соединения participant переводится в `online=false`.
 - Если закрывается старое соединение, уже замененное reconnect, room state не меняется.

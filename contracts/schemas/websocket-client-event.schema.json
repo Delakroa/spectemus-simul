@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://watch-together.local/contracts/schemas/websocket-client-event.schema.json",
+  "$id": "https://spectemus-simul.invalid/contracts/schemas/websocket-client-event.schema.json",
   "title": "Client WebSocket event",
   "type": "object",
   "additionalProperties": false,
@@ -38,10 +38,10 @@
       ]
     },
     "roomId": {
-      "$ref": "https://watch-together.local/contracts/schemas/common.schema.json#/$defs/RoomId"
+      "$ref": "https://spectemus-simul.invalid/contracts/schemas/common.schema.json#/$defs/RoomId"
     },
     "participantId": {
-      "$ref": "https://watch-together.local/contracts/schemas/common.schema.json#/$defs/ParticipantId"
+      "$ref": "https://spectemus-simul.invalid/contracts/schemas/common.schema.json#/$defs/ParticipantId"
     },
     "expectedRoomVersion": {
       "type": "integer",

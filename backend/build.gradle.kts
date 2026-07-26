@@ -3,8 +3,12 @@ plugins {
     id("org.springframework.boot") version "4.1.0"
 }
 
-group = "com.watchtogether"
+group = "com.spectemus.simul"
 version = "0.1.0-SNAPSHOT"
+
+base {
+    archivesName.set("spectemus-simul-backend")
+}
 
 java {
     toolchain {
@@ -41,7 +45,7 @@ dependencies {
 springBoot {
     buildInfo {
         properties {
-            name = "watch-together-backend"
+            name = "spectemus-simul-backend"
         }
     }
 }

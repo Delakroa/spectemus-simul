@@ -20,12 +20,12 @@ room ID, participant identity, file metadata или media bytes.
 
 ## Проверки
 
-    pnpm --filter @watch-together/frontend exec vitest run \
+    pnpm --filter @spectemus-simul/frontend exec vitest run \
       src/features/rooms/media-recovery-signal.test.ts \
       src/features/rooms/use-room-session-host-controls.test.tsx \
       src/pages/HomePage.test.tsx
-    pnpm --filter @watch-together/frontend typecheck
-    pnpm --filter @watch-together/frontend lint
+    pnpm --filter @spectemus-simul/frontend typecheck
+    pnpm --filter @spectemus-simul/frontend lint
 
 Тест эмулирует HTTP LAN, в котором доступен `getRandomValues`, но отсутствует
 `randomUUID`, и проверяет валидный UUID v4.

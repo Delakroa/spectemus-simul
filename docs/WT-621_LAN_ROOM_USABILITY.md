@@ -29,7 +29,7 @@ HTTPS`, объясняет реальную границу и не показы�
 ## Проверка
 
 ```bash
-pnpm --filter @watch-together/frontend exec vitest run src/features/rooms/share-invite.test.ts src/pages/HomePage.test.tsx
+pnpm --filter @spectemus-simul/frontend exec vitest run src/features/rooms/share-invite.test.ts src/pages/HomePage.test.tsx
 pnpm check
 pnpm test:e2e
 ```

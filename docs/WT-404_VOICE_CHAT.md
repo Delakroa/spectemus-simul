@@ -32,9 +32,9 @@
 ## Проверка
 
 ```bash
-pnpm --filter @watch-together/frontend lint
-pnpm --filter @watch-together/frontend typecheck
-pnpm --filter @watch-together/frontend test
+pnpm --filter @spectemus-simul/frontend lint
+pnpm --filter @spectemus-simul/frontend typecheck
+pnpm --filter @spectemus-simul/frontend test
 ./gradlew test
 pnpm format:check
 ```

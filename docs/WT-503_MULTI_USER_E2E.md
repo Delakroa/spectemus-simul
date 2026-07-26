@@ -16,10 +16,10 @@ End-to-end проверка многопользовательского сце�
 
 ## Реализация
 
-- `e2e/` — новый workspace-пакет `@watch-together/e2e` (добавлен в `pnpm-workspace.yaml`).
+- `e2e/` — новый workspace-пакет `@spectemus-simul/e2e` (добавлен в `pnpm-workspace.yaml`).
 - `e2e/playwright.config.ts` — chromium с fake-media флагами, `baseURL` (env `E2E_BASE_URL`, по умолчанию gateway 8088), serial / single-worker.
 - `e2e/tests/multi-user.spec.ts` — базовый сценарий (см. ниже), селекторы по реальному DOM `HomePage` (aria-label «Имя host» / «Имя гостя» / «Invite-ссылка или ID комнаты» / «Сообщение в чат», кнопки «Создать» / «Войти» / «Отправить», `.room-copy-field code` для roomId, счётчик «3/4»).
-- Корневой скрипт `pnpm test:e2e` (`--filter @watch-together/e2e`), скрипт установки браузера `e2e:install`.
+- Корневой скрипт `pnpm test:e2e` (`--filter @spectemus-simul/e2e`), скрипт установки браузера `e2e:install`.
 
 ## Покрыто сейчас
 
@@ -30,7 +30,7 @@ End-to-end проверка многопользовательского сце�
 
 ```bash
 pnpm install
-pnpm --filter @watch-together/e2e run e2e:install   # chromium, один раз
+pnpm --filter @spectemus-simul/e2e run e2e:install   # chromium, один раз
 pnpm infra:up                                         # поднять стек (gateway на 8088)
 pnpm test:e2e
 ```

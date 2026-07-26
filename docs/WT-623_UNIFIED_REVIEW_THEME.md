@@ -29,8 +29,8 @@
 ## Проверки
 
 ```bash
-pnpm --filter @watch-together/frontend test
-pnpm --filter @watch-together/frontend typecheck
+pnpm --filter @spectemus-simul/frontend test
+pnpm --filter @spectemus-simul/frontend typecheck
 pnpm format:check
 pnpm check
 ```

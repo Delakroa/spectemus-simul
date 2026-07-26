@@ -1,5 +1,5 @@
 {
-  "type": "https://watch-together.local/problems/validation-failed",
+  "type": "https://spectemus-simul.invalid/problems/validation-failed",
   "title": "Запрос не прошёл валидацию",
   "status": 422,
   "code": "VALIDATION_FAILED",

@@ -8,7 +8,7 @@ import { createAppQueryClient } from "./query-client";
 describe("App", () => {
   afterEach(() => {
     cleanup();
-    globalThis.localStorage?.removeItem?.("watchTogether.operatorToken");
+    globalThis.localStorage?.removeItem?.("spectemusSimul.operatorToken");
   });
 
   it("показывает страницу 404 для неизвестного маршрута", () => {

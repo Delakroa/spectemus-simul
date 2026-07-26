@@ -22,7 +22,7 @@ describe("system api", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(
         JSON.stringify({
-          name: "watch-together-backend",
+          name: "spectemus-simul-backend",
           version: "",
           buildTime: "unknown",
           apiVersion: "v1",

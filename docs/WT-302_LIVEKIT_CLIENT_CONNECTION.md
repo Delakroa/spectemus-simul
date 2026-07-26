@@ -32,10 +32,10 @@ WT-302 не добавляет:
 ## Проверка
 
 ```bash
-pnpm --filter @watch-together/frontend typecheck
-pnpm --filter @watch-together/frontend lint
-pnpm --filter @watch-together/frontend test
-pnpm --filter @watch-together/frontend build
+pnpm --filter @spectemus-simul/frontend typecheck
+pnpm --filter @spectemus-simul/frontend lint
+pnpm --filter @spectemus-simul/frontend test
+pnpm --filter @spectemus-simul/frontend build
 pnpm check
 ```
 

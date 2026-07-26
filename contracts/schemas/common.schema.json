@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://watch-together.local/contracts/schemas/common.schema.json",
-  "title": "Общие модели Watch Together",
+  "$id": "https://spectemus-simul.invalid/contracts/schemas/common.schema.json",
+  "title": "Общие модели Spectemus Simul",
   "$defs": {
     "RoomId": {
       "type": "string",

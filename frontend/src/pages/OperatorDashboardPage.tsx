@@ -14,7 +14,7 @@ import {
 } from "../features/operator/operator-api";
 import { ApiProblemError } from "../features/rooms/room-api";
 
-const operatorTokenStorageKey = "watchTogether.operatorToken";
+const operatorTokenStorageKey = "spectemusSimul.operatorToken";
 
 const statusFilters = [
   { label: "Открытые", value: "OPEN" },
@@ -430,7 +430,7 @@ export function OperatorDashboardPage() {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `watch-together-feedback-${new Date().toISOString().slice(0, 10)}.json`;
+      anchor.download = `spectemus-simul-feedback-${new Date().toISOString().slice(0, 10)}.json`;
       document.body.append(anchor);
       anchor.click();
       anchor.remove();

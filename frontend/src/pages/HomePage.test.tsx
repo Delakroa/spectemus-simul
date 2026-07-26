@@ -147,7 +147,7 @@ describe("HomePage", () => {
       return Promise.resolve(
         new Response(
           JSON.stringify({
-            name: "watch-together-backend",
+            name: "spectemus-simul-backend",
             version: "0.1.0",
             buildTime: "2026-07-08T16:00:00Z",
             apiVersion: "v1",
@@ -213,7 +213,7 @@ describe("HomePage", () => {
         return Promise.resolve(
           new Response(
             JSON.stringify({
-              name: "watch-together-backend",
+              name: "spectemus-simul-backend",
               version: "0.1.0",
               buildTime: "2026-07-19T10:00:00Z",
               apiVersion: "v1",
@@ -265,7 +265,7 @@ describe("HomePage", () => {
         return Promise.resolve(
           new Response(
             JSON.stringify({
-              name: "watch-together-backend",
+              name: "spectemus-simul-backend",
               version: "0.1.0",
               buildTime: "2026-07-12T12:00:00Z",
               apiVersion: "v1",
@@ -333,7 +333,7 @@ describe("HomePage", () => {
         return Promise.resolve(
           new Response(
             JSON.stringify({
-              name: "watch-together-backend",
+              name: "spectemus-simul-backend",
               version: "0.1.0",
               buildTime: "2026-07-10T10:00:00Z",
               apiVersion: "v1",
@@ -401,7 +401,7 @@ describe("HomePage", () => {
         return Promise.resolve(
           new Response(
             JSON.stringify({
-              name: "watch-together-backend",
+              name: "spectemus-simul-backend",
               version: "0.1.0",
               buildTime: "2026-07-08T16:00:00Z",
               apiVersion: "v1",
@@ -529,7 +529,7 @@ describe("HomePage", () => {
         return Promise.resolve(
           new Response(
             JSON.stringify({
-              name: "watch-together-backend",
+              name: "spectemus-simul-backend",
               version: "0.1.0",
               buildTime: "2026-07-10T10:00:00Z",
               apiVersion: "v1",
@@ -623,7 +623,7 @@ describe("HomePage", () => {
         return Promise.resolve(
           new Response(
             JSON.stringify({
-              name: "watch-together-backend",
+              name: "spectemus-simul-backend",
               version: "0.1.0",
               buildTime: "2026-07-08T16:00:00Z",
               apiVersion: "v1",
@@ -716,7 +716,7 @@ describe("HomePage", () => {
         return Promise.resolve(
           new Response(
             JSON.stringify({
-              name: "watch-together-backend",
+              name: "spectemus-simul-backend",
               version: "0.1.0",
               buildTime: "2026-07-08T16:00:00Z",
               apiVersion: "v1",
@@ -790,7 +790,7 @@ describe("HomePage", () => {
         return Promise.resolve(
           new Response(
             JSON.stringify({
-              name: "watch-together-backend",
+              name: "spectemus-simul-backend",
               version: "0.1.0",
               buildTime: "2026-07-19T14:00:00Z",
               apiVersion: "v1",
@@ -850,7 +850,7 @@ describe("HomePage", () => {
         return Promise.resolve(
           new Response(
             JSON.stringify({
-              name: "watch-together-backend",
+              name: "spectemus-simul-backend",
               version: "0.1.0",
               buildTime: "2026-07-10T10:00:00Z",
               apiVersion: "v1",
@@ -925,7 +925,7 @@ describe("HomePage", () => {
         return Promise.resolve(
           new Response(
             JSON.stringify({
-              name: "watch-together-backend",
+              name: "spectemus-simul-backend",
               version: "0.1.0",
               buildTime: "2026-07-10T10:00:00Z",
               apiVersion: "v1",
@@ -1024,7 +1024,7 @@ describe("HomePage", () => {
         return Promise.resolve(
           new Response(
             JSON.stringify({
-              name: "watch-together-backend",
+              name: "spectemus-simul-backend",
               version: "0.1.0",
               buildTime: "2026-07-10T10:00:00Z",
               apiVersion: "v1",
@@ -1222,7 +1222,7 @@ describe("HomePage", () => {
         return Promise.resolve(
           new Response(
             JSON.stringify({
-              name: "watch-together-backend",
+              name: "spectemus-simul-backend",
               version: "0.1.0",
               buildTime: "2026-07-10T10:00:00Z",
               apiVersion: "v1",
@@ -1362,7 +1362,7 @@ describe("HomePage", () => {
         return Promise.resolve(
           new Response(
             JSON.stringify({
-              name: "watch-together-backend",
+              name: "spectemus-simul-backend",
               version: "0.1.0",
               buildTime: "2026-07-10T10:00:00Z",
               apiVersion: "v1",
@@ -1503,7 +1503,7 @@ describe("HomePage", () => {
         return Promise.resolve(
           new Response(
             JSON.stringify({
-              name: "watch-together-backend",
+              name: "spectemus-simul-backend",
               version: "0.1.0",
               buildTime: "2026-07-10T10:00:00Z",
               apiVersion: "v1",

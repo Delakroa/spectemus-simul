@@ -4,7 +4,7 @@ spring:
       - org.springframework.boot.redis.autoconfigure.RedisAutoConfiguration
       - org.springframework.boot.redis.autoconfigure.RedisReactiveAutoConfiguration
 
-watch-together:
+spectemus-simul:
   rate-limit:
     # Desktop host is a single trusted household process. The in-memory limiter
     # preserves endpoint budgets without introducing a Redis runtime dependency.

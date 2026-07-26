@@ -28,9 +28,9 @@
 ## Проверка
 
 ```bash
-pnpm --filter @watch-together/frontend exec vitest run src/pages/HomePage.test.tsx
-pnpm --filter @watch-together/frontend lint
-pnpm --filter @watch-together/frontend typecheck
+pnpm --filter @spectemus-simul/frontend exec vitest run src/pages/HomePage.test.tsx
+pnpm --filter @spectemus-simul/frontend lint
+pnpm --filter @spectemus-simul/frontend typecheck
 pnpm check
 pnpm test:e2e
 ```

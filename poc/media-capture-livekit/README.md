@@ -1,10 +1,10 @@
 # WT-001 Media Capture LiveKit PoC
 
-Этот package — P0 reference implementation внутри Watch Together monorepo. Product backend, product frontend, room lifecycle, chat, voice, Redis и PostgreSQL находятся вне этого PoC.
+Этот package — P0 reference implementation внутри Spectemus Simul monorepo. Product backend, product frontend, room lifecycle, chat, voice, Redis и PostgreSQL находятся вне этого PoC.
 
 ## 1. Назначение прототипа
 
-Этот прототип проверяет только P0-сценарий Watch Together:
+Этот прототип проверяет только P0-сценарий Spectemus Simul:
 
 ```text
 локальный MP4 у host -> HTMLVideoElement -> captureStream()
@@ -25,7 +25,7 @@ Firefox, Safari, mobile browsers, MKV, HEVC, DTS и DRM не входят в WT-
 ## 3. Как установить зависимости
 
 ```powershell
-cd watch-together-media-capture-livekit/poc/media-capture-livekit
+cd spectemus-simul-media-capture-livekit/poc/media-capture-livekit
 copy .env.example .env
 pnpm install
 ```
@@ -35,14 +35,14 @@ pnpm install
 ## 4. Как запустить всё одной командой
 
 ```powershell
-cd watch-together-media-capture-livekit
+cd spectemus-simul-media-capture-livekit
 pnpm dev:poc
 ```
 
 Или из директории этого package:
 
 ```powershell
-cd watch-together-media-capture-livekit/poc/media-capture-livekit
+cd spectemus-simul-media-capture-livekit/poc/media-capture-livekit
 pnpm dev
 ```
 
@@ -57,7 +57,7 @@ pnpm dev:down
 ## 5. Как запустить LiveKit отдельно
 
 ```powershell
-cd watch-together-media-capture-livekit/poc/media-capture-livekit
+cd spectemus-simul-media-capture-livekit/poc/media-capture-livekit
 docker compose up -d livekit
 docker compose ps
 ```
@@ -69,7 +69,7 @@ docker compose ps
 В отдельном терминале:
 
 ```powershell
-cd watch-together-media-capture-livekit/poc/media-capture-livekit
+cd spectemus-simul-media-capture-livekit/poc/media-capture-livekit
 pnpm dev:token
 ```
 
@@ -86,7 +86,7 @@ GET http://127.0.0.1:3001/token?room=wt-poc-room&identity=host-1&role=host
 В отдельном терминале:
 
 ```powershell
-cd watch-together-media-capture-livekit/poc/media-capture-livekit
+cd spectemus-simul-media-capture-livekit/poc/media-capture-livekit
 pnpm dev:frontend
 ```
 
@@ -165,7 +165,7 @@ Chrome/Edge DevTools -> Console
 LiveKit server logs:
 
 ```powershell
-cd watch-together-media-capture-livekit/poc/media-capture-livekit
+cd spectemus-simul-media-capture-livekit/poc/media-capture-livekit
 pnpm logs:livekit
 ```
 
@@ -231,7 +231,7 @@ Guest получает и показывает `Host playback`, а также п
 ## Автоматические проверки
 
 ```powershell
-cd watch-together-media-capture-livekit
+cd spectemus-simul-media-capture-livekit
 pnpm test
 pnpm build
 ```
@@ -239,7 +239,7 @@ pnpm build
 Или из директории этого package:
 
 ```powershell
-cd watch-together-media-capture-livekit/poc/media-capture-livekit
+cd spectemus-simul-media-capture-livekit/poc/media-capture-livekit
 pnpm test
 pnpm build
 ```

@@ -77,7 +77,7 @@ pnpm test:e2e
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm --filter @watch-together/e2e run e2e:install
+pnpm --filter @spectemus-simul/e2e run e2e:install
 pnpm infra:up
 pnpm test:e2e:capacity
 pnpm test:e2e
@@ -96,4 +96,4 @@ pnpm format:check
 
 - Automated WT-507 не доказывает media QoS под нагрузкой: он проверяет product capacity, presence, chat и отказ сверх лимита.
 - CPU/RAM/network baseline требует ручного прогона на целевой машине и сохранения evidence через WT-607 перед расширением beta.
-- `test:e2e:capacity` зависит от поднятого stack на `http://127.0.0.1:8088` и установленного Chromium (`pnpm --filter @watch-together/e2e run e2e:install`).
+- `test:e2e:capacity` зависит от поднятого stack на `http://127.0.0.1:8088` и установленного Chromium (`pnpm --filter @spectemus-simul/e2e run e2e:install`).

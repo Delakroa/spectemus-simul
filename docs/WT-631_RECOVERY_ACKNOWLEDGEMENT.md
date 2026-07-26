@@ -35,12 +35,12 @@
 
 ## Проверки
 
-    pnpm --filter @watch-together/frontend exec vitest run \
+    pnpm --filter @spectemus-simul/frontend exec vitest run \
       src/features/rooms/media-recovery-signal.test.ts \
       src/features/rooms/use-room-session-host-controls.test.tsx \
       src/pages/HomePage.test.tsx
-    pnpm --filter @watch-together/frontend typecheck
-    pnpm --filter @watch-together/frontend lint
+    pnpm --filter @spectemus-simul/frontend typecheck
+    pnpm --filter @spectemus-simul/frontend lint
     pnpm format:check
 
 Тесты подтверждают адресную доставку host → requester, проверку identity

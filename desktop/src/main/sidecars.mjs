@@ -33,13 +33,13 @@ export function resolveSidecarPaths({
     backendJar:
       environment.SPECTEMUS_BACKEND_JAR ??
       (packaged
-        ? resolve(packagedRoot, "backend", "watch-together-backend.jar")
+        ? resolve(packagedRoot, "backend", "spectemus-simul-backend.jar")
         : resolve(
             PROJECT_ROOT,
             "backend",
             "build",
             "libs",
-            "backend-0.1.0-SNAPSHOT.jar",
+            "spectemus-simul-backend-0.1.0-SNAPSHOT.jar",
           )),
     frontendDirectory:
       environment.SPECTEMUS_FRONTEND_DIST ??

@@ -36,8 +36,8 @@
 ## Проверка
 
 ```bash
-pnpm --filter @watch-together/frontend typecheck
-pnpm --filter @watch-together/frontend test
+pnpm --filter @spectemus-simul/frontend typecheck
+pnpm --filter @spectemus-simul/frontend test
 ```
 
 Локально в этой задаче проверено:

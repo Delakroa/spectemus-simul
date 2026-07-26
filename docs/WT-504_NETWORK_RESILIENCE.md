@@ -59,9 +59,9 @@ pnpm test:e2e
 ## Проверка
 
 ```bash
-pnpm --filter @watch-together/frontend lint
-pnpm --filter @watch-together/frontend typecheck
-pnpm --filter @watch-together/frontend test
+pnpm --filter @spectemus-simul/frontend lint
+pnpm --filter @spectemus-simul/frontend typecheck
+pnpm --filter @spectemus-simul/frontend test
 pnpm contracts:check
 pnpm format:check
 ```
@@ -78,4 +78,4 @@ pnpm format:check
 
 - Automated WT-504 не эмулирует WebRTC media packet loss. Browser-level offline проверяет room WebSocket recovery и пользовательскую управляемость сессии.
 - UDP blocked, TURN-only и VPN требуют отдельной инфраструктуры и ручного evidence перед WT-508 beta deployment.
-- `test:e2e:network` зависит от поднятого stack на `http://127.0.0.1:8088` и установленного Chromium (`pnpm --filter @watch-together/e2e run e2e:install`).
+- `test:e2e:network` зависит от поднятого stack на `http://127.0.0.1:8088` и установленного Chromium (`pnpm --filter @spectemus-simul/e2e run e2e:install`).
