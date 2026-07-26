@@ -11,9 +11,11 @@ import { startGateway } from "./gateway.mjs";
 test("раздаёт SPA и сохраняет Host/Cookie при API proxy", async (t) => {
   let receivedHost;
   let receivedCookie;
+  let receivedForwardedFor;
   const backend = createServer((request, response) => {
     receivedHost = request.headers.host;
     receivedCookie = request.headers.cookie;
+    receivedForwardedFor = request.headers["x-forwarded-for"];
     response.writeHead(200, { "Content-Type": "application/json" });
     response.end('{"ok":true}');
   });
@@ -40,10 +42,12 @@ test("раздаёт SPA и сохраняет Host/Cookie при API proxy", as
   const api = await get(gatewayPort, "/api/v1/health", {
     Cookie: "spectemus-simul-session=secret",
     Host: "192.168.1.42:8088",
+    "X-Forwarded-For": "203.0.113.9",
   });
   assert.equal(api.statusCode, 200);
   assert.equal(receivedHost, "192.168.1.42:8088");
   assert.equal(receivedCookie, "spectemus-simul-session=secret");
+  assert.equal(receivedForwardedFor, "127.0.0.1");
 });
 
 test("проксирует WebSocket upgrade только в локальный backend", async (t) => {
