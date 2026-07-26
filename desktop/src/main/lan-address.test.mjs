@@ -16,6 +16,16 @@ test("выбирает единственный физический private IPv
   );
 });
 
+test("игнорирует macOS VPN tunnel utun при выборе домашней сети", () => {
+  assert.deepEqual(
+    resolveLanAddress({
+      en0: [{ address: "192.168.0.103", family: "IPv4", internal: false }],
+      utun5: [{ address: "10.216.4.70", family: "IPv4", internal: false }],
+    }),
+    { address: "192.168.0.103", interfaceName: "en0", virtual: false },
+  );
+});
+
 test("требует явный выбор при нескольких физических сетях", () => {
   assert.throws(
     () =>

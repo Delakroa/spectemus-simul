@@ -1,6 +1,7 @@
 import { networkInterfaces } from "node:os";
 
-const VIRTUAL_INTERFACE = /(?:docker|veth|vmnet|virtual|wsl|loopback|bridge)/i;
+const VIRTUAL_INTERFACE =
+  /(?:docker|veth|vmnet|virtual|wsl|loopback|bridge|^utun\d*$|^tun\d*$|^tap\d*$|^ppp\d*$|ipsec|wireguard|tailscale|zerotier|vpn)/i;
 
 export class LanAddressSelectionRequired extends Error {
   constructor(candidates) {
