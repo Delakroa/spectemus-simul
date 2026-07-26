@@ -1,10 +1,10 @@
-# GitHub Repository Profile
+# Профиль репозитория GitHub
 
-Use this copy for the GitHub repository sidebar.
+Текст для боковой панели и карточки репозитория.
 
-## Description
+## Описание
 
-CouchSync: private co-watch rooms for local movies — no uploads, just shared playback.
+Spectemus Simul — приватный совместный просмотр локального видео в домашней сети.
 
 ## Website
 
@@ -15,11 +15,11 @@ Leave empty until beta has a public URL.
 ```text
 watch-party
 co-watch
-couchsync
 webrtc
 livekit
 synchronized-playback
 local-media
+lan
 private-rooms
 spring-boot
 react
@@ -29,6 +29,8 @@ playwright
 closed-beta
 ```
 
-## Short Pitch
+## Короткое описание
 
-Watch Together lets a host pick a local MP4, open a private room, and keep guests in sync through LiveKit media, backend-owned room state, chat, voice, reconnect, telemetry and beta feedback. The movie stays on the host machine.
+Host запускает приложение на Mac или Windows, выбирает локальный фильм и
+создаёт приватную комнату. Гость открывает invite-ссылку в браузере и смотрит
+видео синхронно с host-ом. Исходный файл не загружается и не хранится сервисом.
