@@ -21,8 +21,9 @@ Electron main process
   с тем же private LAN IPv4.
 - Secrets генерируются один раз в app data с правами пользователя; они не
   передаются в renderer, invite-ссылки или status UI.
-- Если найдено несколько физических private IPv4, host не угадывает сеть:
-  нужен явный `SPECTEMUS_LAN_IP`.
+- При нескольких физических private IPv4 host не угадывает сеть: нужен явный
+  `SPECTEMUS_LAN_IP`. Виртуальные интерфейсы Docker, VM, WSL и VPN/tunnel
+  (включая macOS `utun`) не считаются домашней сетью.
 - При выходе Electron корректно закрывает gateway, LiveKit и backend.
 
 ## Developer запуск proof

@@ -127,6 +127,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [WT-649_ELECTRON_HOST_PROOF.md](WT-649_ELECTRON_HOST_PROOF.md) — Electron supervisor, local sidecars и LAN gateway без Docker.
 - [WT-650_DESKTOP_INSTALLER_FOUNDATION.md](WT-650_DESKTOP_INSTALLER_FOUNDATION.md) — packaging, signed release gate и install smoke для DMG/NSIS.
 - [WT-660_DESKTOP_GATEWAY_PORT_RECOVERY.md](WT-660_DESKTOP_GATEWAY_PORT_RECOVERY.md) — fallback LAN gateway при занятом `8088` без остановки чужого процесса.
+- [WT-663_DESKTOP_VPN_LAN_SELECTION.md](WT-663_DESKTOP_VPN_LAN_SELECTION.md) — macOS VPN/tunnel-интерфейсы не создают ложную неоднозначность домашней сети.
 - [WT-651_NATIVE_MEDIA_COMPATIBILITY_POC.md](WT-651_NATIVE_MEDIA_COMPATIBILITY_POC.md) — native-media hypothesis, POC harness, license gate и критерии решения.
 - [WT-652_INTERNET_MODE_ARCHITECTURE.md](WT-652_INTERNET_MODE_ARCHITECTURE.md) — отдельный public Internet mode: account/invite, TLS/TURN, privacy, cost gates и последовательность запуска.
 - [WT-653_PUBLIC_ACCESS_CONTRACTS.md](WT-653_PUBLIC_ACCESS_CONTRACTS.md) — planned `/api/v2` account/invite/membership contracts без изменения LAN API.
