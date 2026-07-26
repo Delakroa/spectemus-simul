@@ -33,8 +33,15 @@ export async function startGateway({
     });
   });
 
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    await closeServer(server, server.spectemusSockets);
+    throw new Error("Gateway не вернул TCP-порт после запуска.");
+  }
+
   return {
     close: () => closeServer(server, server.spectemusSockets),
+    port: address.port,
     server,
   };
 }

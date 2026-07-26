@@ -6,6 +6,7 @@ import {
   DEFAULT_PORTS,
   DesktopSupervisor,
   resolveSidecarPaths,
+  startGatewayWithFallback,
 } from "./sidecars.mjs";
 
 test("desktop sidecars используют loopback backend и LAN LiveKit без Redis", () => {
@@ -79,4 +80,44 @@ test("разрешает developer override и ожидает packaged sidecars 
   });
   assert.match(packaged.livekitServer, /livekit-server\.exe$/);
   assert.match(packaged.javaCommand, /java\.exe$/);
+});
+
+test("gateway сохраняет 8088, а при занятом порте выбирает свободный", async () => {
+  const attempts = [];
+  const gatewayFactory = async ({ port }) => {
+    attempts.push(port);
+    if (attempts.length === 1) {
+      const error = new Error("address already in use");
+      error.code = "EADDRINUSE";
+      throw error;
+    }
+    return { close: async () => {}, port: 41_217 };
+  };
+
+  const gateway = await startGatewayWithFallback(gatewayFactory, {
+    backend: { host: "127.0.0.1", port: 8080 },
+    frontendDirectory: "/tmp/frontend",
+    port: 8088,
+  });
+
+  assert.deepEqual(attempts, [8088, 0]);
+  assert.equal(gateway.port, 41_217);
+});
+
+test("gateway не скрывает ошибки, кроме занятого порта", async () => {
+  const unavailable = new Error("frontend не найден");
+  await assert.rejects(
+    () =>
+      startGatewayWithFallback(
+        async () => {
+          throw unavailable;
+        },
+        {
+          backend: { host: "127.0.0.1", port: 8080 },
+          frontendDirectory: "/tmp/frontend",
+          port: 8088,
+        },
+      ),
+    unavailable,
+  );
 });
