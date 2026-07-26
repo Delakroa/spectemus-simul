@@ -1,5 +1,7 @@
 import { spawn, spawnSync } from "node:child_process";
+import { createSocket } from "node:dgram";
 import { access, constants } from "node:fs/promises";
+import { createServer } from "node:net";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -84,10 +86,12 @@ export class DesktopSupervisor {
     gatewayFactory = startGateway,
     spawnProcess = spawn,
     waitForHealthy = waitForHealthyHttp,
+    assertPortsAvailable = assertDesktopPortsAvailable,
   } = {}) {
     this.gatewayFactory = gatewayFactory;
     this.spawnProcess = spawnProcess;
     this.waitForHealthy = waitForHealthy;
+    this.assertPortsAvailable = assertPortsAvailable;
     this.status = { state: "stopped", detail: "Host не запущен." };
     this.listeners = new Set();
     this.children = [];
@@ -114,6 +118,11 @@ export class DesktopSupervisor {
 
     this.failureDetail = undefined;
     try {
+      this.setStatus(
+        "checking-ports",
+        "Проверяем, что порты desktop host свободны.",
+      );
+      await this.assertPortsAvailable(ports);
       this.setStatus("starting-backend", "Запускаем локальный backend.");
       const backend = this.spawnBackend({ lanAddress, paths, ports, secrets });
       this.trackChild(backend, "Backend");
@@ -294,6 +303,83 @@ export class DesktopSupervisor {
         : "Host остановлен.",
     );
   }
+}
+
+export async function assertDesktopPortsAvailable(ports) {
+  await assertTcpPortAvailable("Backend", "127.0.0.1", ports.backend);
+  await assertTcpPortAvailable(
+    "LiveKit signalling",
+    "0.0.0.0",
+    ports.livekitHttp,
+  );
+  await assertTcpPortAvailable(
+    "LiveKit TCP fallback",
+    "0.0.0.0",
+    ports.livekitTcp,
+  );
+  for (
+    let port = ports.livekitUdpStart;
+    port <= ports.livekitUdpEnd;
+    port += 1
+  ) {
+    await assertUdpPortAvailable(port);
+  }
+}
+
+async function assertTcpPortAvailable(service, host, port) {
+  const server = createServer();
+  let listening = false;
+  try {
+    await new Promise((resolveListen, rejectListen) => {
+      server.once("error", rejectListen);
+      server.listen(port, host, () => {
+        server.off("error", rejectListen);
+        listening = true;
+        resolveListen();
+      });
+    });
+  } catch (error) {
+    if (error?.code === "EADDRINUSE") {
+      throw new Error(
+        `${service}: порт ${port} уже занят. Остановите другую копию Spectemus Simul или локальный Docker/dev stack и запустите host снова.`,
+      );
+    }
+    throw error;
+  } finally {
+    if (listening) {
+      await closeProbe(server);
+    }
+  }
+}
+
+async function assertUdpPortAvailable(port) {
+  const socket = createSocket("udp4");
+  let bound = false;
+  try {
+    await new Promise((resolveBind, rejectBind) => {
+      socket.once("error", rejectBind);
+      socket.bind(port, "0.0.0.0", () => {
+        socket.off("error", rejectBind);
+        bound = true;
+        resolveBind();
+      });
+    });
+  } catch (error) {
+    if (error?.code === "EADDRINUSE") {
+      throw new Error(
+        `LiveKit UDP: порт ${port} уже занят. Остановите другую копию Spectemus Simul или локальный Docker/dev stack и запустите host снова.`,
+      );
+    }
+    throw error;
+  } finally {
+    if (bound) {
+      socket.close();
+    }
+  }
+}
+
+function closeProbe(server) {
+  return new Promise((resolveClose) => server.close(() => resolveClose()));
 }
 
 export async function startGatewayWithFallback(gatewayFactory, options) {

@@ -122,6 +122,34 @@ test("gateway не скрывает ошибки, кроме занятого п
   );
 });
 
+test("не запускает sidecars, если их фиксированный порт занят", async () => {
+  let spawned = 0;
+  const supervisor = new DesktopSupervisor({
+    assertPortsAvailable: async () => {
+      throw new Error(
+        "Backend: порт 8080 уже занят. Остановите другую копию Spectemus Simul или локальный Docker/dev stack и запустите host снова.",
+      );
+    },
+    spawnProcess: () => {
+      spawned += 1;
+      throw new Error("sidecar не должен запускаться");
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      supervisor.start({
+        lanAddress: "192.168.1.42",
+        paths: {},
+        runtimeDirectory: "/tmp/runtime",
+        secrets: { livekitApiKey: "key", livekitApiSecret: "secret" },
+      }),
+    /Backend: порт 8080 уже занят/,
+  );
+  assert.equal(spawned, 0);
+  assert.match(supervisor.status.detail, /Backend: порт 8080 уже занят/);
+});
+
 test("аварийный выход sidecar останавливает gateway и оставшиеся процессы", async () => {
   const children = [];
   let closedGateway = 0;
