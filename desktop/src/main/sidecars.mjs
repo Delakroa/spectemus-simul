@@ -134,13 +134,14 @@ export class DesktopSupervisor {
       );
 
       this.setStatus("starting-gateway", "Открываем LAN gateway.");
-      this.gateway = await this.gatewayFactory({
+      const gateway = await startGatewayWithFallback(this.gatewayFactory, {
         backend: { host: "127.0.0.1", port: ports.backend },
         frontendDirectory: paths.frontendDirectory,
         port: ports.gateway,
       });
+      this.gateway = gateway.instance;
 
-      const url = `http://${lanAddress}:${ports.gateway}`;
+      const url = `http://${lanAddress}:${gateway.port}`;
       this.setStatus("running", `Host готов: ${url}`, { lanAddress, url });
       return { url };
     } catch (error) {
@@ -234,6 +235,20 @@ export class DesktopSupervisor {
     for (const listener of this.listeners) {
       listener(this.status);
     }
+  }
+}
+
+export async function startGatewayWithFallback(gatewayFactory, options) {
+  try {
+    const gateway = await gatewayFactory(options);
+    return { instance: gateway, port: resolveGatewayPort(gateway) };
+  } catch (error) {
+    if (!isAddressInUse(error)) {
+      throw error;
+    }
+
+    const gateway = await gatewayFactory({ ...options, port: 0 });
+    return { instance: gateway, port: resolveGatewayPort(gateway) };
   }
 }
 
@@ -346,4 +361,21 @@ function waitForChildReadiness(child, name, waitForHealthy) {
       },
     );
   });
+}
+
+function isAddressInUse(error) {
+  return (
+    typeof error === "object" && error !== null && error.code === "EADDRINUSE"
+  );
+}
+
+function resolveGatewayPort(gateway) {
+  if (
+    !Number.isInteger(gateway?.port) ||
+    gateway.port < 1 ||
+    gateway.port > 65_535
+  ) {
+    throw new Error("Gateway не вернул корректный TCP-порт.");
+  }
+  return gateway.port;
 }

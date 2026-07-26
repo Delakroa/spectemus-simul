@@ -28,7 +28,7 @@ test("раздаёт SPA и сохраняет Host/Cookie при API proxy", as
     host: "127.0.0.1",
     port: 0,
   });
-  const gatewayPort = gateway.server.address().port;
+  const gatewayPort = gateway.port;
   t.after(() => gateway.close());
 
   const page = await get(gatewayPort, "/rooms/AbCdEfGhIjKlMnOpQrStUv", {
@@ -66,7 +66,7 @@ test("проксирует WebSocket upgrade только в локальный 
     host: "127.0.0.1",
     port: 0,
   });
-  const gatewayPort = gateway.server.address().port;
+  const gatewayPort = gateway.port;
   t.after(() => gateway.close());
 
   const response = await websocketUpgrade(gatewayPort);

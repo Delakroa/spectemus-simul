@@ -1557,7 +1557,8 @@ export function HomePage() {
                     <p className="room-network-hint" role="status">
                       <Wifi size={16} aria-hidden="true" /> Это приглашение работает только на этом
                       компьютере. Для второго устройства откройте сервис у host по
-                      <code>http://&lt;IPv4-host&gt;:8088</code> и создайте новую комнату.
+                      <code>http://&lt;IPv4-host&gt;:{window.location.port || "80"}</code> и
+                      создайте новую комнату.
                     </p>
                   )}
                   <p className="visually-hidden" role="status">

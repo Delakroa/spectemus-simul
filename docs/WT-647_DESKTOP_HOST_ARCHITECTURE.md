@@ -51,12 +51,12 @@ S² Desktop Host (Electron)
 │  └─ корректно останавливает дочерние процессы
 │
 └─ lightweight Node HTTP gateway
-   ├─ раздаёт собранный React UI на LAN IP:8088
+   ├─ раздаёт собранный React UI на LAN IP:8088 (или свободном порту)
    ├─ проксирует /api и room WebSocket в backend
    └─ даёт гостям тот же same-origin URL, что и host-у
 
 Гости в LAN
-└─ Chrome / Edge → http://<host-LAN-IP>:8088/rooms/<invite>
+└─ Chrome / Edge → ссылка `http://<host-LAN-IP>:<порт>/rooms/<invite>`
 ```
 
 LiveKit в single-node режиме не имеет внешних зависимостей; Redis нужен для
@@ -86,6 +86,9 @@ desktop runtime. Feedback в первом offline desktop-релизе оста�
   если их несколько; не делает port forwarding и не использует публичный IP.
 - Windows firewall permission запрашивается узко и только для Private profile,
   как в текущем LAN bootstrap.
+- Gateway сначала резервирует привычный `8088`. Если порт занят, он не трогает
+  чужой процесс и получает свободный TCP-порт от ОС; в invite-ссылке всегда
+  остаётся фактически выбранный порт.
 - Остановка приложения предлагает завершить активную комнату и корректно
   завершает sidecars; crash recovery отображает понятное действие «Запустить
   host заново».

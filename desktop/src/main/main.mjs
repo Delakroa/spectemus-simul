@@ -20,6 +20,7 @@ import {
 
 let mainWindow;
 let allowQuit = false;
+let localGatewayOrigin;
 const supervisor = new DesktopSupervisor();
 const MAIN_DIRECTORY = join(fileURLToPath(new URL(".", import.meta.url)));
 
@@ -58,7 +59,10 @@ app.whenReady().then(async () => {
       runtimeDirectory,
       secrets,
     });
-    await mainWindow.loadURL(url.replace(lan.address, "127.0.0.1"));
+    const localUrl = new URL(url);
+    localUrl.hostname = "127.0.0.1";
+    localGatewayOrigin = localUrl.origin;
+    await mainWindow.loadURL(localUrl.toString());
   } catch (error) {
     await showStartupPage({
       detail: startupErrorMessage(error),
@@ -97,11 +101,22 @@ function createWindow() {
   });
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (event, targetUrl) => {
-    if (!targetUrl.startsWith("http://127.0.0.1:8088/")) {
+    if (!isLocalGatewayUrl(targetUrl)) {
       event.preventDefault();
     }
   });
   return window;
+}
+
+function isLocalGatewayUrl(targetUrl) {
+  if (!localGatewayOrigin) {
+    return false;
+  }
+  try {
+    return new URL(targetUrl).origin === localGatewayOrigin;
+  } catch {
+    return false;
+  }
 }
 
 async function showStartupPage({ detail, state }) {
