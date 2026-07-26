@@ -13,7 +13,7 @@ const required = [
       "backend",
       "build",
       "libs",
-      "spectemus-simul-backend-0.1.0-SNAPSHOT.jar",
+      "spectemus-simul-backend.jar",
     ),
     "Spring Boot jar",
   ],
