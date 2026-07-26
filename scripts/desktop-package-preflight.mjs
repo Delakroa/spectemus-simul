@@ -8,13 +8,7 @@ const livekit = platform === "win" ? "livekit-server.exe" : "livekit-server";
 const required = [
   [resolve(root, "frontend", "dist", "index.html"), "собранный React UI"],
   [
-    resolve(
-      root,
-      "backend",
-      "build",
-      "libs",
-      "spectemus-simul-backend-0.1.0-SNAPSHOT.jar",
-    ),
+    resolve(root, "backend", "build", "libs", "spectemus-simul-backend.jar"),
     "Spring Boot jar",
   ],
   [

@@ -10,7 +10,8 @@ Desktop development-путь и packaging ожидали файл с верси�
 
 Gradle теперь всегда выпускает boot JAR под именем
 `spectemus-simul-backend.jar`. Тот же путь используют development runtime и
-electron-builder при упаковке приложения.
+electron-builder при упаковке приложения, а preflight проверяет его перед
+сборкой Mac- и Windows-инсталляторов.
 
 ## Проверка
 
