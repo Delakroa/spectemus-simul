@@ -66,7 +66,7 @@ WT-301 добавляет только typed API client для token endpoint. �
 ```bash
 pnpm contracts:check
 pnpm backend:test
-pnpm --filter @watch-together/frontend test
+pnpm --filter @spectemus-simul/frontend test
 pnpm infra:check
 pnpm check
 ```

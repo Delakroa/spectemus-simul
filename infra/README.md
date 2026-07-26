@@ -1,6 +1,6 @@
 # Локальная инфраструктура
 
-Локальная Docker Compose среда Watch Together, созданная в WT-104.
+Локальная Docker Compose среда Spectemus Simul, созданная в WT-104.
 
 ## Сервисы
 
@@ -79,8 +79,8 @@ docker compose --env-file infra/.env -f infra/compose.yaml up --build -d --wait
 
 PostgreSQL и Redis используют named volumes:
 
-- `watch-together_postgres-data`;
-- `watch-together_redis-data`.
+- `spectemus-simul_postgres-data`;
+- `spectemus-simul_redis-data`.
 
 Обычный `pnpm infra:down` сохраняет данные. `pnpm infra:reset` удаляет их без возможности восстановления.
 

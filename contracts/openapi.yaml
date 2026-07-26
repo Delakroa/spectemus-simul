@@ -2,7 +2,7 @@ openapi: 3.1.0
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 
 info:
-  title: Watch Together REST API
+  title: Spectemus Simul REST API
   version: 1.0.0
   description: |
     Контракт product backend. Эндпоинты с `x-implementation-status: planned`

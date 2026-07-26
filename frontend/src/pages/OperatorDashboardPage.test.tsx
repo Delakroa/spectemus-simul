@@ -61,7 +61,7 @@ function deferred<T>() {
 describe("OperatorDashboardPage", () => {
   afterEach(() => {
     cleanup();
-    globalThis.localStorage?.removeItem?.("watchTogether.operatorToken");
+    globalThis.localStorage?.removeItem?.("spectemusSimul.operatorToken");
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });

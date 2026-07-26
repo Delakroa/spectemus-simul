@@ -1,12 +1,12 @@
-name: watch-together
+name: spectemus-simul
 
 services:
   postgres:
     image: postgres:18.4-alpine3.23
     environment:
-      POSTGRES_DB: "${POSTGRES_DB:-watch_together}"
-      POSTGRES_USER: "${POSTGRES_USER:-watch_together}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-watch_together_dev_only}"
+      POSTGRES_DB: "${POSTGRES_DB:-spectemus_simul}"
+      POSTGRES_USER: "${POSTGRES_USER:-spectemus_simul}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-spectemus_simul_dev_only}"
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -26,9 +26,9 @@ services:
       - --appendonly
       - "yes"
       - --requirepass
-      - "${REDIS_PASSWORD:-watch_together_redis_dev_only}"
+      - "${REDIS_PASSWORD:-spectemus_simul_redis_dev_only}"
     environment:
-      REDIS_PASSWORD: "${REDIS_PASSWORD:-watch_together_redis_dev_only}"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:-spectemus_simul_redis_dev_only}"
     ports:
       - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
@@ -59,7 +59,7 @@ services:
     environment:
       LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-devsecretdevsecretdevsecretdevsecret}"
       REDIS_HOST: "redis:6379"
-      REDIS_PASSWORD: "${REDIS_PASSWORD:-watch_together_redis_dev_only}"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:-spectemus_simul_redis_dev_only}"
     ports:
       - "${LIVEKIT_BIND_ADDRESS:-127.0.0.1}:${LIVEKIT_HTTP_PORT:-7880}:7880"
       - "${LIVEKIT_BIND_ADDRESS:-127.0.0.1}:${LIVEKIT_TCP_PORT:-7881}:7881"
@@ -85,7 +85,7 @@ services:
       SPRING_PROFILES_ACTIVE: "local"
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"
-      REDIS_PASSWORD: "${REDIS_PASSWORD:-watch_together_redis_dev_only}"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:-spectemus_simul_redis_dev_only}"
       ROOM_TTL: "${ROOM_TTL:-4h}"
       ROOM_CLEANUP_GRACE: "${ROOM_CLEANUP_GRACE:-5m}"
       SESSION_COOKIE_SECURE: "${SESSION_COOKIE_SECURE:-false}"

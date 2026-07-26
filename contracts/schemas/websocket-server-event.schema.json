@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://watch-together.local/contracts/schemas/websocket-server-event.schema.json",
+  "$id": "https://spectemus-simul.invalid/contracts/schemas/websocket-server-event.schema.json",
   "title": "Server WebSocket event",
   "description": "Неизвестный type сохраняет валидный envelope и должен безопасно игнорироваться клиентом.",
   "type": "object",
@@ -36,12 +36,12 @@
       ]
     },
     "roomId": {
-      "$ref": "https://watch-together.local/contracts/schemas/common.schema.json#/$defs/RoomId"
+      "$ref": "https://spectemus-simul.invalid/contracts/schemas/common.schema.json#/$defs/RoomId"
     },
     "participantId": {
       "anyOf": [
         {
-          "$ref": "https://watch-together.local/contracts/schemas/common.schema.json#/$defs/ParticipantId"
+          "$ref": "https://spectemus-simul.invalid/contracts/schemas/common.schema.json#/$defs/ParticipantId"
         },
         {
           "type": "null"
@@ -73,7 +73,7 @@
       "then": {
         "properties": {
           "payload": {
-            "$ref": "https://watch-together.local/contracts/schemas/common.schema.json#/$defs/RoomSnapshot"
+            "$ref": "https://spectemus-simul.invalid/contracts/schemas/common.schema.json#/$defs/RoomSnapshot"
           }
         }
       }
@@ -95,7 +95,7 @@
             "required": ["status", "updatedAt"],
             "properties": {
               "status": {
-                "$ref": "https://watch-together.local/contracts/schemas/common.schema.json#/$defs/RoomStatus"
+                "$ref": "https://spectemus-simul.invalid/contracts/schemas/common.schema.json#/$defs/RoomStatus"
               },
               "updatedAt": {
                 "type": "string",
@@ -118,7 +118,7 @@
       "then": {
         "properties": {
           "payload": {
-            "$ref": "https://watch-together.local/contracts/schemas/common.schema.json#/$defs/Participant"
+            "$ref": "https://spectemus-simul.invalid/contracts/schemas/common.schema.json#/$defs/Participant"
           }
         }
       }
@@ -140,7 +140,7 @@
             "required": ["participantId", "reason"],
             "properties": {
               "participantId": {
-                "$ref": "https://watch-together.local/contracts/schemas/common.schema.json#/$defs/ParticipantId"
+                "$ref": "https://spectemus-simul.invalid/contracts/schemas/common.schema.json#/$defs/ParticipantId"
               },
               "reason": {
                 "type": "string",
@@ -168,7 +168,7 @@
             "required": ["participantId", "online", "updatedAt"],
             "properties": {
               "participantId": {
-                "$ref": "https://watch-together.local/contracts/schemas/common.schema.json#/$defs/ParticipantId"
+                "$ref": "https://spectemus-simul.invalid/contracts/schemas/common.schema.json#/$defs/ParticipantId"
               },
               "online": {
                 "type": "boolean"
@@ -224,10 +224,10 @@
             "required": ["participantId", "status", "updatedAt"],
             "properties": {
               "participantId": {
-                "$ref": "https://watch-together.local/contracts/schemas/common.schema.json#/$defs/ParticipantId"
+                "$ref": "https://spectemus-simul.invalid/contracts/schemas/common.schema.json#/$defs/ParticipantId"
               },
               "status": {
-                "$ref": "https://watch-together.local/contracts/schemas/common.schema.json#/$defs/RoomStatus"
+                "$ref": "https://spectemus-simul.invalid/contracts/schemas/common.schema.json#/$defs/RoomStatus"
               },
               "updatedAt": {
                 "type": "string",
@@ -294,10 +294,10 @@
                 "format": "uuid"
               },
               "participantId": {
-                "$ref": "https://watch-together.local/contracts/schemas/common.schema.json#/$defs/ParticipantId"
+                "$ref": "https://spectemus-simul.invalid/contracts/schemas/common.schema.json#/$defs/ParticipantId"
               },
               "displayName": {
-                "$ref": "https://watch-together.local/contracts/schemas/common.schema.json#/$defs/DisplayName"
+                "$ref": "https://spectemus-simul.invalid/contracts/schemas/common.schema.json#/$defs/DisplayName"
               },
               "text": {
                 "type": "string",
@@ -325,7 +325,7 @@
       "then": {
         "properties": {
           "payload": {
-            "$ref": "https://watch-together.local/contracts/schemas/problem-details.schema.json"
+            "$ref": "https://spectemus-simul.invalid/contracts/schemas/problem-details.schema.json"
           }
         }
       }

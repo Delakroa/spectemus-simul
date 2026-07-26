@@ -1,6 +1,6 @@
 # Backend
 
-Spring Boot бэкенд Watch Together.
+Spring Boot бэкенд Spectemus Simul.
 
 ## Стек
 
@@ -54,7 +54,7 @@ WT-201, WT-202, WT-203, WT-204, WT-205, WT-206, WT-207 и WT-209 добавил�
 
 WT-301 добавляет выдачу LiveKit product tokens по текущей room session. Backend подписывает JWT через `LIVEKIT_API_SECRET`, возвращает browser-facing `LIVEKIT_URL` и назначает grants по роли participant. WT-302-WT-306 используют эти tokens для product media pipeline на frontend; backend остаётся authority для room/session access, а медиабайты не загружаются на сервер.
 
-WT-402 добавляет backend lifecycle для host reconnect: `HOST_DISCONNECTED`, события `host.disconnected` / `host.reconnected`, grace period `watch-together.websocket.host-reconnect-grace` и закрытие комнаты с reason `HOST_TIMEOUT`, если host не вернулся.
+WT-402 добавляет backend lifecycle для host reconnect: `HOST_DISCONNECTED`, события `host.disconnected` / `host.reconnected`, grace period `spectemus-simul.websocket.host-reconnect-grace` и закрытие комнаты с reason `HOST_TIMEOUT`, если host не вернулся.
 
 WT-403 добавляет текстовый чат поверх room WebSocket: server-side validation, per-participant rate limit, `chat.message` broadcast и `error` events для `VALIDATION_FAILED` / `RATE_LIMITED`.
 
@@ -75,7 +75,7 @@ Room state, participant sessions и idempotency records хранятся в Redi
 ```text
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
-REDIS_PASSWORD=watch_together_redis_dev_only
+REDIS_PASSWORD=spectemus_simul_redis_dev_only
 ROOM_TTL=4h
 ROOM_CLEANUP_GRACE=5m
 WEBSOCKET_PRESENCE_TTL=30s

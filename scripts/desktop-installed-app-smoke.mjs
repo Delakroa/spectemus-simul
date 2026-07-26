@@ -11,7 +11,7 @@ const required = [
   [executable, "desktop executable"],
   [`${resources}/frontend/index.html`, "React UI"],
   [
-    `${resources}/sidecars/backend/watch-together-backend.jar`,
+    `${resources}/sidecars/backend/spectemus-simul-backend.jar`,
     "Spring Boot jar",
   ],
   [`${resources}/sidecars/runtime/bin/${java}`, "bundled Java runtime"],

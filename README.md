@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/assets/watch-together-banner.svg" alt="Spectemus Simul — приватный совместный просмотр" width="100%" />
+  <img src=".github/assets/spectemus-simul-banner.svg" alt="Spectemus Simul — приватный совместный просмотр" width="100%" />
 </p>
 
 # Spectemus Simul

@@ -22,7 +22,7 @@ autoplay аудио у гостя.
 ## Проверки
 
 ```bash
-pnpm --filter @watch-together/frontend test
+pnpm --filter @spectemus-simul/frontend test
 pnpm check
 pnpm test:e2e
 ```

@@ -1,4 +1,4 @@
-# Контракты Watch Together
+# Контракты Spectemus Simul
 
 ## Назначение
 

@@ -1,4 +1,4 @@
-# Security response headers for the Watch Together frontend. Rendered from this template by the
+# Security response headers for the Spectemus Simul frontend. Rendered from this template by the
 # nginx entrypoint's envsubst at container start; only ${WT_CSP_CONNECT_SRC} is substituted.
 # CSP notes: the Vite build emits only external scripts (script-src 'self' is safe); inline style
 # attributes (React style={{…}}) require style-src 'unsafe-inline'; blob: is needed for the host's

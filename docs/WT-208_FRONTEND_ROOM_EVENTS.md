@@ -48,8 +48,8 @@ Frontend считает backend source of truth:
 ## Проверка
 
 ```bash
-pnpm --filter @watch-together/frontend typecheck
-pnpm --filter @watch-together/frontend test
+pnpm --filter @spectemus-simul/frontend typecheck
+pnpm --filter @spectemus-simul/frontend test
 pnpm check
 pnpm infra:check
 pnpm security:audit

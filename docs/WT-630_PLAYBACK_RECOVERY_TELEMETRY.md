@@ -48,11 +48,11 @@ LiveKit-дорожек.
 
 ```bash
 pnpm contracts:check
-pnpm --filter @watch-together/frontend exec vitest run \
+pnpm --filter @spectemus-simul/frontend exec vitest run \
   src/features/telemetry/telemetry.test.ts \
   src/features/rooms/use-room-session-host-controls.test.tsx
-pnpm --filter @watch-together/frontend typecheck
-pnpm --filter @watch-together/frontend lint
+pnpm --filter @spectemus-simul/frontend typecheck
+pnpm --filter @spectemus-simul/frontend lint
 pnpm backend:test
 pnpm format:check
 ```

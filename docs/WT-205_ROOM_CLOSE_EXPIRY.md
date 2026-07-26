@@ -42,7 +42,7 @@ POST /api/v1/rooms/{roomId}/close
 
 - `expiresAt` остаётся product boundary;
 - после `expiresAt` join и WebSocket connect недоступны;
-- Redis room key живёт ещё `watch-together.rooms.cleanup-grace`, чтобы backend успел выполнить cleanup и отправить `room.closed` reason `EXPIRED` активным WebSocket-сессиям.
+- Redis room key живёт ещё `spectemus-simul.rooms.cleanup-grace`, чтобы backend успел выполнить cleanup и отправить `room.closed` reason `EXPIRED` активным WebSocket-сессиям.
 
 ## WebSocket
 

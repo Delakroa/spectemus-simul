@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
-$tcpRuleName = "Watch Together LAN TCP"
-$udpRuleName = "Watch Together LAN UDP"
+$tcpRuleName = "Spectemus Simul LAN TCP"
+$udpRuleName = "Spectemus Simul LAN UDP"
 
 function Test-IsAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -56,4 +56,4 @@ New-NetFirewallRule `
     -Protocol UDP `
     -LocalPort 50000-50100 | Out-Null
 
-Write-Host "[ok] Разрешены только Watch Together LAN-порты для профиля Private."
+Write-Host "[ok] Разрешены только Spectemus Simul LAN-порты для профиля Private."

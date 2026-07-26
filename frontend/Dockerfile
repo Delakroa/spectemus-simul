@@ -12,7 +12,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY frontend/package.json frontend/package.json
 COPY poc/media-capture-livekit/package.json poc/media-capture-livekit/package.json
 
-RUN pnpm install --frozen-lockfile --filter @watch-together/frontend...
+RUN pnpm install --frozen-lockfile --filter @spectemus-simul/frontend...
 
 COPY frontend frontend
 
@@ -22,7 +22,7 @@ ARG VITE_LIVEKIT_URL=ws://127.0.0.1:7880
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 ENV VITE_LIVEKIT_URL=$VITE_LIVEKIT_URL
 
-RUN pnpm --filter @watch-together/frontend build
+RUN pnpm --filter @spectemus-simul/frontend build
 
 FROM nginx:1.31.1-alpine3.23
 

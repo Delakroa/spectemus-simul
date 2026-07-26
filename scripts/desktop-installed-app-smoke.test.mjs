@@ -36,7 +36,7 @@ test("install smoke сообщает об отсутствующем Windows sid
     await createFile(appPath, "resources/frontend/index.html");
     await createFile(
       appPath,
-      "resources/sidecars/backend/watch-together-backend.jar",
+      "resources/sidecars/backend/spectemus-simul-backend.jar",
     );
     await createFile(appPath, "resources/sidecars/runtime/bin/java.exe");
 
@@ -59,7 +59,7 @@ async function createMacApp(appPath) {
     createFile(appPath, "Contents/Resources/frontend/index.html"),
     createFile(
       appPath,
-      "Contents/Resources/sidecars/backend/watch-together-backend.jar",
+      "Contents/Resources/sidecars/backend/spectemus-simul-backend.jar",
     ),
     createFile(appPath, "Contents/Resources/sidecars/runtime/bin/java"),
     createFile(appPath, "Contents/Resources/sidecars/livekit/livekit-server"),

@@ -10,7 +10,7 @@ production generator LiveKit. Он не разворачивает сервер 
 app.<domain>  ── TLS ─┐
 rtc.<domain>  ── TLS ─┼─ Caddy из official LiveKit generator ─┐
 turn.<domain> ── TLS ─┘                                      ├─ LiveKit / embedded TURN
-                                                              └─ 127.0.0.1:8088 Watch Together gateway
+                                                              └─ 127.0.0.1:8088 Spectemus Simul gateway
 ```
 
 `infra/staging/compose.yaml` запускает только backend и gateway. LiveKit,
@@ -70,11 +70,11 @@ Staging compose задаёт gateway `WT_FORWARDED_PROTO=https`, поэтому 
 Скопировать этот репозиторий на VM и создать защищённый env-файл вне checkout:
 
 ```bash
-install -m 700 -d /opt/watch-together
-install -m 600 infra/staging/.env.example /opt/watch-together/.env
+install -m 700 -d /opt/spectemus-simul
+install -m 600 infra/staging/.env.example /opt/spectemus-simul/.env
 ```
 
-Заполнить `/opt/watch-together/.env`:
+Заполнить `/opt/spectemus-simul/.env`:
 
 - `WT_STAGING_APP_DOMAIN`, `WT_STAGING_RTC_DOMAIN`;
 - Redis password, LiveKit API key и API secret из generator output;
@@ -83,8 +83,8 @@ install -m 600 infra/staging/.env.example /opt/watch-together/.env
 Затем из корня checkout:
 
 ```bash
-docker compose --env-file /opt/watch-together/.env -f infra/staging/compose.yaml config
-docker compose --env-file /opt/watch-together/.env -f infra/staging/compose.yaml up --build -d --wait
+docker compose --env-file /opt/spectemus-simul/.env -f infra/staging/compose.yaml config
+docker compose --env-file /opt/spectemus-simul/.env -f infra/staging/compose.yaml up --build -d --wait
 ```
 
 Не запускайте на VM одновременно `infra/compose.yaml`: это local-only стек и

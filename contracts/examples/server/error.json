@@ -7,7 +7,7 @@
   "roomVersion": 42,
   "occurredAt": "2026-07-09T07:30:03Z",
   "payload": {
-    "type": "https://watch-together.local/problems/room-state-conflict",
+    "type": "https://spectemus-simul.invalid/problems/room-state-conflict",
     "title": "Состояние комнаты изменилось",
     "status": 409,
     "code": "ROOM_STATE_CONFLICT",

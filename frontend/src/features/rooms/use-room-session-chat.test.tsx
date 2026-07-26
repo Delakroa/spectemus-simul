@@ -352,7 +352,7 @@ describe("useRoomSession text chat", () => {
       roomVersion: 1,
       occurredAt: "2026-07-10T10:03:00Z",
       payload: {
-        type: "https://watch-together.local/problems/chat-rate-limited",
+        type: "https://spectemus-simul.invalid/problems/chat-rate-limited",
         title: "Слишком много сообщений",
         status: 429,
         code: "RATE_LIMITED",

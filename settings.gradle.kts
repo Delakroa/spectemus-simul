@@ -2,6 +2,6 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
-rootProject.name = "watch-together"
+rootProject.name = "spectemus-simul"
 
 include("backend")

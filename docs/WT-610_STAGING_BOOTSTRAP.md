@@ -17,7 +17,7 @@ WT-610 фиксирует безопасную границу:
 
 - официальный LiveKit generator отвечает за Caddy, certificate issuance,
   embedded TURN/TLS, ICE ports и Redis foundation;
-- `infra/staging/compose.yaml` отвечает только за Watch Together backend и
+- `infra/staging/compose.yaml` отвечает только за Spectemus Simul backend и
   gateway, которые слушают loopback;
 - backend использует Redis database `1`, LiveKit — database `0`;
 - отдельные `app`, `rtc` и `turn` hostnames делают TLS, WSS и TURN/TLS

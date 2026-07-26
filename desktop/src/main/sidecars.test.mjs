@@ -69,7 +69,7 @@ test("разрешает developer override и ожидает packaged sidecars 
   assert.equal(development.livekitServer, "livekit-server");
   assert.match(
     development.backendJar,
-    /backend\/build\/libs\/backend-0\.1\.0-SNAPSHOT\.jar$/,
+    /backend\/build\/libs\/spectemus-simul-backend-0\.1\.0-SNAPSHOT\.jar$/,
   );
 
   const packaged = resolveSidecarPaths({

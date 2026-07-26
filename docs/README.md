@@ -13,6 +13,8 @@
 - [WT-664_PRODUCT_ROADMAP_README.md](WT-664_PRODUCT_ROADMAP_README.md) —
   честная публичная дорожная карта LAN preview → просмотр из разных городов и
   расширение совместимости локального видео.
+- [WT-665_COMPLETE_SPECTEMUS_RENAME.md](WT-665_COMPLETE_SPECTEMUS_RENAME.md) —
+  решение о полном pre-release ребрендинге и его технические границы.
 
 ## Быстрый порядок чтения
 

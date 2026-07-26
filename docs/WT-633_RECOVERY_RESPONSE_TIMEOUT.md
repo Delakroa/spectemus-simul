@@ -20,7 +20,7 @@
 
 ## Проверки
 
-    pnpm --filter @watch-together/frontend exec vitest run \
+    pnpm --filter @spectemus-simul/frontend exec vitest run \
       src/features/rooms/use-room-session-host-controls.test.tsx \
       src/pages/HomePage.test.tsx
     pnpm check

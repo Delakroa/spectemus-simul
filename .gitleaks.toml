@@ -1,4 +1,4 @@
-# gitleaks configuration for Watch Together (WT-505).
+# gitleaks configuration for Spectemus Simul (WT-505).
 #
 # Per docs/CONVENTIONS.md real secrets live only in local .env files / secret storage
 # and never in git. Every credential-looking string in the repo is a placeholder,

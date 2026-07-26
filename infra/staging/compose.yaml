@@ -1,4 +1,4 @@
-name: watch-together-staging
+name: spectemus-simul-staging
 
 # Application layer for a Linux VM running the official LiveKit Caddy/TURN stack.
 # The generated LiveKit stack owns ports 80/443/7881/3478 and Redis on localhost.

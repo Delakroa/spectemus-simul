@@ -44,8 +44,8 @@
 ## Проверка
 
 ```bash
-pnpm --filter @watch-together/frontend exec vitest run src/features/rooms/file-diagnostics.test.ts src/features/rooms/file-publication.test.ts src/features/rooms/use-room-session-host-controls.test.tsx src/pages/HomePage.test.tsx
-pnpm --filter @watch-together/frontend typecheck
+pnpm --filter @spectemus-simul/frontend exec vitest run src/features/rooms/file-diagnostics.test.ts src/features/rooms/file-publication.test.ts src/features/rooms/use-room-session-host-controls.test.tsx src/pages/HomePage.test.tsx
+pnpm --filter @spectemus-simul/frontend typecheck
 pnpm check
 ```
 
