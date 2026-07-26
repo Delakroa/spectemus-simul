@@ -2,6 +2,9 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("spectemusDesktop", {
   getRuntimeStatus: () => ipcRenderer.invoke("spectemus:runtime-status"),
+  restartRuntime: () => ipcRenderer.invoke("spectemus:restart-runtime"),
+  selectLanAddress: (address) =>
+    ipcRenderer.invoke("spectemus:select-lan-address", address),
   onRuntimeStatus: (listener) => {
     const wrapped = (_event, status) => listener(status);
     ipcRenderer.on("spectemus:runtime-status", wrapped);

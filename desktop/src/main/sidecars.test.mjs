@@ -121,3 +121,108 @@ test("gateway не скрывает ошибки, кроме занятого п
     unavailable,
   );
 });
+
+test("аварийный выход sidecar останавливает gateway и оставшиеся процессы", async () => {
+  const children = [];
+  let closedGateway = 0;
+  const supervisor = new DesktopSupervisor({
+    gatewayFactory: async () => ({
+      close: async () => {
+        closedGateway += 1;
+      },
+      port: 8088,
+    }),
+    spawnProcess: () => {
+      const child = new EventEmitter();
+      child.exitCode = null;
+      child.killed = false;
+      child.kill = () => {
+        child.killed = true;
+        child.exitCode = 0;
+        queueMicrotask(() => child.emit("exit", 0, "SIGTERM"));
+        return true;
+      };
+      children.push(child);
+      return child;
+    },
+    waitForHealthy: async () => {},
+  });
+
+  await supervisor.start({
+    lanAddress: "192.168.1.42",
+    paths: {
+      backendJar: "/tmp/backend.jar",
+      frontendDirectory: "/tmp/frontend",
+      javaCommand: "/tmp/java",
+      livekitServer: "/tmp/livekit-server",
+    },
+    runtimeDirectory: "/tmp/runtime",
+    secrets: { livekitApiKey: "key", livekitApiSecret: "secret" },
+  });
+
+  const [backend, livekit] = children;
+  livekit.exitCode = 1;
+  livekit.emit("exit", 1, null);
+
+  await waitFor(() => supervisor.status.state === "error");
+  assert.match(supervisor.status.detail, /LiveKit завершился неожиданно/);
+  assert.equal(closedGateway, 1);
+  assert.equal(backend.killed, true);
+});
+
+test("stop не оставляет sidecars, если gateway вернул ошибку при закрытии", async () => {
+  const children = [];
+  const supervisor = new DesktopSupervisor({
+    gatewayFactory: async () => ({
+      close: async () => {
+        throw new Error("gateway close failed");
+      },
+      port: 8088,
+    }),
+    spawnProcess: () => {
+      const child = new EventEmitter();
+      child.exitCode = null;
+      child.killed = false;
+      child.kill = () => {
+        child.killed = true;
+        child.exitCode = 0;
+        queueMicrotask(() => child.emit("exit", 0, "SIGTERM"));
+        return true;
+      };
+      children.push(child);
+      return child;
+    },
+    waitForHealthy: async () => {},
+  });
+
+  await supervisor.start({
+    lanAddress: "192.168.1.42",
+    paths: {
+      backendJar: "/tmp/backend.jar",
+      frontendDirectory: "/tmp/frontend",
+      javaCommand: "/tmp/java",
+      livekitServer: "/tmp/livekit-server",
+    },
+    runtimeDirectory: "/tmp/runtime",
+    secrets: { livekitApiKey: "key", livekitApiSecret: "secret" },
+  });
+  await supervisor.stop();
+
+  assert.equal(supervisor.status.state, "stopped");
+  assert.match(supervisor.status.detail, /часть локальных сервисов/);
+  assert.deepEqual(
+    children.map((child) => child.killed),
+    [true, true],
+  );
+});
+
+async function waitFor(predicate, timeoutMs = 1_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error("Ожидаемое состояние supervisor не наступило.");
+}

@@ -21,10 +21,13 @@ Electron main process
   с тем же private LAN IPv4.
 - Secrets генерируются один раз в app data с правами пользователя; они не
   передаются в renderer, invite-ссылки или status UI.
-- При нескольких физических private IPv4 host не угадывает сеть: нужен явный
-  `SPECTEMUS_LAN_IP`. Виртуальные интерфейсы Docker, VM, WSL и VPN/tunnel
-  (включая macOS `utun`) не считаются домашней сетью.
-- При выходе Electron корректно закрывает gateway, LiveKit и backend.
+- При нескольких физических private IPv4 приложение не угадывает сеть, а
+  предлагает выбрать её в окне desktop host. Виртуальные интерфейсы Docker,
+  VM, WSL и VPN/tunnel (включая macOS `utun`) не считаются домашней сетью.
+  `SPECTEMUS_LAN_IP` остаётся только developer override.
+- При выходе Electron корректно закрывает gateway, LiveKit и backend. При
+  аварийном завершении sidecar приложение также завершает остальные локальные
+  сервисы и даёт пользователю действие «Перезапустить».
 
 ## Developer запуск proof
 
@@ -44,9 +47,11 @@ SPECTEMUS_LIVEKIT_SERVER=/path/to/livekit-server \
 pnpm desktop:dev
 ```
 
-Если на компьютере больше одной домашней сети, дополнительно передайте
-`SPECTEMUS_LAN_IP=192.168.x.x`. BrowserWindow открывает loopback gateway, а
-гостю отправляется `http://<выбранный-ip>:8088/rooms/<room-id>`.
+Если в developer-сценарии нужно закрепить конкретную сеть, дополнительно
+передайте `SPECTEMUS_LAN_IP=192.168.x.x`. В установленном приложении при
+нескольких физических сетях адрес выбирается в UI. BrowserWindow открывает
+loopback gateway, а гостю отправляется
+`http://<выбранный-ip>:<фактический-порт>/rooms/<room-id>`.
 
 ## Что проверено кодом
 
@@ -54,6 +59,8 @@ pnpm desktop:dev
 - per-installation secrets и LiveKit config без Redis;
 - SPA fallback, HTTP proxy и WebSocket upgrade в loopback backend;
 - desktop profile стартует без Redis (WT-648 backend test).
+- аварийное завершение sidecar закрывает gateway и оставшийся sidecar;
+- ошибка закрытия gateway не оставляет backend/LiveKit в фоне.
 
 ## Не является готовым релизом
 
