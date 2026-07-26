@@ -11,6 +11,7 @@ declare global {
   interface Window {
     spectemusDesktop?: {
       getRuntimeStatus: () => Promise<DesktopRuntimeStatus>;
+      restartRuntime: () => Promise<DesktopRuntimeStatus>;
       onRuntimeStatus: (listener: (status: DesktopRuntimeStatus) => void) => () => void;
     };
   }
@@ -18,6 +19,7 @@ declare global {
 
 export function DesktopRuntimeStatusIndicator() {
   const [status, setStatus] = useState<DesktopRuntimeStatus | null>(null);
+  const [restarting, setRestarting] = useState(false);
 
   useEffect(() => {
     const desktop = window.spectemusDesktop;
@@ -34,14 +36,35 @@ export function DesktopRuntimeStatusIndicator() {
 
   const statusClass =
     status.state === "running" ? "ready" : status.state === "error" ? "error" : "pending";
+  const canRestart = status.state === "error" && !restarting;
+
+  const restart = () => {
+    const desktop = window.spectemusDesktop;
+    if (!desktop || restarting) {
+      return;
+    }
+    setRestarting(true);
+    void desktop.restartRuntime().finally(() => setRestarting(false));
+  };
+
   return (
-    <span
+    <div
       className={`desktop-runtime-status desktop-runtime-status--${statusClass}`}
       role="status"
       title={status.detail}
     >
       <MonitorPlay size={15} aria-hidden="true" />
       <span>Desktop host: {status.state === "running" ? "готов" : status.detail}</span>
-    </span>
+      {status.state === "error" ? (
+        <button
+          className="desktop-runtime-status__restart"
+          type="button"
+          disabled={!canRestart}
+          onClick={restart}
+        >
+          {restarting ? "Запускаем…" : "Перезапустить"}
+        </button>
+      ) : null}
+    </div>
   );
 }

@@ -91,6 +91,8 @@ export class DesktopSupervisor {
     this.status = { state: "stopped", detail: "Host не запущен." };
     this.listeners = new Set();
     this.children = [];
+    this.stopPromise = undefined;
+    this.failureDetail = undefined;
   }
 
   subscribe(listener) {
@@ -110,6 +112,7 @@ export class DesktopSupervisor {
       throw new Error("Desktop host уже запускается или работает.");
     }
 
+    this.failureDetail = undefined;
     try {
       this.setStatus("starting-backend", "Запускаем локальный backend.");
       const backend = this.spawnBackend({ lanAddress, paths, ports, secrets });
@@ -119,6 +122,7 @@ export class DesktopSupervisor {
           `http://127.0.0.1:${ports.backend}/actuator/health`,
         ),
       );
+      this.assertStartupIsActive();
 
       this.setStatus("starting-livekit", "Запускаем локальный media server.");
       const livekit = this.spawnLiveKit({
@@ -132,6 +136,7 @@ export class DesktopSupervisor {
       await waitForChildReadiness(livekit, "LiveKit", () =>
         this.waitForHealthy(`http://127.0.0.1:${ports.livekitHttp}/`),
       );
+      this.assertStartupIsActive();
 
       this.setStatus("starting-gateway", "Открываем LAN gateway.");
       const gateway = await startGatewayWithFallback(this.gatewayFactory, {
@@ -140,6 +145,7 @@ export class DesktopSupervisor {
         port: ports.gateway,
       });
       this.gateway = gateway.instance;
+      this.assertStartupIsActive();
 
       const url = `http://${lanAddress}:${gateway.port}`;
       this.setStatus("running", `Host готов: ${url}`, { lanAddress, url });
@@ -155,16 +161,19 @@ export class DesktopSupervisor {
   }
 
   async stop() {
+    if (this.stopPromise) {
+      return this.stopPromise;
+    }
     if (this.status.state === "stopped") {
       return;
     }
-    this.setStatus("stopping", "Останавливаем локальные сервисы.");
-    if (this.gateway) {
-      await this.gateway.close();
-      this.gateway = undefined;
+
+    this.stopPromise = this.stopServices();
+    try {
+      await this.stopPromise;
+    } finally {
+      this.stopPromise = undefined;
     }
-    await Promise.all(this.children.splice(0).reverse().map(stopChild));
-    this.setStatus("stopped", "Host остановлен.");
   }
 
   spawnBackend({ lanAddress, paths, ports, secrets }) {
@@ -218,12 +227,13 @@ export class DesktopSupervisor {
   trackChild(child, name) {
     this.children.push(child);
     child.once("error", (error) => {
-      this.setStatus("error", `${name} не удалось запустить: ${error.message}`);
+      this.handleUnexpectedFailure(
+        `${name} не удалось запустить: ${error.message}`,
+      );
     });
     child.once("exit", (code, signal) => {
       if (this.status.state !== "stopping" && this.status.state !== "stopped") {
-        this.setStatus(
-          "error",
+        this.handleUnexpectedFailure(
           `${name} завершился неожиданно (${signal ?? `код ${code ?? "unknown"}`}).`,
         );
       }
@@ -235,6 +245,54 @@ export class DesktopSupervisor {
     for (const listener of this.listeners) {
       listener(this.status);
     }
+  }
+
+  assertStartupIsActive() {
+    if (this.status.state === "stopping" || this.status.state === "stopped") {
+      throw new Error(
+        this.failureDetail ?? "Запуск desktop host был остановлен.",
+      );
+    }
+    if (this.status.state === "error") {
+      throw new Error(this.status.detail);
+    }
+  }
+
+  handleUnexpectedFailure(detail) {
+    if (
+      this.status.state === "stopping" ||
+      this.status.state === "stopped" ||
+      this.status.state === "error"
+    ) {
+      return;
+    }
+    this.failureDetail = detail;
+    this.setStatus("error", detail);
+    void this.stop().then(() => {
+      if (this.failureDetail === detail) {
+        this.setStatus("error", detail);
+      }
+    });
+  }
+
+  async stopServices() {
+    this.setStatus("stopping", "Останавливаем локальные сервисы.");
+    const gateway = this.gateway;
+    this.gateway = undefined;
+    const children = this.children.splice(0).reverse();
+    const results = await Promise.allSettled([
+      ...(gateway ? [gateway.close()] : []),
+      ...children.map(stopChild),
+    ]);
+    const cleanupFailed = results.some(
+      (result) => result.status === "rejected",
+    );
+    this.setStatus(
+      "stopped",
+      cleanupFailed
+        ? "Host остановлен, но часть локальных сервисов потребовала принудительного завершения."
+        : "Host остановлен.",
+    );
   }
 }
 
@@ -314,7 +372,7 @@ function assertJavaVersion(javaCommand) {
 }
 
 function stopChild(child) {
-  if (child.exitCode !== null || child.killed) {
+  if (child.exitCode !== null) {
     return Promise.resolve();
   }
   return new Promise((resolveStop) => {
