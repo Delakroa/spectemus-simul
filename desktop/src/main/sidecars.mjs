@@ -1,7 +1,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createSocket } from "node:dgram";
 import { access, constants } from "node:fs/promises";
-import { createServer } from "node:net";
+import { createConnection, createServer } from "node:net";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -86,11 +86,13 @@ export class DesktopSupervisor {
     gatewayFactory = startGateway,
     spawnProcess = spawn,
     waitForHealthy = waitForHealthyHttp,
+    waitForLiveKitReady = waitForLiveKitTcpReady,
     assertPortsAvailable = assertDesktopPortsAvailable,
   } = {}) {
     this.gatewayFactory = gatewayFactory;
     this.spawnProcess = spawnProcess;
     this.waitForHealthy = waitForHealthy;
+    this.waitForLiveKitReady = waitForLiveKitReady;
     this.assertPortsAvailable = assertPortsAvailable;
     this.status = { state: "stopped", detail: "Host не запущен." };
     this.listeners = new Set();
@@ -143,7 +145,10 @@ export class DesktopSupervisor {
       });
       this.trackChild(livekit, "LiveKit");
       await waitForChildReadiness(livekit, "LiveKit", () =>
-        this.waitForHealthy(`http://127.0.0.1:${ports.livekitHttp}/`),
+        this.waitForLiveKitReady({
+          host: "127.0.0.1",
+          port: ports.livekitHttp,
+        }),
       );
       this.assertStartupIsActive();
 
@@ -417,6 +422,42 @@ export async function waitForHealthyHttp(
   throw new Error(
     `Сервис не стал доступен: ${url}${lastError ? ` (${lastError.message})` : ""}`,
   );
+}
+
+export async function waitForLiveKitTcpReady(
+  { host, port },
+  { timeoutMs = 60_000, intervalMs = 500 } = {},
+) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError;
+  while (Date.now() < deadline) {
+    try {
+      await connectTcp({ host, port });
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+    await new Promise((resolveSleep) => setTimeout(resolveSleep, intervalMs));
+  }
+  throw new Error(
+    `LiveKit signal port не стал доступен: ${host}:${port}${lastError ? ` (${lastError.message})` : ""}`,
+  );
+}
+
+function connectTcp({ host, port }) {
+  return new Promise((resolveConnect, rejectConnect) => {
+    const socket = createConnection({ host, port });
+    socket.setTimeout(1_500);
+    socket.once("connect", () => {
+      socket.end();
+      resolveConnect();
+    });
+    socket.once("timeout", () => {
+      socket.destroy();
+      rejectConnect(new Error("TCP connection timeout"));
+    });
+    socket.once("error", rejectConnect);
+  });
 }
 
 async function assertReadable(filePath, label) {
