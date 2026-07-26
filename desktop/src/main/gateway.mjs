@@ -17,6 +17,7 @@ const CONTENT_TYPES = {
   ".svg": "image/svg+xml",
   ".woff2": "font/woff2",
 };
+const UPSTREAM_TIMEOUT_MS = 15_000;
 
 export async function startGateway({
   backend = { host: "127.0.0.1", port: 8080 },
@@ -93,7 +94,8 @@ function proxyHttp({ backend, request, response }) {
       port: backend.port,
       method: request.method,
       path: request.url,
-      headers: request.headers,
+      headers: trustedForwardHeaders(request),
+      timeout: UPSTREAM_TIMEOUT_MS,
     },
     (upstreamResponse) => {
       response.writeHead(
@@ -103,14 +105,19 @@ function proxyHttp({ backend, request, response }) {
       upstreamResponse.pipe(response);
     },
   );
+  upstream.once("timeout", () => {
+    upstream.destroy(new Error("Backend timeout"));
+  });
   upstream.once("error", () => {
     if (!response.headersSent) {
       response.writeHead(502, {
         "Content-Type": "application/json",
         "Cache-Control": "no-store",
       });
+      response.end('{"code":"BACKEND_UNAVAILABLE"}');
+      return;
     }
-    response.end('{"code":"BACKEND_UNAVAILABLE"}');
+    response.destroy();
   });
   request.pipe(upstream);
 }
@@ -131,16 +138,31 @@ function proxyUpgrade({ backend, request, socket, head }) {
       `${request.method} ${request.url} HTTP/${request.httpVersion}`,
     ];
     for (let index = 0; index < request.rawHeaders.length; index += 2) {
+      if (request.rawHeaders[index].toLowerCase() === "x-forwarded-for") {
+        continue;
+      }
       headLines.push(
         `${request.rawHeaders[index]}: ${request.rawHeaders[index + 1]}`,
       );
     }
+    headLines.push(`X-Forwarded-For: ${clientAddress(request)}`);
     upstream.write(`${headLines.join("\r\n")}\r\n\r\n`);
     if (head.length > 0) {
       upstream.write(head);
     }
     socket.pipe(upstream).pipe(socket);
   });
+}
+
+function trustedForwardHeaders(request) {
+  const headers = { ...request.headers };
+  delete headers["x-forwarded-for"];
+  headers["x-forwarded-for"] = clientAddress(request);
+  return headers;
+}
+
+function clientAddress(request) {
+  return request.socket.remoteAddress ?? "unknown";
 }
 
 async function serveFrontend({ request, response, root, pathname }) {
