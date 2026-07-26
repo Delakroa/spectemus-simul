@@ -41,7 +41,7 @@ export function resolveSidecarPaths({
             "backend",
             "build",
             "libs",
-            "spectemus-simul-backend-0.1.0-SNAPSHOT.jar",
+            "spectemus-simul-backend.jar",
           )),
     frontendDirectory:
       environment.SPECTEMUS_FRONTEND_DIST ??

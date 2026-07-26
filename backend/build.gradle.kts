@@ -50,6 +50,10 @@ springBoot {
     }
 }
 
+tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
+    archiveFileName.set("spectemus-simul-backend.jar")
+}
+
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }

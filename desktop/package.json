@@ -38,7 +38,7 @@
         "to": "frontend"
       },
       {
-        "from": "../backend/build/libs/spectemus-simul-backend-0.1.0-SNAPSHOT.jar",
+        "from": "../backend/build/libs/spectemus-simul-backend.jar",
         "to": "sidecars/backend/spectemus-simul-backend.jar"
       },
       {
