@@ -189,7 +189,22 @@ export function HomePage() {
   const navigate = useNavigate();
   const isMobileInviteHandoff = useMobileInviteHandoff(Boolean(routeRoomId));
   const { health, version, isPending, isError, refetch } = useSystemStatus();
-  const roomSession = useRoomSession(isMobileInviteHandoff ? undefined : routeRoomId);
+  const [desktopPublicInviteOrigin, setDesktopPublicInviteOrigin] = useState<string>();
+  useEffect(() => {
+    const desktop = window.spectemusDesktop;
+    if (!desktop?.getPublicInviteOrigin) {
+      return;
+    }
+    void desktop.getPublicInviteOrigin().then((origin) => {
+      if (origin) {
+        setDesktopPublicInviteOrigin(origin);
+      }
+    });
+  }, []);
+  const roomSession = useRoomSession(
+    isMobileInviteHandoff ? undefined : routeRoomId,
+    desktopPublicInviteOrigin,
+  );
   const { setHostPreviewElement, setRemotePlaybackElements } = roomSession;
   const [hostDisplayName, setHostDisplayName] = useState("Host");
   const [guestDisplayName, setGuestDisplayName] = useState("Guest");

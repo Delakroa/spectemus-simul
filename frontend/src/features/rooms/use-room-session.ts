@@ -279,7 +279,7 @@ const initialState: RoomSessionState = {
   voiceStatus: "idle",
 };
 
-export function useRoomSession(routeRoomId?: string) {
+export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
   const [state, setState] = useState<RoomSessionState>(initialState);
   const connectRoomEventsRef = useRef<
     | ((room: RoomSnapshot, participant: Participant, options?: ConnectRoomEventsOptions) => void)
@@ -2075,8 +2075,8 @@ export function useRoomSession(routeRoomId?: string) {
 
   const inviteUrl = useMemo(() => {
     const path = state.invitePath ?? (state.room ? `/rooms/${state.room.roomId}` : null);
-    return path ? new URL(path, window.location.origin).toString() : null;
-  }, [state.invitePath, state.room]);
+    return path ? new URL(path, inviteOrigin ?? window.location.origin).toString() : null;
+  }, [inviteOrigin, state.invitePath, state.room]);
 
   return {
     ...state,
