@@ -1288,6 +1288,13 @@ a {
   font-size: 13px;
 }
 
+.remote-player__resume-action {
+  min-height: 34px;
+  margin-top: 4px;
+  padding: 7px 12px;
+  font-size: 13px;
+}
+
 .remote-player__meta {
   display: flex;
   min-width: 0;

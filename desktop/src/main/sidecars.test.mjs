@@ -8,6 +8,7 @@ import {
   DesktopSupervisor,
   resolveSidecarPaths,
   startGatewayWithFallback,
+  stopChild,
   waitForLiveKitTcpReady,
 } from "./sidecars.mjs";
 
@@ -98,6 +99,17 @@ test("готовность LiveKit проверяется подключение
   } finally {
     await new Promise((resolveClose) => server.close(resolveClose));
   }
+});
+
+test("остановка sidecar ждёт подтверждения выхода после SIGKILL", async () => {
+  const child = new EventEmitter();
+  child.exitCode = null;
+  child.kill = () => true;
+
+  await assert.rejects(
+    () => stopChild(child, { forceKillWaitMs: 1, gracefulShutdownWaitMs: 1 }),
+    /не подтвердил завершение/,
+  );
 });
 
 test("gateway сохраняет 8088, а при занятом порте выбирает свободный", async () => {

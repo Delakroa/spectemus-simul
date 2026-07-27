@@ -70,6 +70,7 @@ describe("createRemotePlaybackController", () => {
 
     expect(videoTrack.attach).toHaveBeenCalledWith(videoElement);
     expect(audioTrack.attach).toHaveBeenCalledWith(audioElement);
+    expect(videoElement.muted).toBe(true);
     expect(onStateChange).toHaveBeenLastCalledWith(
       expect.objectContaining({
         audioTrackName: "movie-audio",
@@ -114,7 +115,7 @@ describe("createRemotePlaybackController", () => {
     controller.disconnect();
   });
 
-  it("показывает error state когда browser отклоняет autoplay remote video", async () => {
+  it("показывает понятный error state, когда browser отклоняет autoplay remote video", async () => {
     const videoTrack = createTrack("video", "movie-video-track");
     const videoPublication = createPublication(videoTrack, "movie-video");
     const participant = createParticipant();
@@ -132,7 +133,7 @@ describe("createRemotePlaybackController", () => {
     await vi.waitFor(() =>
       expect(onStateChange).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          error: "Autoplay blocked",
+          error: "Браузер ждёт явного действия для запуска видео.",
           status: "error",
           videoTrackName: "movie-video",
         }),

@@ -463,6 +463,10 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
     await remotePlaybackControllerRef.current?.resumeAudio();
   }, []);
 
+  const resumeRemotePlaybackVideo = useCallback(async () => {
+    await remotePlaybackControllerRef.current?.resumeVideo();
+  }, []);
+
   const requestMediaRecovery = useCallback(async () => {
     if (participantRef.current?.role !== "GUEST") {
       return;
@@ -2097,6 +2101,7 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
     retryLiveKitConnection,
     retryRoomConnection,
     resumeRemotePlaybackAudio,
+    resumeRemotePlaybackVideo,
     restore,
     routeRoomId,
     selectFile,

@@ -26,6 +26,7 @@ export type RemotePlaybackElements = {
 export type RemotePlaybackController = {
   disconnect: () => void;
   resumeAudio: () => Promise<void>;
+  resumeVideo: () => Promise<void>;
   setElements: (elements: RemotePlaybackElements) => void;
 };
 
@@ -93,21 +94,34 @@ export function createRemotePlaybackController(
     }
   };
 
+  const resumeVideo = async (): Promise<void> => {
+    if (!videoTrack || !videoElement) {
+      return;
+    }
+
+    try {
+      await videoElement.play();
+      emitState();
+    } catch (error) {
+      emitState({
+        error: formatVideoPlaybackError(error),
+        status: "error",
+      });
+    }
+  };
+
   const attachVideo = () => {
     if (!videoTrack || !videoElement) {
       return;
     }
 
     videoElement.autoplay = true;
-    videoElement.muted = false;
+    // Звук фильма воспроизводит отдельный audio element. Mute video позволяет
+    // браузеру начать remote video без обязательного клика гостя.
+    videoElement.muted = true;
     videoElement.playsInline = true;
     videoTrack.attach(videoElement);
-    void videoElement.play().catch((error: unknown) => {
-      emitState({
-        error: error instanceof Error ? error.message : "Не удалось воспроизвести видео.",
-        status: "error",
-      });
-    });
+    void resumeVideo();
   };
 
   const attachAudio = () => {
@@ -233,6 +247,7 @@ export function createRemotePlaybackController(
       handlers.onStateChange(idleState);
     },
     resumeAudio,
+    resumeVideo,
     setElements: (elements) => {
       detachCurrentTracks();
       audioElement = elements.audioElement;
@@ -241,6 +256,25 @@ export function createRemotePlaybackController(
       emitState();
     },
   };
+}
+
+function formatVideoPlaybackError(error: unknown) {
+  if (isAutoplayBlocked(error)) {
+    return "Браузер ждёт явного действия для запуска видео.";
+  }
+
+  return error instanceof Error ? error.message : "Не удалось воспроизвести видео.";
+}
+
+function isAutoplayBlocked(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.name === "NotAllowedError" ||
+    /autoplay|user (didn't|did not) interact|user gesture/i.test(error.message)
+  );
 }
 
 function isMovieAudioPublication(publication: RemoteTrackPublication) {
