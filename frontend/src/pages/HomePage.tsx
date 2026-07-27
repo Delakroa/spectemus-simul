@@ -215,6 +215,7 @@ export function HomePage() {
   const [inviteShareStatus, setInviteShareStatus] = useState<InviteShareStatus>("idle");
   const [inviteQrSvg, setInviteQrSvg] = useState<string | null>(null);
   const [inviteQrError, setInviteQrError] = useState(false);
+  const [isFeedbackSheetOpen, setIsFeedbackSheetOpen] = useState(false);
   const [roomIdCopied, setRoomIdCopied] = useState(false);
   const [seekBarValue, setSeekBarValue] = useState<number | null>(null);
   const [playbackMuted, setPlaybackMuted] = useState(false);
@@ -771,6 +772,15 @@ export function HomePage() {
                   LiveKit: {formatLiveKitStatus(roomSession.liveKitStatus)}
                 </span>
               </div>
+              <button
+                aria-label="Оставить отзыв о комнате"
+                className="button room-feedback-trigger"
+                onClick={() => setIsFeedbackSheetOpen(true)}
+                type="button"
+              >
+                <MessageSquare size={17} aria-hidden="true" />
+                Отзыв
+              </button>
               {publicInviteUrl && (
                 <button
                   className="button room-share-trigger"
@@ -801,6 +811,24 @@ export function HomePage() {
             qrSvg={inviteQrSvg}
             shareStatus={inviteShareStatus}
             telegramShareUrl={telegramShareUrl}
+          />
+        )}
+
+        {room && isFeedbackSheetOpen && (
+          <FeedbackSheet
+            error={feedbackError}
+            includeMetadata={includeFeedbackMetadata}
+            message={feedbackMessage}
+            onClose={() => setIsFeedbackSheetOpen(false)}
+            onIncludeMetadataChange={setIncludeFeedbackMetadata}
+            onMessageChange={setFeedbackMessage}
+            onOutcomeChange={handleFeedbackOutcomeChange}
+            onReasonChange={setFeedbackReason}
+            onSubmit={handleSubmitFeedback}
+            outcome={feedbackOutcome}
+            reason={feedbackReason}
+            receipt={feedbackReceipt}
+            status={feedbackStatus}
           />
         )}
 
@@ -1737,21 +1765,6 @@ export function HomePage() {
         )}
       </section>
 
-      <FeedbackPanel
-        error={feedbackError}
-        includeMetadata={includeFeedbackMetadata}
-        message={feedbackMessage}
-        onIncludeMetadataChange={setIncludeFeedbackMetadata}
-        onMessageChange={setFeedbackMessage}
-        onOutcomeChange={handleFeedbackOutcomeChange}
-        onReasonChange={setFeedbackReason}
-        onSubmit={handleSubmitFeedback}
-        outcome={feedbackOutcome}
-        reason={feedbackReason}
-        receipt={feedbackReceipt}
-        status={feedbackStatus}
-      />
-
       <section className="system-panel" aria-labelledby="system-title">
         <div className="system-panel__heading">
           <div>
@@ -2095,10 +2108,11 @@ function UserErrorBanner({
   );
 }
 
-function FeedbackPanel({
+function FeedbackSheet({
   error,
   includeMetadata,
   message,
+  onClose,
   onIncludeMetadataChange,
   onMessageChange,
   onOutcomeChange,
@@ -2112,6 +2126,7 @@ function FeedbackPanel({
   error: string | null;
   includeMetadata: boolean;
   message: string;
+  onClose: () => void;
   onIncludeMetadataChange: (value: boolean) => void;
   onMessageChange: (value: string) => void;
   onOutcomeChange: (value: FeedbackOutcome) => void;
@@ -2122,94 +2137,129 @@ function FeedbackPanel({
   receipt: FeedbackResponse | null;
   status: FeedbackSubmitStatus;
 }) {
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   return (
-    <section className="feedback-panel" aria-labelledby="feedback-title">
-      <div className="feedback-panel__heading">
-        <div>
-          <p className="eyebrow">Beta</p>
-          <h2 id="feedback-title">Обратная связь</h2>
-        </div>
-        {receipt && (
-          <span className="feedback-panel__receipt">ID {receipt.feedbackId.slice(0, 8)}</span>
-        )}
-      </div>
-
-      <form className="feedback-form" onSubmit={onSubmit}>
-        <div className="feedback-form__grid">
-          <label className="feedback-field" htmlFor="feedback-outcome">
-            <span>Итог</span>
-            <select
-              id="feedback-outcome"
-              aria-label="Итог сессии"
-              value={outcome}
-              onChange={(event) => onOutcomeChange(event.currentTarget.value as FeedbackOutcome)}
+    <div className="feedback-sheet__backdrop" onMouseDown={onClose} role="presentation">
+      <section
+        aria-labelledby="feedback-title"
+        aria-modal="true"
+        className="feedback-sheet"
+        onMouseDown={(event) => event.stopPropagation()}
+        role="dialog"
+      >
+        <div className="feedback-sheet__heading">
+          <div>
+            <p className="eyebrow">Beta</p>
+            <h2 id="feedback-title">Отзыв о комнате</h2>
+            <p>Помогите сделать совместный просмотр надёжнее.</p>
+          </div>
+          <div className="feedback-sheet__heading-actions">
+            {receipt && (
+              <span className="feedback-sheet__receipt">ID {receipt.feedbackId.slice(0, 8)}</span>
+            )}
+            <button
+              aria-label="Закрыть форму отзыва"
+              className="icon-button"
+              onClick={onClose}
+              type="button"
             >
-              {FEEDBACK_OUTCOME_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="feedback-field" htmlFor="feedback-reason">
-            <span>Причина</span>
-            <select
-              id="feedback-reason"
-              aria-label="Причина отзыва"
-              value={reason}
-              onChange={(event) => onReasonChange(event.currentTarget.value as FeedbackReason)}
-            >
-              {FEEDBACK_REASON_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+              <X size={18} aria-hidden="true" />
+            </button>
+          </div>
         </div>
 
-        <label className="feedback-field" htmlFor="feedback-message">
-          <span>Комментарий</span>
-          <textarea
-            id="feedback-message"
-            aria-label="Комментарий к beta"
-            maxLength={2000}
-            onChange={(event) => onMessageChange(event.currentTarget.value)}
-            rows={4}
-            value={message}
-          />
-        </label>
+        <form className="feedback-form" onSubmit={onSubmit}>
+          <div className="feedback-form__grid">
+            <label className="feedback-field" htmlFor="feedback-outcome">
+              <span>Итог</span>
+              <select
+                id="feedback-outcome"
+                aria-label="Итог сессии"
+                value={outcome}
+                onChange={(event) => onOutcomeChange(event.currentTarget.value as FeedbackOutcome)}
+              >
+                {FEEDBACK_OUTCOME_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-        <div className="feedback-form__actions">
-          <label className="feedback-checkbox">
-            <input
-              type="checkbox"
-              checked={includeMetadata}
-              onChange={(event) => onIncludeMetadataChange(event.currentTarget.checked)}
+            <label className="feedback-field" htmlFor="feedback-reason">
+              <span>Причина</span>
+              <select
+                id="feedback-reason"
+                aria-label="Причина отзыва"
+                value={reason}
+                onChange={(event) => onReasonChange(event.currentTarget.value as FeedbackReason)}
+              >
+                {FEEDBACK_REASON_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <label className="feedback-field" htmlFor="feedback-message">
+            <span>Комментарий</span>
+            <textarea
+              id="feedback-message"
+              aria-label="Комментарий к beta"
+              maxLength={2000}
+              onChange={(event) => onMessageChange(event.currentTarget.value)}
+              placeholder="Что было удобно или что пошло не так?"
+              rows={3}
+              value={message}
             />
-            <span>Технические данные</span>
           </label>
 
-          <button className="button button--primary" type="submit" disabled={status === "sending"}>
-            <Send size={16} aria-hidden="true" />
-            {status === "sending" ? "Отправляем…" : "Отправить отзыв"}
-          </button>
-        </div>
+          <div className="feedback-form__actions">
+            <label className="feedback-checkbox">
+              <input
+                type="checkbox"
+                checked={includeMetadata}
+                onChange={(event) => onIncludeMetadataChange(event.currentTarget.checked)}
+              />
+              <span>Приложить технические данные</span>
+            </label>
 
-        {status === "sent" && receipt && (
-          <p className="feedback-form__status" role="status">
-            Отзыв отправлен · ID {receipt.feedbackId.slice(0, 8)}
-          </p>
-        )}
+            <button
+              className="button button--primary"
+              type="submit"
+              disabled={status === "sending"}
+            >
+              <Send size={16} aria-hidden="true" />
+              {status === "sending" ? "Отправляем…" : "Отправить отзыв"}
+            </button>
+          </div>
 
-        {status === "error" && error && (
-          <p className="feedback-form__error" role="alert">
-            {error}
-          </p>
-        )}
-      </form>
-    </section>
+          {status === "sent" && receipt && (
+            <p className="feedback-form__status" role="status">
+              Отзыв отправлен · ID {receipt.feedbackId.slice(0, 8)}
+            </p>
+          )}
+
+          {status === "error" && error && (
+            <p className="feedback-form__error" role="alert">
+              {error}
+            </p>
+          )}
+        </form>
+      </section>
+    </div>
   );
 }
 
