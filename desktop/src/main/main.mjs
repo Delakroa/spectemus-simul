@@ -21,6 +21,7 @@ import {
 let mainWindow;
 let allowQuit = false;
 let localGatewayOrigin;
+let publicGatewayOrigin;
 let startupPromise;
 const supervisor = new DesktopSupervisor();
 const MAIN_DIRECTORY = join(fileURLToPath(new URL(".", import.meta.url)));
@@ -31,6 +32,10 @@ supervisor.subscribe((status) => {
 
 app.whenReady().then(async () => {
   ipcMain.handle("spectemus:runtime-status", () => supervisor.status);
+  ipcMain.handle(
+    "spectemus:public-invite-origin",
+    () => publicGatewayOrigin ?? null,
+  );
   ipcMain.handle("spectemus:restart-runtime", async () => {
     await waitForStartupToSettle();
     await supervisor.stop();
@@ -56,6 +61,8 @@ async function startDesktopHost(preferredLanAddress) {
   }
 
   startupPromise = (async () => {
+    localGatewayOrigin = undefined;
+    publicGatewayOrigin = undefined;
     await showStartupPage({
       detail: "Проверяем локальный runtime…",
       state: "starting",
@@ -84,7 +91,9 @@ async function startDesktopHost(preferredLanAddress) {
         runtimeDirectory,
         secrets,
       });
-      const localUrl = new URL(url);
+      const publicUrl = new URL(url);
+      publicGatewayOrigin = publicUrl.origin;
+      const localUrl = new URL(publicUrl);
       localUrl.hostname = "127.0.0.1";
       localGatewayOrigin = localUrl.origin;
       await mainWindow.loadURL(localUrl.toString());

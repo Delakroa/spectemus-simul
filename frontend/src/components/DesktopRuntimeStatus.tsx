@@ -11,6 +11,7 @@ declare global {
   interface Window {
     spectemusDesktop?: {
       getRuntimeStatus: () => Promise<DesktopRuntimeStatus>;
+      getPublicInviteOrigin?: () => Promise<string | null>;
       restartRuntime: () => Promise<DesktopRuntimeStatus>;
       onRuntimeStatus: (listener: (status: DesktopRuntimeStatus) => void) => () => void;
     };
