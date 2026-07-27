@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
+import { createServer } from "node:net";
 import test from "node:test";
 
 import {
@@ -7,6 +8,7 @@ import {
   DesktopSupervisor,
   resolveSidecarPaths,
   startGatewayWithFallback,
+  waitForLiveKitTcpReady,
 } from "./sidecars.mjs";
 
 test("desktop sidecars используют loopback backend и LAN LiveKit без Redis", () => {
@@ -82,6 +84,22 @@ test("разрешает developer override и ожидает packaged sidecars 
   assert.match(packaged.javaCommand, /java\.exe$/);
 });
 
+test("готовность LiveKit проверяется подключением к signal-порту", async () => {
+  const server = createServer();
+  await new Promise((resolveListen) =>
+    server.listen(0, "127.0.0.1", resolveListen),
+  );
+  try {
+    const address = server.address();
+    await waitForLiveKitTcpReady(
+      { host: "127.0.0.1", port: address.port },
+      { timeoutMs: 50, intervalMs: 5 },
+    );
+  } finally {
+    await new Promise((resolveClose) => server.close(resolveClose));
+  }
+});
+
 test("gateway сохраняет 8088, а при занятом порте выбирает свободный", async () => {
   const attempts = [];
   const gatewayFactory = async ({ port }) => {
@@ -154,6 +172,7 @@ test("аварийный выход sidecar останавливает gateway �
   const children = [];
   let closedGateway = 0;
   const supervisor = new DesktopSupervisor({
+    assertPortsAvailable: async () => {},
     gatewayFactory: async () => ({
       close: async () => {
         closedGateway += 1;
@@ -174,6 +193,7 @@ test("аварийный выход sidecar останавливает gateway �
       return child;
     },
     waitForHealthy: async () => {},
+    waitForLiveKitReady: async () => {},
   });
 
   await supervisor.start({
@@ -201,6 +221,7 @@ test("аварийный выход sidecar останавливает gateway �
 test("stop не оставляет sidecars, если gateway вернул ошибку при закрытии", async () => {
   const children = [];
   const supervisor = new DesktopSupervisor({
+    assertPortsAvailable: async () => {},
     gatewayFactory: async () => ({
       close: async () => {
         throw new Error("gateway close failed");
@@ -221,6 +242,7 @@ test("stop не оставляет sidecars, если gateway вернул ош�
       return child;
     },
     waitForHealthy: async () => {},
+    waitForLiveKitReady: async () => {},
   });
 
   await supervisor.start({

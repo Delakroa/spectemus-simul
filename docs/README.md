@@ -138,6 +138,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [WT-668_GATEWAY_TRUSTED_CLIENT_IP.md](WT-668_GATEWAY_TRUSTED_CLIENT_IP.md) — trusted client IP, timeout и корректный обрыв HTTP proxy.
 - [WT-669_STABLE_BACKEND_ARTIFACT.md](WT-669_STABLE_BACKEND_ARTIFACT.md) — стабильное имя backend JAR для desktop development и packaging.
 - [WT-670_INSTALLER_STABLE_JAR_PREFLIGHT.md](WT-670_INSTALLER_STABLE_JAR_PREFLIGHT.md) — исправление installer preflight после стабилизации имени backend JAR.
+- [WT-671_LIVEKIT_READINESS_LAN_BOUNDARY.md](WT-671_LIVEKIT_READINESS_LAN_BOUNDARY.md) — TCP readiness signal-порта LiveKit и явная граница доверенной LAN-сети.
 - [WT-651_NATIVE_MEDIA_COMPATIBILITY_POC.md](WT-651_NATIVE_MEDIA_COMPATIBILITY_POC.md) — native-media hypothesis, POC harness, license gate и критерии решения.
 - [WT-652_INTERNET_MODE_ARCHITECTURE.md](WT-652_INTERNET_MODE_ARCHITECTURE.md) — отдельный public Internet mode: account/invite, TLS/TURN, privacy, cost gates и последовательность запуска.
 - [WT-653_PUBLIC_ACCESS_CONTRACTS.md](WT-653_PUBLIC_ACCESS_CONTRACTS.md) — planned `/api/v2` account/invite/membership contracts без изменения LAN API.

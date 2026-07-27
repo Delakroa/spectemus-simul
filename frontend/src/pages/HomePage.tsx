@@ -1864,6 +1864,10 @@ function InviteShareSheet({
 
           <div className="invite-share-sheet__copy">
             <p>Отсканируйте код или отправьте ссылку. Просмотр поддерживается на компьютере.</p>
+            <p>
+              Отправляйте приглашение только близким людям в доверенной домашней сети. Не
+              используйте его в публичном Wi-Fi или незнакомой сети.
+            </p>
             <code>{inviteUrl}</code>
             <div className="invite-share-sheet__actions">
               <button
