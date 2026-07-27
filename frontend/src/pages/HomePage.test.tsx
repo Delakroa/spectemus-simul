@@ -248,7 +248,8 @@ describe("HomePage", () => {
     expect(screen.getByLabelText("Invite-ссылка или ID комнаты")).toHaveValue("");
   });
 
-  it("отправляет beta feedback с техническим контекстом", async () => {
+  it("открывает feedback в комнате и отправляет его с техническим контекстом", async () => {
+    vi.stubGlobal("WebSocket", MockWebSocket);
     const user = userEvent.setup();
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
       const url = String(input);
@@ -275,6 +276,37 @@ describe("HomePage", () => {
         );
       }
 
+      if (url.endsWith(`/api/v1/rooms/${roomId}`)) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              participant: createRoomSnapshot().participants[0],
+              room: createRoomSnapshot(),
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      if (url.endsWith(`/api/v1/rooms/${roomId}/livekit-token`) && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              token: "header.payload.signature",
+              liveKitUrl: "ws://127.0.0.1:7880",
+              roomName: roomId,
+              participantId: hostId,
+              participantIdentity: hostId,
+              role: "HOST",
+              canPublish: true,
+              canPublishData: true,
+              expiresAt: "2026-07-12T12:30:00Z",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
       if (url.endsWith("/api/v1/feedback") && init?.method === "POST") {
         return Promise.resolve(
           new Response(
@@ -291,9 +323,15 @@ describe("HomePage", () => {
       return Promise.resolve(new Response(null, { status: 404 }));
     });
 
-    renderPage();
+    renderPage([`/rooms/${roomId}`]);
 
-    await screen.findByText("Сервис готов");
+    await screen.findByRole("button", { name: "Оставить отзыв о комнате" });
+    expect(screen.queryByRole("dialog", { name: "Отзыв о комнате" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Оставить отзыв о комнате" }));
+
+    const feedbackSheet = await screen.findByRole("dialog", { name: "Отзыв о комнате" });
+    expect(feedbackSheet).toHaveTextContent("Помогите сделать совместный просмотр надёжнее.");
     await user.selectOptions(screen.getByLabelText("Итог сессии"), "BLOCKED");
     await user.selectOptions(screen.getByLabelText("Причина отзыва"), "CONNECTION");
     await user.type(screen.getByLabelText("Комментарий к beta"), "Связь пропала у гостя.");
@@ -308,11 +346,16 @@ describe("HomePage", () => {
       outcome: "BLOCKED",
       reason: "CONNECTION",
       message: "Связь пропала у гостя.",
+      roomId,
+      participantRole: "HOST",
       metadata: expect.objectContaining({
-        liveKitStatus: "idle",
-        roomConnectionStatus: "idle",
+        participantCount: 1,
+        roomStatus: "READY",
       }),
     });
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Отзыв о комнате" })).not.toBeInTheDocument();
   });
 
   it("показывает problem details и recovery-действие для ошибки создания комнаты", async () => {
