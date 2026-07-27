@@ -4,6 +4,13 @@ spring:
       - org.springframework.boot.redis.autoconfigure.RedisAutoConfiguration
       - org.springframework.boot.redis.autoconfigure.RedisReactiveAutoConfiguration
 
+management:
+  health:
+    redis:
+      # Desktop host intentionally has no Redis process. Without this switch the
+      # Actuator contributor reports DOWN and blocks the bundled host startup.
+      enabled: false
+
 spectemus-simul:
   rate-limit:
     # Desktop host is a single trusted household process. The in-memory limiter
