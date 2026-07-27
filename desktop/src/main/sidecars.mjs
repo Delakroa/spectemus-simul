@@ -498,20 +498,77 @@ function assertJavaVersion(javaCommand) {
   }
 }
 
-function stopChild(child) {
+export function stopChild(
+  child,
+  { forceKillWaitMs = 1_000, gracefulShutdownWaitMs = 5_000 } = {},
+) {
   if (child.exitCode !== null) {
     return Promise.resolve();
   }
-  return new Promise((resolveStop) => {
-    const timeout = setTimeout(() => {
-      child.kill("SIGKILL");
-      resolveStop();
-    }, 5_000);
-    child.once("exit", () => {
-      clearTimeout(timeout);
-      resolveStop();
-    });
-    child.kill("SIGTERM");
+  return new Promise((resolveStop, rejectStop) => {
+    let forceKillTimeout;
+    let gracefulShutdownTimeout;
+    let finished = false;
+
+    const cleanup = () => {
+      clearTimeout(forceKillTimeout);
+      clearTimeout(gracefulShutdownTimeout);
+      child.off("exit", onExit);
+      child.off("error", onError);
+    };
+    const finish = (callback) => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      cleanup();
+      callback();
+    };
+    const onExit = () => finish(resolveStop);
+    const onError = (error) => finish(() => rejectStop(error));
+    const forceKill = () => {
+      try {
+        const killed = child.kill("SIGKILL");
+        if (!killed && child.exitCode === null) {
+          finish(() =>
+            rejectStop(
+              new Error(
+                "Не удалось принудительно остановить локальный сервис.",
+              ),
+            ),
+          );
+          return;
+        }
+      } catch (error) {
+        finish(() => rejectStop(error));
+        return;
+      }
+
+      forceKillTimeout = setTimeout(() => {
+        finish(() =>
+          rejectStop(
+            new Error(
+              "Локальный сервис не подтвердил завершение после принудительной остановки.",
+            ),
+          ),
+        );
+      }, forceKillWaitMs);
+    };
+
+    child.once("exit", onExit);
+    child.once("error", onError);
+    gracefulShutdownTimeout = setTimeout(forceKill, gracefulShutdownWaitMs);
+
+    try {
+      const killed = child.kill("SIGTERM");
+      if (!killed && child.exitCode === null) {
+        finish(() =>
+          rejectStop(new Error("Не удалось остановить локальный сервис.")),
+        );
+      }
+    } catch (error) {
+      finish(() => rejectStop(error));
+    }
   });
 }
 

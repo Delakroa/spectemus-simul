@@ -1184,8 +1184,22 @@ export function HomePage() {
                       <span>
                         {isHost
                           ? formatHostWatchPlaybackHint(roomSession.filePublicationStatus)
-                          : formatRemotePlaybackHint(roomSession.remotePlaybackStatus)}
+                          : formatRemotePlaybackHint(
+                              roomSession.remotePlaybackStatus,
+                              roomSession.remotePlaybackError,
+                            )}
                       </span>
+                      {!isHost &&
+                        isRemoteVideoUserActionRequired(roomSession.remotePlaybackError) && (
+                          <button
+                            className="button button--primary remote-player__resume-action"
+                            type="button"
+                            onClick={() => void roomSession.resumeRemotePlaybackVideo()}
+                          >
+                            <Play size={16} aria-hidden="true" />
+                            Включить видео
+                          </button>
+                        )}
                     </div>
                   )}
 
@@ -2598,7 +2612,11 @@ function formatRemotePlaybackStatus(status: RemotePlaybackStatus) {
   return labels[status];
 }
 
-function formatRemotePlaybackHint(status: RemotePlaybackStatus) {
+function formatRemotePlaybackHint(status: RemotePlaybackStatus, error: string | null) {
+  if (status === "error" && isRemoteVideoUserActionRequired(error)) {
+    return "Браузер ожидает подтверждения. Нажмите «Включить видео».";
+  }
+
   const labels: Record<RemotePlaybackStatus, string> = {
     error: "Не удалось воспроизвести поток.",
     idle: "LiveKit подключается.",
@@ -2608,6 +2626,10 @@ function formatRemotePlaybackHint(status: RemotePlaybackStatus) {
   };
 
   return labels[status];
+}
+
+function isRemoteVideoUserActionRequired(error: string | null) {
+  return error === "Браузер ждёт явного действия для запуска видео.";
 }
 
 function formatVoiceStatus(status: VoiceChatStatus) {
