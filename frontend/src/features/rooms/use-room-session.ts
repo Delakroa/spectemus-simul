@@ -126,6 +126,7 @@ export type RoomUserError = {
 
 export type {
   FileDiagnosticsResult,
+  PlaybackEvent,
   PlaybackStatus,
   QualityIndicatorsState,
   RemotePlaybackElements,
@@ -302,6 +303,7 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
   const participantRef = useRef<Participant | null>(null);
   const pendingActionRef = useRef<RoomActionStatus>(null);
   const playbackStatePublisherRef = useRef<HostPlaybackStatePublisher | null>(null);
+  const playbackStateRevisionRef = useRef(0);
   const playbackStateReceiverRef = useRef<GuestPlaybackStateReceiver | null>(null);
   const qualityIndicatorControllerRef = useRef<QualityIndicatorController | null>(null);
   const remotePlaybackControllerRef = useRef<RemotePlaybackController | null>(null);
@@ -831,6 +833,12 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
           connection.room,
           publication.videoElement,
           file.displayName,
+          {
+            initialRevision: playbackStateRevisionRef.current,
+            onRevisionChange: (revision) => {
+              playbackStateRevisionRef.current = revision;
+            },
+          },
         );
         startHostPlaybackTracking(publication.videoElement);
         setState((current) => ({

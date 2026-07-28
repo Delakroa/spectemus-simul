@@ -57,6 +57,7 @@ import { copyText } from "../features/rooms/copy-text";
 import { type LiveKitConnectionStatus } from "../features/rooms/livekit-connection";
 import {
   type FilePublicationStatus,
+  type PlaybackEvent,
   type PlaybackStatus,
   type QualityIndicatorsState,
   type RemotePlaybackStatus,
@@ -739,14 +740,18 @@ export function HomePage() {
       >
         <div className="room-workspace__heading">
           <div>
-            <p className="eyebrow">{room ? "Private review room" : "Ваша комната"}</p>
-            {room ? (
+            <p className="eyebrow">
+              {roomClosed ? "Просмотр завершён" : room ? "Private review room" : "Ваша комната"}
+            </p>
+            {roomClosed ? (
+              <h2 id="room-workspace-title">Комната закрыта</h2>
+            ) : room ? (
               <h1 id="room-workspace-title">Комната {formatShortRoomId(room.roomId)}</h1>
             ) : (
               <h2 id="room-workspace-title">Начните совместный просмотр</h2>
             )}
           </div>
-          {room && (
+          {room && !roomClosed && (
             <div className="room-workspace__actions">
               <div className="room-connection-group">
                 <span
@@ -814,7 +819,7 @@ export function HomePage() {
           />
         )}
 
-        {room && isFeedbackSheetOpen && (
+        {room && !roomClosed && isFeedbackSheetOpen && (
           <FeedbackSheet
             error={feedbackError}
             includeMetadata={includeFeedbackMetadata}
@@ -830,6 +835,16 @@ export function HomePage() {
             receipt={feedbackReceipt}
             status={feedbackStatus}
           />
+        )}
+
+        {roomClosed && (
+          <div className="room-closed-notice" role="status">
+            <Power size={22} aria-hidden="true" />
+            <div>
+              <strong>{isHost ? "Вы завершили просмотр" : "Хозяин завершил просмотр"}</strong>
+              <span>Чат, приглашение и видео этой комнаты больше недоступны.</span>
+            </div>
+          </div>
         )}
 
         {(!room || roomClosed) && (
@@ -938,7 +953,7 @@ export function HomePage() {
           </div>
         )}
 
-        {room && (
+        {room && !roomClosed && (
           <div className={`room-dashboard room-dashboard--${isHost ? "host" : "guest"}`}>
             {isHost && !roomClosed && (
               <section className="room-card room-card--file" aria-labelledby="file-picker-title">
@@ -1345,7 +1360,12 @@ export function HomePage() {
                 {!isHost && (
                   <div className="playback-sync" aria-label="Host playback">
                     <span>Host playback</span>
-                    <strong>{formatPlaybackSyncStatus(roomSession.playbackSyncStatus)}</strong>
+                    <strong>
+                      {formatPlaybackSyncStatus(
+                        roomSession.playbackSyncStatus,
+                        roomSession.playbackSyncEvent,
+                      )}
+                    </strong>
                     <span>
                       {formatPlaybackSyncTime(
                         roomSession.playbackSyncCurrentTime,
@@ -2654,7 +2674,11 @@ function formatVoiceRemoteCount(count: number) {
   return `${count} голосовые дорожки`;
 }
 
-function formatPlaybackSyncStatus(status: PlaybackStatus) {
+function formatPlaybackSyncStatus(status: PlaybackStatus, event: PlaybackEvent | null) {
+  if (status === "idle" && event === "stop") {
+    return "Остановлено";
+  }
+
   const labels: Record<PlaybackStatus, string> = {
     ended: "Завершено",
     idle: "Нет состояния",

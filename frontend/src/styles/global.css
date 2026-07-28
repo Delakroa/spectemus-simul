@@ -479,6 +479,39 @@ a {
   gap: 18px;
 }
 
+.room-closed-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 24px;
+  padding: 16px 18px;
+  border: 1px solid rgb(255 151 124 / 36%);
+  border-radius: 12px;
+  color: #f6f1ff;
+  background: rgb(77 35 48 / 42%);
+}
+
+.room-closed-notice svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: #ff9a81;
+}
+
+.room-closed-notice div {
+  display: grid;
+  gap: 4px;
+}
+
+.room-closed-notice strong {
+  font-size: 15px;
+}
+
+.room-closed-notice span {
+  color: #d7c4d5;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
 .room-form {
   display: grid;
   min-width: 0;

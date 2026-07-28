@@ -44,6 +44,11 @@ export type HostPlaybackStatePublisher = {
   send: (event: PlaybackEvent) => void;
 };
 
+export type HostPlaybackStatePublisherOptions = {
+  initialRevision?: number;
+  onRevisionChange?: (revision: number) => void;
+};
+
 export type GuestPlaybackStateReceiver = {
   disconnect: () => void;
   setVideoElement: (videoElement: HTMLVideoElement | null) => void;
@@ -80,9 +85,10 @@ export function createHostPlaybackStatePublisher(
   room: LiveKitRoom,
   videoElement: HTMLVideoElement,
   fileName: string,
+  options: HostPlaybackStatePublisherOptions = {},
 ): HostPlaybackStatePublisher {
   let disconnected = false;
-  let revision = 0;
+  let revision = options.initialRevision ?? 0;
   let heartbeatTimer: number | null = null;
 
   const send = (event: PlaybackEvent) => {
@@ -91,6 +97,7 @@ export function createHostPlaybackStatePublisher(
     }
 
     revision += 1;
+    options.onRevisionChange?.(revision);
     void room.localParticipant.publishData(
       encodePlaybackStateMessage(
         createPlaybackStateMessage(videoElement, fileName, revision, event),

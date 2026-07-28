@@ -732,9 +732,12 @@ describe("HomePage", () => {
       payload: { reason: "HOST_CLOSED", closedAt: "2026-07-09T07:31:00Z" },
     });
 
-    // После закрытия формы снова доступны, и можно создать новую комнату.
+    // После закрытия формы снова доступны, а интерфейс прошлой комнаты исчезает.
     expect(await screen.findByLabelText("Invite-ссылка или ID комнаты")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Создать" })).toBeEnabled();
+    expect(screen.getByText("Вы завершили просмотр")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Чат" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Участники" })).not.toBeInTheDocument();
   });
 
   it("восстанавливает комнату при открытии invite route с активной session", async () => {
