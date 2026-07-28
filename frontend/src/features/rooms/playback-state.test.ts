@@ -72,6 +72,46 @@ describe("playback-state", () => {
     );
   });
 
+  it("продолжает revision после повторной публикации, чтобы гость не отбросил новое состояние", () => {
+    vi.useFakeTimers();
+    const room = createRoom();
+    const firstVideoElement = document.createElement("video");
+    setVideoState(firstVideoElement, {
+      currentTime: 12,
+      duration: 60,
+      paused: true,
+      readyState: 4,
+    });
+    let latestRevision = 0;
+
+    const firstPublisher = createHostPlaybackStatePublisher(
+      room as never,
+      firstVideoElement,
+      "movie.mp4",
+      { onRevisionChange: (revision) => (latestRevision = revision) },
+    );
+    firstPublisher.disconnect();
+
+    const secondVideoElement = document.createElement("video");
+    setVideoState(secondVideoElement, {
+      currentTime: 12,
+      duration: 60,
+      paused: true,
+      readyState: 4,
+    });
+    createHostPlaybackStatePublisher(room as never, secondVideoElement, "movie.mp4", {
+      initialRevision: latestRevision,
+    });
+
+    expect(getPublishedMessage(room, 0)).toEqual(expect.objectContaining({ revision: 1 }));
+    expect(getPublishedMessage(room, 1)).toEqual(
+      expect.objectContaining({ event: "stop", revision: 2 }),
+    );
+    expect(getPublishedMessage(room, 2)).toEqual(
+      expect.objectContaining({ event: "publish", revision: 3 }),
+    );
+  });
+
   it("guest receiver применяет свежие host messages и игнорирует устаревшие revision", () => {
     const room = createRoom();
     const onStateChange = vi.fn();
