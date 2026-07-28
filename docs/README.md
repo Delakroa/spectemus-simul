@@ -144,6 +144,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [WT-674_ROOM_FEEDBACK_SHEET.md](WT-674_ROOM_FEEDBACK_SHEET.md) — beta-feedback открывается как тёмная панель активной комнаты и не удлиняет сценарий просмотра.
 - [WT-675_DESKTOP_CLEANUP_AND_GUEST_VIDEO_AUTOPLAY.md](WT-675_DESKTOP_CLEANUP_AND_GUEST_VIDEO_AUTOPLAY.md) — desktop host подтверждает остановку sidecars, а guest video не зависит от autoplay с отдельной аудиодорожкой.
 - [WT-676_ROOM_LIFECYCLE_TRANSITIONS.md](WT-676_ROOM_LIFECYCLE_TRANSITIONS.md) — закрытая комната не оставляет старый чат на экране, а повторная публикация видео сразу синхронизируется у guest-а.
+- [WT-677_DESKTOP_SINGLE_INSTANCE.md](WT-677_DESKTOP_SINGLE_INSTANCE.md) — вторая копия приложения не запускает ещё один desktop host, а возвращает фокус в уже открытое окно.
 - [WT-651_NATIVE_MEDIA_COMPATIBILITY_POC.md](WT-651_NATIVE_MEDIA_COMPATIBILITY_POC.md) — native-media hypothesis, POC harness, license gate и критерии решения.
 - [WT-652_INTERNET_MODE_ARCHITECTURE.md](WT-652_INTERNET_MODE_ARCHITECTURE.md) — отдельный public Internet mode: account/invite, TLS/TURN, privacy, cost gates и последовательность запуска.
 - [WT-653_PUBLIC_ACCESS_CONTRACTS.md](WT-653_PUBLIC_ACCESS_CONTRACTS.md) — planned `/api/v2` account/invite/membership contracts без изменения LAN API.

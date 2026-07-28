@@ -3,6 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { acquireDesktopInstanceLock } from "./instance-lock.mjs";
 import {
   LanAddressSelectionRequired,
   resolveLanAddress,
@@ -30,30 +31,36 @@ supervisor.subscribe((status) => {
   mainWindow?.webContents.send("spectemus:runtime-status", status);
 });
 
-app.whenReady().then(async () => {
-  ipcMain.handle("spectemus:runtime-status", () => supervisor.status);
-  ipcMain.handle(
-    "spectemus:public-invite-origin",
-    () => publicGatewayOrigin ?? null,
-  );
-  ipcMain.handle("spectemus:restart-runtime", async () => {
-    await waitForStartupToSettle();
-    await supervisor.stop();
+const isPrimaryInstance = acquireDesktopInstanceLock(app, focusMainWindow);
+
+if (isPrimaryInstance) {
+  app.whenReady().then(async () => {
+    ipcMain.handle("spectemus:runtime-status", () => supervisor.status);
+    ipcMain.handle(
+      "spectemus:public-invite-origin",
+      () => publicGatewayOrigin ?? null,
+    );
+    ipcMain.handle("spectemus:restart-runtime", async () => {
+      await waitForStartupToSettle();
+      await supervisor.stop();
+      await startDesktopHost(process.env.SPECTEMUS_LAN_IP);
+      return supervisor.status;
+    });
+    ipcMain.handle("spectemus:select-lan-address", async (_event, address) => {
+      if (typeof address !== "string") {
+        throw new Error(
+          "Для desktop host выберите private IPv4 домашней сети.",
+        );
+      }
+      await waitForStartupToSettle();
+      await supervisor.stop();
+      await startDesktopHost(address);
+      return supervisor.status;
+    });
+    mainWindow = createWindow();
     await startDesktopHost(process.env.SPECTEMUS_LAN_IP);
-    return supervisor.status;
   });
-  ipcMain.handle("spectemus:select-lan-address", async (_event, address) => {
-    if (typeof address !== "string") {
-      throw new Error("Для desktop host выберите private IPv4 домашней сети.");
-    }
-    await waitForStartupToSettle();
-    await supervisor.stop();
-    await startDesktopHost(address);
-    return supervisor.status;
-  });
-  mainWindow = createWindow();
-  await startDesktopHost(process.env.SPECTEMUS_LAN_IP);
-});
+}
 
 async function startDesktopHost(preferredLanAddress) {
   if (startupPromise) {
@@ -126,18 +133,31 @@ async function waitForStartupToSettle() {
   }
 }
 
-app.on("before-quit", (event) => {
-  if (allowQuit) {
+if (isPrimaryInstance) {
+  app.on("before-quit", (event) => {
+    if (allowQuit) {
+      return;
+    }
+    event.preventDefault();
+    allowQuit = true;
+    void supervisor.stop().finally(() => app.quit());
+  });
+
+  app.on("window-all-closed", () => {
+    app.quit();
+  });
+}
+
+function focusMainWindow() {
+  if (!mainWindow) {
     return;
   }
-  event.preventDefault();
-  allowQuit = true;
-  void supervisor.stop().finally(() => app.quit());
-});
-
-app.on("window-all-closed", () => {
-  app.quit();
-});
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+  mainWindow.show();
+  mainWindow.focus();
+}
 
 function createWindow() {
   const window = new BrowserWindow({
