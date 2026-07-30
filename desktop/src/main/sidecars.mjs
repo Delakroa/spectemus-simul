@@ -2,10 +2,15 @@ import { spawn, spawnSync } from "node:child_process";
 import { createSocket } from "node:dgram";
 import { access, constants } from "node:fs/promises";
 import { createConnection, createServer } from "node:net";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { startGateway } from "./gateway.mjs";
+import {
+  clearOwnedSidecars,
+  recoverOwnedSidecars,
+  writeOwnedSidecars,
+} from "./owned-processes.mjs";
 
 const PROJECT_ROOT = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -99,6 +104,8 @@ export class DesktopSupervisor {
     this.children = [];
     this.stopPromise = undefined;
     this.failureDetail = undefined;
+    this.runtimeDirectory = undefined;
+    this.ownedSidecars = [];
   }
 
   subscribe(listener) {
@@ -120,6 +127,8 @@ export class DesktopSupervisor {
 
     this.failureDetail = undefined;
     try {
+      this.runtimeDirectory = runtimeDirectory;
+      await recoverOwnedSidecars({ runtimeDirectory });
       this.setStatus(
         "checking-ports",
         "Проверяем, что порты desktop host свободны.",
@@ -128,6 +137,11 @@ export class DesktopSupervisor {
       this.setStatus("starting-backend", "Запускаем локальный backend.");
       const backend = this.spawnBackend({ lanAddress, paths, ports, secrets });
       this.trackChild(backend, "Backend");
+      await this.rememberOwnedSidecar({
+        child: backend,
+        commandIncludes: [paths.backendJar, `--server.port=${ports.backend}`],
+        name: "Backend",
+      });
       await waitForChildReadiness(backend, "Backend", () =>
         this.waitForHealthy(
           `http://127.0.0.1:${ports.backend}/actuator/health`,
@@ -144,6 +158,14 @@ export class DesktopSupervisor {
         secrets,
       });
       this.trackChild(livekit, "LiveKit");
+      await this.rememberOwnedSidecar({
+        child: livekit,
+        commandIncludes: [
+          paths.livekitServer,
+          join(runtimeDirectory, "livekit.yaml"),
+        ],
+        name: "LiveKit",
+      });
       await waitForChildReadiness(livekit, "LiveKit", () =>
         this.waitForLiveKitReady({
           host: "127.0.0.1",
@@ -254,6 +276,20 @@ export class DesktopSupervisor {
     });
   }
 
+  async rememberOwnedSidecar({ child, commandIncludes, name }) {
+    if (
+      !Number.isInteger(child.pid) ||
+      child.pid <= 0 ||
+      !this.runtimeDirectory
+    )
+      return;
+    this.ownedSidecars.push({ pid: child.pid, name, commandIncludes });
+    await writeOwnedSidecars({
+      runtimeDirectory: this.runtimeDirectory,
+      processes: this.ownedSidecars,
+    });
+  }
+
   setStatus(state, detail, additional = {}) {
     this.status = { state, detail, ...additional };
     for (const listener of this.listeners) {
@@ -301,6 +337,10 @@ export class DesktopSupervisor {
     const cleanupFailed = results.some(
       (result) => result.status === "rejected",
     );
+    if (!cleanupFailed && this.runtimeDirectory) {
+      await clearOwnedSidecars(this.runtimeDirectory);
+      this.ownedSidecars = [];
+    }
     this.setStatus(
       "stopped",
       cleanupFailed
