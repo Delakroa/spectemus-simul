@@ -76,9 +76,28 @@ install -m 600 infra/staging/.env.example /opt/spectemus-simul/.env
 
 Заполнить `/opt/spectemus-simul/.env`:
 
-- `WT_STAGING_APP_DOMAIN`, `WT_STAGING_RTC_DOMAIN`;
+- `WT_STAGING_APP_DOMAIN`, `WT_STAGING_RTC_DOMAIN`, `WT_STAGING_TURN_DOMAIN`;
 - Redis password, LiveKit API key и API secret из generator output;
 - отдельный длинный `FEEDBACK_ADMIN_TOKEN` для `/operator`.
+
+До запуска compose выполните локальную проверку защищённого env-файла. Она не
+печатает секреты, проверяет отсутствие sample-значений и требует три разных
+публичных DNS-имени для application, RTC и TURN:
+
+```bash
+pnpm staging:preflight -- --env-file /opt/spectemus-simul/.env
+```
+
+Когда DNS уже направлен на выбранную VM, добавьте её публичный IPv4. Команда
+проверит A-записи `app`, `rtc` и `turn`; только после зелёного результата
+переходите к запуску Caddy и приложения:
+
+```bash
+pnpm staging:preflight -- \
+  --env-file /opt/spectemus-simul/.env \
+  --public-ipv4 <VM_PUBLIC_IPV4> \
+  --verify-dns
+```
 
 Затем из корня checkout:
 
