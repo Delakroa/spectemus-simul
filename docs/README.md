@@ -8,6 +8,8 @@
 
 ## Документы о продукте
 
+- [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) — единый порядок развития: LAN
+  quality, закрытый Internet mode и release gates.
 - [WT-662_README_PRODUCT_GUIDE.md](WT-662_README_PRODUCT_GUIDE.md) — граница
   между публичным руководством пользователя и внутренней историей проекта.
 - [WT-664_PRODUCT_ROADMAP_README.md](WT-664_PRODUCT_ROADMAP_README.md) —
