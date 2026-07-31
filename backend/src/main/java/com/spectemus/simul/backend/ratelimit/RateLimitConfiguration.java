@@ -1,5 +1,6 @@
 package com.spectemus.simul.backend.ratelimit;
 
+import com.spectemus.simul.backend.publicaccess.PublicAccessProperties;
 import com.spectemus.simul.backend.ratelimit.RateLimitProperties.Limit;
 
 import io.micrometer.core.instrument.MeterRegistry;
@@ -24,14 +25,17 @@ class RateLimitConfiguration implements WebMvcConfigurer {
     private final ObjectProvider<RateLimiter> rateLimiter;
     private final ObjectProvider<RateLimitProperties> properties;
     private final ObjectProvider<MeterRegistry> meterRegistry;
+    private final ObjectProvider<PublicAccessProperties> publicAccessProperties;
 
     RateLimitConfiguration(
             ObjectProvider<RateLimiter> rateLimiter,
             ObjectProvider<RateLimitProperties> properties,
-            ObjectProvider<MeterRegistry> meterRegistry) {
+            ObjectProvider<MeterRegistry> meterRegistry,
+            ObjectProvider<PublicAccessProperties> publicAccessProperties) {
         this.rateLimiter = rateLimiter;
         this.properties = properties;
         this.meterRegistry = meterRegistry;
+        this.publicAccessProperties = publicAccessProperties;
     }
 
     @Override
@@ -54,6 +58,44 @@ class RateLimitConfiguration implements WebMvcConfigurer {
                 "/api/v1/rooms/*/livekit-token");
         register(registry, limiter, meters, "feedback", config.feedback(), "/api/v1/feedback");
         register(registry, limiter, meters, "telemetry", config.telemetry(), "/api/v1/telemetry");
+        PublicAccessProperties publicAccess = publicAccessProperties.getIfAvailable();
+        if (publicAccess != null && publicAccess.isEnabled()) {
+            register(
+                    registry,
+                    limiter,
+                    meters,
+                    "email-challenge",
+                    config.emailChallenge(),
+                    "/api/v2/auth/email-challenges");
+            register(
+                    registry,
+                    limiter,
+                    meters,
+                    "email-challenge-verify",
+                    config.emailChallengeVerify(),
+                    "/api/v2/auth/email-challenges/*/verify");
+            register(
+                    registry,
+                    limiter,
+                    meters,
+                    "public-room",
+                    config.publicRoom(),
+                    "/api/v2/public-rooms");
+            register(
+                    registry,
+                    limiter,
+                    meters,
+                    "public-invite",
+                    config.publicInvite(),
+                    "/api/v2/public-rooms/*/invites");
+            register(
+                    registry,
+                    limiter,
+                    meters,
+                    "invite-redemption",
+                    config.inviteRedemption(),
+                    "/api/v2/invite-redemptions");
+        }
     }
 
     private void register(

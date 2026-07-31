@@ -2,8 +2,11 @@ package com.spectemus.simul.backend.config;
 
 import static org.springframework.security.config.http.SessionCreationPolicy.STATELESS;
 
+import com.spectemus.simul.backend.publicaccess.PublicAccessProperties;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -15,14 +18,17 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        return http
+    SecurityFilterChain securityFilterChain(
+            HttpSecurity http, ObjectProvider<PublicAccessProperties> publicAccessProperties)
+            throws Exception {
+        var security = http
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(STATELESS))
-                .authorizeHttpRequests(authorize -> authorize
+                .authorizeHttpRequests(authorize -> {
+                    authorize
                         .requestMatchers(
                                 "/api/v1/health",
                                 "/api/v1/version",
@@ -55,9 +61,40 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/feedback/reports/*")
                         .permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/telemetry")
-                        .permitAll()
-                        .anyRequest()
-                        .denyAll())
-                .build();
+                        .permitAll();
+
+                    PublicAccessProperties publicAccess = publicAccessProperties.getIfAvailable();
+                    if (publicAccess != null && publicAccess.isEnabled()) {
+                        authorize
+                                .requestMatchers(HttpMethod.POST, "/api/v2/auth/email-challenges")
+                                .permitAll()
+                                .requestMatchers(
+                                        HttpMethod.POST,
+                                        "/api/v2/auth/email-challenges/*/verify")
+                                .permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/v2/account")
+                                .permitAll()
+                                .requestMatchers(HttpMethod.POST, "/api/v2/public-rooms")
+                                .permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/v2/public-rooms/*")
+                                .permitAll()
+                                .requestMatchers(
+                                        HttpMethod.POST, "/api/v2/public-rooms/*/invites")
+                                .permitAll()
+                                .requestMatchers(
+                                        HttpMethod.POST,
+                                        "/api/v2/public-rooms/*/invites/*/revoke")
+                                .permitAll()
+                                .requestMatchers(
+                                        HttpMethod.POST,
+                                        "/api/v2/public-rooms/*/members/*/revoke")
+                                .permitAll()
+                                .requestMatchers(HttpMethod.POST, "/api/v2/invite-redemptions")
+                                .permitAll();
+                    }
+
+                    authorize.anyRequest().denyAll();
+                });
+        return security.build();
     }
 }

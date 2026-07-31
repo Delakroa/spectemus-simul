@@ -32,7 +32,7 @@
     "format:installer": "prettier --check .github/workflows/desktop-installer.yml docs/PRODUCT_ROADMAP.md docs/WT-650_DESKTOP_INSTALLER_FOUNDATION.md docs/WT-657_DESKTOP_INSTALL_SMOKE.md docs/WT-659_DESKTOP_PREVIEW_EVIDENCE.md docs/WT-660_DESKTOP_GATEWAY_PORT_RECOVERY.md docs/WT-663_DESKTOP_VPN_LAN_SELECTION.md docs/WT-675_DESKTOP_CLEANUP_AND_GUEST_VIDEO_AUTOPLAY.md docs/WT-677_DESKTOP_SINGLE_INSTANCE.md docs/WT-678_DESKTOP_OWNED_PROCESS_RECOVERY.md docs/WT-682_LOCAL_MEDIA_NORMALIZER.md scripts/desktop-installed-app-smoke.mjs scripts/desktop-installed-app-smoke.test.mjs scripts/desktop-package-preflight.mjs scripts/desktop-package-preflight.test.mjs scripts/desktop-sidecars-stage.mjs scripts/desktop-signing-preflight.mjs scripts/desktop-signing-preflight.test.mjs",
     "format:media-poc": "prettier --check docs/WT-651_NATIVE_MEDIA_COMPATIBILITY_POC.md scripts/native-media-poc.mjs scripts/native-media-poc-core.mjs scripts/native-media-poc-core.test.mjs scripts/native-media-poc.test.mjs",
     "format:media-compatibility": "prettier --check docs/WT-658_BROWSER_MEDIA_COMPATIBILITY.md",
-    "format:staging": "prettier --check docs/WT-680_INTERNET_ALPHA_PRECHECK.md infra/staging/README.md scripts/staging-preflight.mjs scripts/staging-preflight.test.mjs",
+    "format:staging": "prettier --check docs/WT-653_PUBLIC_ACCESS_CONTRACTS.md docs/WT-654_PASSWORDLESS_ACCOUNTS_AND_INVITES.md docs/WT-680_INTERNET_ALPHA_PRECHECK.md infra/staging/README.md scripts/staging-preflight.mjs scripts/staging-preflight.test.mjs",
     "infra:check": "node scripts/check-infra.mjs",
     "infra:config": "docker compose -f infra/compose.yaml config",
     "infra:down": "docker compose -f infra/compose.yaml down",
