@@ -1040,6 +1040,23 @@ a {
   font-weight: 700;
 }
 
+.file-picker__normalizing {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.file-picker__normalizing .button {
+  min-height: 34px;
+  padding: 8px 11px;
+  font-size: 13px;
+}
+
 .file-picker__hint {
   margin: 10px 0 0;
   color: var(--muted);
@@ -2908,6 +2925,10 @@ html:has(.operator-page) {
 
 .room-workspace--active .file-picker__experimental {
   color: #ffca7a;
+}
+
+.room-workspace--active .file-picker__normalizing {
+  color: #d8c8ee;
 }
 
 .room-workspace--active .participant-row__avatar {

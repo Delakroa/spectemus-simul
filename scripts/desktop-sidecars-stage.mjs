@@ -10,6 +10,7 @@ await rm(sidecars, { recursive: true, force: true });
 await mkdir(sidecars, { recursive: true, mode: 0o700 });
 await stageRuntime(options.runtime, resolve(sidecars, "runtime"));
 await stageLiveKit(options.livekit, resolve(sidecars, "livekit"));
+await stageMediaTools(options.media, resolve(sidecars, "media"));
 
 console.log("[ok] Desktop sidecars подготовлены для packaging.");
 
@@ -37,6 +38,17 @@ async function stageLiveKit(source, destination) {
   }
 }
 
+async function stageMediaTools(source, destination) {
+  const executable = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
+  const probe = process.platform === "win32" ? "ffprobe.exe" : "ffprobe";
+  await assertExecutable(
+    resolve(source, "bin", executable),
+    "FFmpeg normalizer",
+  );
+  await assertExecutable(resolve(source, "bin", probe), "FFprobe normalizer");
+  await cp(source, destination, { recursive: true, force: true });
+}
+
 function parseOptions(args) {
   const valuesArgs = args[0] === "--" ? args.slice(1) : args;
   const values = new Map();
@@ -45,17 +57,24 @@ function parseOptions(args) {
     const value = valuesArgs[index + 1];
     if (!key?.startsWith("--") || !value || values.has(key)) {
       throw new Error(
-        "Использование: pnpm desktop:sidecars:stage -- --runtime <JAVA_HOME> --livekit <path>",
+        "Использование: pnpm desktop:sidecars:stage -- --runtime <JAVA_HOME> --livekit <path> --media <directory>",
       );
     }
     values.set(key, value);
   }
   const runtime = values.get("--runtime");
   const livekit = values.get("--livekit");
-  if (!runtime || !livekit) {
-    throw new Error("Нужны --runtime <JAVA_HOME> и --livekit <path>.");
+  const media = values.get("--media");
+  if (!runtime || !livekit || !media) {
+    throw new Error(
+      "Нужны --runtime <JAVA_HOME>, --livekit <path> и --media <directory>.",
+    );
   }
-  return { runtime: resolve(runtime), livekit: resolve(livekit) };
+  return {
+    runtime: resolve(runtime),
+    livekit: resolve(livekit),
+    media: resolve(media),
+  };
 }
 
 async function assertReadable(filePath, label) {

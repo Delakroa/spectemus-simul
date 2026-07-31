@@ -63,6 +63,8 @@ async function createMacApp(appPath) {
     ),
     createFile(appPath, "Contents/Resources/sidecars/runtime/bin/java"),
     createFile(appPath, "Contents/Resources/sidecars/livekit/livekit-server"),
+    createFile(appPath, "Contents/Resources/sidecars/media/bin/ffmpeg"),
+    createFile(appPath, "Contents/Resources/sidecars/media/bin/ffprobe"),
   ]);
 }
 

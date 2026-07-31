@@ -28,9 +28,12 @@ import {
 } from "./room-events";
 import {
   diagnoseFile,
+  diagnoseMediaSource,
   FileDiagnosticsFailure,
   type FileDiagnosticsResult,
+  type MediaDiagnosticSource,
 } from "./file-diagnostics";
+import { desktopMediaUrl, type DesktopMediaSelection } from "./desktop-media";
 import {
   FilePublicationFailure,
   publishFileToLiveKit,
@@ -104,7 +107,7 @@ function createHostPlaybackCheckpoint(videoElement: HTMLVideoElement): HostPlayb
 export type RoomConnectionStatus =
   "idle" | "connecting" | "open" | "reconnecting" | "closed" | "error";
 export type RoomActionStatus = "create" | "join" | "restore" | "leave" | "close" | null;
-export type FileStatus = "idle" | "checking" | "ready" | "error";
+export type FileStatus = "idle" | "checking" | "normalizing" | "ready" | "error";
 export type FilePublicationStatus = "idle" | "publishing" | "restarting" | "live" | "error";
 export type HostPlaybackStatus = "idle" | "playing" | "paused" | "ended";
 export type MediaRecoveryRequestStatus = "idle" | "sending" | "sent" | "unanswered" | "error";
@@ -184,6 +187,7 @@ export type RoomSessionState = {
   filePublicationError: string | null;
   filePublicationStatus: FilePublicationStatus;
   filePublicationTrackCount: number;
+  filePreparationProgress: number | null;
   fileResult: FileDiagnosticsResult | null;
   fileStatus: FileStatus;
   hostPlaybackCurrentTime: number;
@@ -237,6 +241,7 @@ const initialState: RoomSessionState = {
   filePublicationError: null,
   filePublicationStatus: "idle",
   filePublicationTrackCount: 0,
+  filePreparationProgress: null,
   fileResult: null,
   fileStatus: "idle",
   hostPlaybackCurrentTime: 0,
@@ -287,6 +292,7 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
     | null
   >(null);
   const fileDiagnosticsRequestIdRef = useRef(0);
+  const desktopMediaIdRef = useRef<string | null>(null);
   const fileObjectUrlRef = useRef<string | null>(null);
   const hostPlaybackCleanupRef = useRef<(() => void) | null>(null);
   const hostSeekControllerRef = useRef<HostSeekController | null>(null);
@@ -332,6 +338,26 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
   }
 
   useEffect(() => {
+    const desktop = window.spectemusDesktop;
+    if (!desktop?.onMediaNormalizationProgress) {
+      return undefined;
+    }
+    return desktop.onMediaNormalizationProgress(({ id, progress }) => {
+      if (desktopMediaIdRef.current !== id) {
+        return;
+      }
+      setState((current) =>
+        current.fileStatus === "normalizing"
+          ? {
+              ...current,
+              filePreparationProgress: Math.min(100, Math.max(0, Math.round(progress))),
+            }
+          : current,
+      );
+    });
+  }, []);
+
+  useEffect(() => {
     participantRef.current = state.participant;
     pendingActionRef.current = state.pendingAction;
     roomRef.current = state.room;
@@ -361,6 +387,13 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
       URL.revokeObjectURL(fileObjectUrlRef.current);
       fileObjectUrlRef.current = null;
     }
+  }, []);
+
+  const releaseDesktopMedia = useCallback((id: string | null) => {
+    if (!id) {
+      return;
+    }
+    void window.spectemusDesktop?.releaseMedia?.(id).catch(() => {});
   }, []);
 
   const disconnectRemotePlayback = useCallback(() => {
@@ -605,16 +638,20 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
     filePublicationRequestIdRef.current += 1;
     stopCurrentFilePublication();
     revokeFileUrl();
+    const desktopMediaId = desktopMediaIdRef.current;
+    desktopMediaIdRef.current = null;
+    releaseDesktopMedia(desktopMediaId);
     setState((current) => ({
       ...current,
       fileError: null,
       filePublicationError: null,
       filePublicationStatus: "idle",
       filePublicationTrackCount: 0,
+      filePreparationProgress: null,
       fileResult: null,
       fileStatus: "idle",
     }));
-  }, [revokeFileUrl, stopCurrentFilePublication]);
+  }, [releaseDesktopMedia, revokeFileUrl, stopCurrentFilePublication]);
 
   const selectFile = useCallback(
     async (file: File) => {
@@ -625,12 +662,16 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
       filePublicationRequestIdRef.current += 1;
       stopCurrentFilePublication();
       revokeFileUrl();
+      const desktopMediaId = desktopMediaIdRef.current;
+      desktopMediaIdRef.current = null;
+      releaseDesktopMedia(desktopMediaId);
       setState((current) => ({
         ...current,
         fileError: null,
         filePublicationError: null,
         filePublicationStatus: "idle",
         filePublicationTrackCount: 0,
+        filePreparationProgress: null,
         fileResult: null,
         fileStatus: "checking",
       }));
@@ -649,6 +690,7 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
           filePublicationError: null,
           filePublicationStatus: "idle",
           filePublicationTrackCount: 0,
+          filePreparationProgress: null,
           fileResult: result,
           fileStatus: "ready",
         }));
@@ -665,13 +707,135 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
           filePublicationError: null,
           filePublicationStatus: "idle",
           filePublicationTrackCount: 0,
+          filePreparationProgress: null,
           fileResult: null,
           fileStatus: "error",
         }));
       }
     },
-    [revokeFileUrl, stopCurrentFilePublication],
+    [releaseDesktopMedia, revokeFileUrl, stopCurrentFilePublication],
   );
+
+  const selectDesktopMedia = useCallback(
+    async (selection: DesktopMediaSelection) => {
+      hostPublicationRecoveryRequestedRef.current = false;
+      hostPlaybackRecoveryCheckpointRef.current = null;
+      const requestId = fileDiagnosticsRequestIdRef.current + 1;
+      fileDiagnosticsRequestIdRef.current = requestId;
+      filePublicationRequestIdRef.current += 1;
+      stopCurrentFilePublication();
+      revokeFileUrl();
+      const previousMediaId = desktopMediaIdRef.current;
+      desktopMediaIdRef.current = selection.id;
+      if (previousMediaId && previousMediaId !== selection.id) {
+        releaseDesktopMedia(previousMediaId);
+      }
+      setState((current) => ({
+        ...current,
+        fileError: null,
+        filePublicationError: null,
+        filePublicationStatus: "idle",
+        filePublicationTrackCount: 0,
+        filePreparationProgress: null,
+        fileResult: null,
+        fileStatus: "checking",
+      }));
+
+      const source: MediaDiagnosticSource = {
+        displayName: selection.displayName,
+        formatName: selection.playbackName,
+        mimeType: "",
+        objectUrl: desktopMediaUrl(selection.id),
+      };
+
+      try {
+        let directResult: FileDiagnosticsResult | null = null;
+        let directFailure: unknown = null;
+        try {
+          directResult = await diagnoseMediaSource(source);
+        } catch (error) {
+          if (!isNormalizableDiagnosticFailure(error)) {
+            throw error;
+          }
+          directFailure = error;
+        }
+
+        let result = directResult;
+        const desktop = window.spectemusDesktop;
+        const needsNormalizedCopy =
+          directResult === null || directResult.compatibility === "experimental";
+        if (needsNormalizedCopy && desktop?.normalizeMedia) {
+          setState((current) => ({
+            ...current,
+            fileError: null,
+            filePreparationProgress: 0,
+            fileStatus: "normalizing",
+          }));
+          const normalized = await desktop.normalizeMedia(selection.id);
+          if (fileDiagnosticsRequestIdRef.current !== requestId) {
+            releaseDesktopMedia(normalized.id);
+            return;
+          }
+          result = {
+            ...(await diagnoseMediaSource({
+              displayName: normalized.displayName,
+              formatName: normalized.playbackName,
+              mimeType: "video/mp4",
+              objectUrl: desktopMediaUrl(normalized.id),
+            })),
+            normalization: "local",
+          };
+        }
+
+        if (!result) {
+          throw directFailure ?? new Error("Не удалось проверить видео.");
+        }
+
+        if (fileDiagnosticsRequestIdRef.current !== requestId) {
+          return;
+        }
+        setState((current) => ({
+          ...current,
+          fileError: null,
+          filePublicationError: null,
+          filePublicationStatus: "idle",
+          filePublicationTrackCount: 0,
+          filePreparationProgress: null,
+          fileResult: result,
+          fileStatus: "ready",
+        }));
+      } catch (error) {
+        if (fileDiagnosticsRequestIdRef.current !== requestId) {
+          return;
+        }
+        const message =
+          error instanceof FileDiagnosticsFailure
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : "Не удалось подготовить видео.";
+        setState((current) => ({
+          ...current,
+          fileError: message,
+          filePublicationError: null,
+          filePublicationStatus: "idle",
+          filePublicationTrackCount: 0,
+          filePreparationProgress: null,
+          fileResult: null,
+          fileStatus: "error",
+        }));
+      }
+    },
+    [releaseDesktopMedia, revokeFileUrl, stopCurrentFilePublication],
+  );
+
+  const cancelFilePreparation = useCallback(() => {
+    const mediaId = desktopMediaIdRef.current;
+    if (!mediaId) {
+      return;
+    }
+    void window.spectemusDesktop?.cancelMediaNormalization?.(mediaId).catch(() => {});
+  }, []);
 
   const startHostPlaybackTracking = useCallback((videoElement: HTMLVideoElement) => {
     const previousSeekController = hostSeekControllerRef.current;
@@ -2095,6 +2259,7 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
     close,
     create,
     clearUserError,
+    cancelFilePreparation,
     hostPause,
     hostPlay,
     hostSeek,
@@ -2113,6 +2278,7 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
     restore,
     routeRoomId,
     selectFile,
+    selectDesktopMedia,
     sendChatMessage,
     setHostPreviewElement,
     setRemotePlaybackElements,
@@ -2448,6 +2614,13 @@ function isBenignPlayInterruption(error: unknown) {
     error.name === "AbortError" ||
     error.message.includes("interrupted by a call to pause") ||
     error.message.includes("interrupted by a new load request")
+  );
+}
+
+function isNormalizableDiagnosticFailure(error: unknown) {
+  return (
+    error instanceof FileDiagnosticsFailure &&
+    ["UNSUPPORTED_FORMAT", "METADATA_LOAD_FAILED", "CAPTURE_PREVIEW_FAILED"].includes(error.code)
   );
 }
 

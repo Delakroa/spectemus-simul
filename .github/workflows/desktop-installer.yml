@@ -39,6 +39,8 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: 1.26.0
+      - name: Установить GnuPG для проверки FFmpeg source
+        run: brew install gnupg
       - name: Установить зависимости
         run: pnpm install --frozen-lockfile
       - name: Собрать закреплённый LiveKit sidecar
@@ -48,8 +50,14 @@ jobs:
           GOBIN="$RUNNER_TEMP/livekit" go install github.com/livekit/livekit-server/cmd/server@v1.13.3
           mv "$RUNNER_TEMP/livekit/server" "$RUNNER_TEMP/livekit/livekit-server"
           "$RUNNER_TEMP/livekit/livekit-server" --version
+      - name: Собрать LGPL FFmpeg media sidecar
+        shell: bash
+        run: |
+          bash scripts/build-media-sidecar.sh \
+            --output "$RUNNER_TEMP/media" \
+            --source-output "$RUNNER_TEMP/ffmpeg-source"
       - name: Подготовить sidecars
-        run: pnpm desktop:sidecars:stage -- --runtime "$JAVA_HOME" --livekit "$RUNNER_TEMP/livekit/livekit-server"
+        run: pnpm desktop:sidecars:stage -- --runtime "$JAVA_HOME" --livekit "$RUNNER_TEMP/livekit/livekit-server" --media "$RUNNER_TEMP/media"
       - name: Собрать React UI и backend jar
         run: pnpm desktop:prepare
       - name: Проверить packaging inputs
@@ -90,7 +98,9 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: spectemus-simul-macos-${{ matrix.arch }}-${{ github.run_id }}
-          path: desktop/release/
+          path: |
+            desktop/release/
+            ${{ runner.temp }}/ffmpeg-source/
           if-no-files-found: error
           retention-days: 14
 
@@ -109,6 +119,18 @@ jobs:
         with:
           distribution: temurin
           java-version: 25
+      - uses: msys2/setup-msys2@v2
+        with:
+          install: >-
+            curl
+            gnupg
+            make
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-nasm
+            tar
+            xz
+          msystem: MINGW64
+          update: true
       - name: Установить зависимости
         run: pnpm install --frozen-lockfile
       - name: Получить LiveKit sidecar
@@ -122,7 +144,17 @@ jobs:
           Expand-Archive $archive -DestinationPath "$env:RUNNER_TEMP\livekit"
           $livekit = (Get-ChildItem "$env:RUNNER_TEMP\livekit" -Filter livekit-server.exe -Recurse | Select-Object -First 1).FullName
           if (-not $livekit) { throw "LiveKit Server не найден в official release archive." }
-          pnpm desktop:sidecars:stage -- --runtime "$env:JAVA_HOME" --livekit "$livekit"
+          "LIVEKIT_SIDECAR=$livekit" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Собрать LGPL FFmpeg media sidecar
+        shell: msys2 {0}
+        run: |
+          temp="$(cygpath -u "$RUNNER_TEMP")"
+          bash scripts/build-media-sidecar.sh \
+            --output "$temp/media" \
+            --source-output "$temp/ffmpeg-source"
+      - name: Подготовить sidecars
+        shell: pwsh
+        run: pnpm desktop:sidecars:stage -- --runtime "$env:JAVA_HOME" --livekit "$env:LIVEKIT_SIDECAR" --media "$env:RUNNER_TEMP\media"
       - name: Собрать React UI и backend jar
         run: pnpm desktop:prepare
       - name: Проверить packaging inputs
@@ -165,6 +197,8 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: spectemus-simul-windows-${{ github.run_id }}
-          path: desktop/release/
+          path: |
+            desktop/release/
+            ${{ runner.temp }}/ffmpeg-source/
           if-no-files-found: error
           retention-days: 14

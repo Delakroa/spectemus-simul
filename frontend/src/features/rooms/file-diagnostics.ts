@@ -16,10 +16,18 @@ export type FileDiagnosticsResult = {
   hasVideo: boolean;
   height: number;
   mimeType: string;
+  normalization?: "direct" | "local";
   objectUrl: string;
   verdict: MediaFileVerdict;
   verdictLabel: string;
   width: number;
+};
+
+export type MediaDiagnosticSource = {
+  displayName: string;
+  formatName?: string;
+  mimeType: string;
+  objectUrl: string;
 };
 
 type MediaFormatProfile = {
@@ -79,15 +87,25 @@ export async function diagnoseFile(file: File): Promise<FileDiagnosticsResult> {
   const objectUrl = URL.createObjectURL(file);
 
   try {
-    return await runChecks(file, objectUrl);
+    return await diagnoseMediaSource({
+      displayName: file.name,
+      mimeType: file.type,
+      objectUrl,
+    });
   } catch (error) {
     URL.revokeObjectURL(objectUrl);
     throw error;
   }
 }
 
-async function runChecks(file: File, objectUrl: string): Promise<FileDiagnosticsResult> {
-  const profile = resolveMediaFormatProfile(file);
+export async function diagnoseMediaSource(
+  source: MediaDiagnosticSource,
+): Promise<FileDiagnosticsResult> {
+  return runChecks(source);
+}
+
+async function runChecks(source: MediaDiagnosticSource): Promise<FileDiagnosticsResult> {
+  const profile = resolveMediaFormatProfile(source);
   const mimeType = profile.browserMimeType;
   const video = document.createElement("video");
 
@@ -107,7 +125,7 @@ async function runChecks(file: File, objectUrl: string): Promise<FileDiagnostics
   }
 
   try {
-    const metadata = await loadMetadata(video, objectUrl);
+    const metadata = await loadMetadata(video, source.objectUrl);
 
     if (!metadata.hasVideo) {
       throw new FileDiagnosticsFailure("NO_VIDEO_TRACK", "Файл не содержит видеодорожки.");
@@ -117,7 +135,7 @@ async function runChecks(file: File, objectUrl: string): Promise<FileDiagnostics
 
     return {
       compatibility: profile.compatibility,
-      displayName: file.name,
+      displayName: source.displayName,
       durationMs: metadata.durationMs,
       format: profile.format,
       formatLabel: profile.label,
@@ -125,7 +143,8 @@ async function runChecks(file: File, objectUrl: string): Promise<FileDiagnostics
       hasVideo: true,
       height: metadata.height,
       mimeType,
-      objectUrl,
+      normalization: "direct",
+      objectUrl: source.objectUrl,
       verdict: "CAN_STREAM",
       verdictLabel:
         profile.compatibility === "native"
@@ -264,9 +283,11 @@ function cleanupDiagnosticVideo(video: HTMLVideoElement): void {
   video.load();
 }
 
-function resolveMediaFormatProfile(file: File): MediaFormatProfile {
-  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-  const mimeType = normalizeMimeType(file.type);
+function resolveMediaFormatProfile(
+  source: Pick<MediaDiagnosticSource, "displayName" | "formatName" | "mimeType">,
+): MediaFormatProfile {
+  const extension = (source.formatName ?? source.displayName).split(".").pop()?.toLowerCase() ?? "";
+  const mimeType = normalizeMimeType(source.mimeType);
 
   const nativeProfile =
     MEDIA_FORMAT_PROFILES.find((profile) => profile.extensions.includes(extension)) ??

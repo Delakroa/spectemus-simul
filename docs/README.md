@@ -147,6 +147,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [WT-677_DESKTOP_SINGLE_INSTANCE.md](WT-677_DESKTOP_SINGLE_INSTANCE.md) — вторая копия приложения не запускает ещё один desktop host, а возвращает фокус в уже открытое окно.
 - [WT-678_DESKTOP_OWNED_PROCESS_RECOVERY.md](WT-678_DESKTOP_OWNED_PROCESS_RECOVERY.md) — после аварийного завершения desktop host очищает только подтверждённые старые sidecars Spectemus.
 - [WT-651_NATIVE_MEDIA_COMPATIBILITY_POC.md](WT-651_NATIVE_MEDIA_COMPATIBILITY_POC.md) — native-media hypothesis, POC harness, license gate и критерии решения.
+- [WT-682_LOCAL_MEDIA_NORMALIZER.md](WT-682_LOCAL_MEDIA_NORMALIZER.md) — desktop normalizer: локальная временная H.264/AAC копия, loopback privacy boundary, отмена и LGPL packaging gate.
 - [WT-652_INTERNET_MODE_ARCHITECTURE.md](WT-652_INTERNET_MODE_ARCHITECTURE.md) — отдельный public Internet mode: account/invite, TLS/TURN, privacy, cost gates и последовательность запуска.
 - [WT-653_PUBLIC_ACCESS_CONTRACTS.md](WT-653_PUBLIC_ACCESS_CONTRACTS.md) — planned `/api/v2` account/invite/membership contracts без изменения LAN API.
 - [WT-657_DESKTOP_INSTALL_SMOKE.md](WT-657_DESKTOP_INSTALL_SMOKE.md) — CI монтирует DMG и устанавливает NSIS, затем проверяет runtime-компоненты готового приложения.

@@ -36,6 +36,9 @@ export function resolveSidecarPaths({
     platform === "win32" ? "livekit-server.exe" : "livekit-server";
   const packagedRoot = resolve(resourcesPath, "sidecars");
   const developmentRoot = resolve(PROJECT_ROOT, "desktop", ".sidecars");
+  const mediaDirectory = packaged
+    ? resolve(packagedRoot, "media", "bin")
+    : resolve(developmentRoot, "media", "bin");
   return {
     backendJar:
       environment.SPECTEMUS_BACKEND_JAR ??
@@ -68,10 +71,29 @@ export function resolveSidecarPaths({
       (packaged
         ? resolve(packagedRoot, "livekit", livekitName)
         : resolve(developmentRoot, "livekit", livekitName)),
+    ffmpeg:
+      environment.SPECTEMUS_FFMPEG ??
+      (packaged
+        ? resolve(
+            mediaDirectory,
+            platform === "win32" ? "ffmpeg.exe" : "ffmpeg",
+          )
+        : "ffmpeg"),
+    ffprobe:
+      environment.SPECTEMUS_FFPROBE ??
+      (packaged
+        ? resolve(
+            mediaDirectory,
+            platform === "win32" ? "ffprobe.exe" : "ffprobe",
+          )
+        : "ffprobe"),
   };
 }
 
-export async function assertDesktopResources(paths) {
+export async function assertDesktopResources(
+  paths,
+  { requireMediaTools = false } = {},
+) {
   await assertReadable(paths.frontendDirectory, "Собранный React UI");
   await assertReadable(paths.backendJar, "Spring Boot backend jar");
   if (paths.javaCommand.includes("/") || paths.javaCommand.includes("\\")) {
@@ -84,6 +106,37 @@ export async function assertDesktopResources(paths) {
       "LiveKit Server (для macOS developer proof укажите SPECTEMUS_LIVEKIT_SERVER после brew install livekit)",
     );
   }
+  if (requireMediaTools) {
+    await assertExecutable(paths.ffmpeg, "FFmpeg normalizer");
+    await assertExecutable(paths.ffprobe, "FFprobe normalizer");
+  }
+}
+
+export async function hasMediaTools(paths) {
+  try {
+    if (paths.ffmpeg.includes("/") || paths.ffmpeg.includes("\\")) {
+      await access(paths.ffmpeg, constants.X_OK);
+    }
+    if (paths.ffprobe.includes("/") || paths.ffprobe.includes("\\")) {
+      await access(paths.ffprobe, constants.X_OK);
+    }
+    const ffmpeg = spawnSync(paths.ffmpeg, ["-version"], {
+      encoding: "utf8",
+      windowsHide: true,
+    });
+    const ffprobe = spawnSync(paths.ffprobe, ["-version"], {
+      encoding: "utf8",
+      windowsHide: true,
+    });
+    return (
+      !ffmpeg.error &&
+      ffmpeg.status === 0 &&
+      !ffprobe.error &&
+      ffprobe.status === 0
+    );
+  } catch {
+    return false;
+  }
 }
 
 export class DesktopSupervisor {
@@ -93,12 +146,14 @@ export class DesktopSupervisor {
     waitForHealthy = waitForHealthyHttp,
     waitForLiveKitReady = waitForLiveKitTcpReady,
     assertPortsAvailable = assertDesktopPortsAvailable,
+    mediaResolver,
   } = {}) {
     this.gatewayFactory = gatewayFactory;
     this.spawnProcess = spawnProcess;
     this.waitForHealthy = waitForHealthy;
     this.waitForLiveKitReady = waitForLiveKitReady;
     this.assertPortsAvailable = assertPortsAvailable;
+    this.mediaResolver = mediaResolver;
     this.status = { state: "stopped", detail: "Host не запущен." };
     this.listeners = new Set();
     this.children = [];
@@ -178,6 +233,7 @@ export class DesktopSupervisor {
       const gateway = await startGatewayWithFallback(this.gatewayFactory, {
         backend: { host: "127.0.0.1", port: ports.backend },
         frontendDirectory: paths.frontendDirectory,
+        mediaResolver: this.mediaResolver,
         port: ports.gateway,
       });
       this.gateway = gateway.instance;

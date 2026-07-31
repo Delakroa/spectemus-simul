@@ -78,6 +78,49 @@ test("проксирует WebSocket upgrade только в локальный 
   assert.equal(receivedCookie, "spectemus-simul-session=secret");
 });
 
+test("раздаёт выбранный host-ом media file только через loopback и поддерживает Range", async (t) => {
+  const frontendDirectory = await mkdtemp(join(tmpdir(), "spectemus-gateway-"));
+  const movie = join(frontendDirectory, "prepared.mp4");
+  await writeFile(join(frontendDirectory, "index.html"), "ok");
+  await writeFile(movie, "0123456789");
+  const mediaId = "d77b031d-e42c-452b-8749-b90560e63c42";
+  const gateway = await startGateway({
+    frontendDirectory,
+    host: "127.0.0.1",
+    mediaResolver: (id) =>
+      id === mediaId ? { displayName: "prepared.mp4", filePath: movie } : null,
+    port: 0,
+  });
+  t.after(() => gateway.close());
+
+  const response = await get(gateway.port, `/_desktop/media/${mediaId}`, {
+    Range: "bytes=2-5",
+  });
+
+  assert.equal(response.statusCode, 206);
+  assert.equal(response.body, "2345");
+  assert.equal(response.headers["content-type"], "video/mp4");
+  assert.equal(response.headers["content-range"], "bytes 2-5/10");
+});
+
+test("не раздаёт desktop media без loopback resolver", async (t) => {
+  const frontendDirectory = await mkdtemp(join(tmpdir(), "spectemus-gateway-"));
+  await writeFile(join(frontendDirectory, "index.html"), "ok");
+  const gateway = await startGateway({
+    frontendDirectory,
+    host: "127.0.0.1",
+    port: 0,
+  });
+  t.after(() => gateway.close());
+
+  const response = await get(
+    gateway.port,
+    "/_desktop/media/d77b031d-e42c-452b-8749-b90560e63c42",
+  );
+
+  assert.equal(response.statusCode, 404);
+});
+
 function listen(server) {
   return new Promise((resolve) =>
     server.listen(0, "127.0.0.1", () => resolve(server.address().port)),
@@ -97,7 +140,11 @@ function get(port, path, headers) {
         response.setEncoding("utf8");
         response.on("data", (chunk) => (body += chunk));
         response.on("end", () =>
-          resolve({ body, statusCode: response.statusCode }),
+          resolve({
+            body,
+            headers: response.headers,
+            statusCode: response.statusCode,
+          }),
         );
       },
     );
