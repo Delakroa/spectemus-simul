@@ -5,6 +5,8 @@ const platform = readPlatform(process.argv.slice(2));
 const root = process.cwd();
 const executable = platform === "win" ? "java.exe" : "java";
 const livekit = platform === "win" ? "livekit-server.exe" : "livekit-server";
+const ffmpeg = platform === "win" ? "ffmpeg.exe" : "ffmpeg";
+const ffprobe = platform === "win" ? "ffprobe.exe" : "ffprobe";
 const required = [
   [resolve(root, "frontend", "dist", "index.html"), "собранный React UI"],
   [
@@ -19,6 +21,16 @@ const required = [
   [
     resolve(root, "desktop", ".sidecars", "livekit", livekit),
     "LiveKit sidecar",
+    true,
+  ],
+  [
+    resolve(root, "desktop", ".sidecars", "media", "bin", ffmpeg),
+    "FFmpeg normalizer",
+    true,
+  ],
+  [
+    resolve(root, "desktop", ".sidecars", "media", "bin", ffprobe),
+    "FFprobe normalizer",
     true,
   ],
 ];

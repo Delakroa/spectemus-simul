@@ -3,6 +3,7 @@ import {
   request as requestHttp,
 } from "node:http";
 import { connect } from "node:net";
+import { createReadStream } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 
@@ -17,15 +18,34 @@ const CONTENT_TYPES = {
   ".svg": "image/svg+xml",
   ".woff2": "font/woff2",
 };
+const MEDIA_CONTENT_TYPES = {
+  ".avi": "video/x-msvideo",
+  ".flv": "video/x-flv",
+  ".m4v": "video/mp4",
+  ".mkv": "video/x-matroska",
+  ".mov": "video/quicktime",
+  ".mp4": "video/mp4",
+  ".mpeg": "video/mpeg",
+  ".mpg": "video/mpeg",
+  ".m2ts": "video/mp2t",
+  ".ts": "video/mp2t",
+  ".webm": "video/webm",
+  ".wmv": "video/x-ms-wmv",
+};
 const UPSTREAM_TIMEOUT_MS = 15_000;
 
 export async function startGateway({
   backend = { host: "127.0.0.1", port: 8080 },
   frontendDirectory,
   host = "0.0.0.0",
+  mediaResolver,
   port = 8088,
 }) {
-  const server = createGatewayServer({ backend, frontendDirectory });
+  const server = createGatewayServer({
+    backend,
+    frontendDirectory,
+    mediaResolver,
+  });
   await new Promise((resolveListen, rejectListen) => {
     server.once("error", rejectListen);
     server.listen(port, host, () => {
@@ -47,11 +67,15 @@ export async function startGateway({
   };
 }
 
-export function createGatewayServer({ backend, frontendDirectory }) {
+export function createGatewayServer({
+  backend,
+  frontendDirectory,
+  mediaResolver,
+}) {
   const root = resolve(frontendDirectory);
   const sockets = new Set();
   const server = createHttpServer((request, response) => {
-    void handleRequest({ backend, request, response, root });
+    void handleRequest({ backend, mediaResolver, request, response, root });
   });
   server.on("upgrade", (request, socket, head) => {
     const pathname = new URL(request.url ?? "/", "http://gateway.local")
@@ -70,7 +94,13 @@ export function createGatewayServer({ backend, frontendDirectory }) {
   return server;
 }
 
-async function handleRequest({ backend, request, response, root }) {
+async function handleRequest({
+  backend,
+  mediaResolver,
+  request,
+  response,
+  root,
+}) {
   const url = new URL(request.url ?? "/", "http://gateway.local");
   if (url.pathname === "/gateway-health") {
     response.writeHead(200, {
@@ -84,7 +114,80 @@ async function handleRequest({ backend, request, response, root }) {
     proxyHttp({ backend, request, response });
     return;
   }
+  const mediaId = mediaIdFromPath(url.pathname);
+  if (mediaId) {
+    await serveDesktopMedia({ mediaId, mediaResolver, request, response });
+    return;
+  }
   await serveFrontend({ request, response, root, pathname: url.pathname });
+}
+
+async function serveDesktopMedia({
+  mediaId,
+  mediaResolver,
+  request,
+  response,
+}) {
+  if (!isLoopbackRequest(request) || !mediaResolver) {
+    response.writeHead(404, { "Cache-Control": "no-store" });
+    response.end();
+    return;
+  }
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    response.writeHead(405, { Allow: "GET, HEAD" });
+    response.end();
+    return;
+  }
+  const media = mediaResolver(mediaId);
+  if (!media) {
+    response.writeHead(404, { "Cache-Control": "no-store" });
+    response.end();
+    return;
+  }
+
+  let mediaStats;
+  try {
+    mediaStats = await stat(media.filePath);
+  } catch {
+    response.writeHead(404, { "Cache-Control": "no-store" });
+    response.end();
+    return;
+  }
+  if (!mediaStats.isFile()) {
+    response.writeHead(404, { "Cache-Control": "no-store" });
+    response.end();
+    return;
+  }
+
+  const range = parseRange(request.headers.range, mediaStats.size);
+  if (range === "invalid") {
+    response.writeHead(416, {
+      "Accept-Ranges": "bytes",
+      "Cache-Control": "no-store",
+      "Content-Range": `bytes */${mediaStats.size}`,
+    });
+    response.end();
+    return;
+  }
+  const start = range?.start ?? 0;
+  const end = range?.end ?? mediaStats.size - 1;
+  const headers = {
+    "Accept-Ranges": "bytes",
+    "Cache-Control": "no-store",
+    "Content-Length": String(end - start + 1),
+    "Content-Type": mediaContentType(media.displayName),
+  };
+  if (range) {
+    headers["Content-Range"] = `bytes ${start}-${end}/${mediaStats.size}`;
+  }
+  response.writeHead(range ? 206 : 200, headers);
+  if (request.method === "HEAD") {
+    response.end();
+    return;
+  }
+  const stream = createReadStream(media.filePath, { end, start });
+  stream.once("error", () => response.destroy());
+  stream.pipe(response);
 }
 
 function proxyHttp({ backend, request, response }) {
@@ -235,6 +338,60 @@ function contentType(filePath) {
 
 function acceptsHtml(request) {
   return request.headers.accept?.includes("text/html") ?? false;
+}
+
+function mediaIdFromPath(pathname) {
+  const match = /^\/_desktop\/media\/([0-9a-f-]{36})$/i.exec(pathname);
+  return match?.[1] ?? null;
+}
+
+function isLoopbackRequest(request) {
+  const address = request.socket.remoteAddress;
+  return (
+    address === "127.0.0.1" ||
+    address === "::1" ||
+    address === "::ffff:127.0.0.1"
+  );
+}
+
+function mediaContentType(displayName) {
+  return (
+    MEDIA_CONTENT_TYPES[extname(displayName).toLowerCase()] ??
+    "application/octet-stream"
+  );
+}
+
+function parseRange(header, size) {
+  if (!header) {
+    return null;
+  }
+  const match = /^bytes=(\d*)-(\d*)$/.exec(header);
+  if (!match) {
+    return "invalid";
+  }
+  const [, rawStart, rawEnd] = match;
+  if (!rawStart && !rawEnd) {
+    return "invalid";
+  }
+  if (!rawStart) {
+    const suffixLength = Number(rawEnd);
+    if (!Number.isInteger(suffixLength) || suffixLength <= 0) {
+      return "invalid";
+    }
+    return { end: size - 1, start: Math.max(0, size - suffixLength) };
+  }
+  const start = Number(rawStart);
+  const end = rawEnd ? Number(rawEnd) : size - 1;
+  if (
+    !Number.isInteger(start) ||
+    !Number.isInteger(end) ||
+    start < 0 ||
+    end < start ||
+    start >= size
+  ) {
+    return "invalid";
+  }
+  return { end: Math.min(end, size - 1), start };
 }
 
 function closeServer(server, sockets = new Set()) {

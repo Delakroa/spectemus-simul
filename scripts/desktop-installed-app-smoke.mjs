@@ -7,6 +7,8 @@ const executable =
   platform === "mac" ? "Contents/MacOS/Spectemus Simul" : "Spectemus Simul.exe";
 const java = platform === "mac" ? "java" : "java.exe";
 const livekit = platform === "mac" ? "livekit-server" : "livekit-server.exe";
+const ffmpeg = platform === "mac" ? "ffmpeg" : "ffmpeg.exe";
+const ffprobe = platform === "mac" ? "ffprobe" : "ffprobe.exe";
 const required = [
   [executable, "desktop executable"],
   [`${resources}/frontend/index.html`, "React UI"],
@@ -16,6 +18,8 @@ const required = [
   ],
   [`${resources}/sidecars/runtime/bin/${java}`, "bundled Java runtime"],
   [`${resources}/sidecars/livekit/${livekit}`, "LiveKit sidecar"],
+  [`${resources}/sidecars/media/bin/${ffmpeg}`, "FFmpeg normalizer"],
+  [`${resources}/sidecars/media/bin/${ffprobe}`, "FFprobe normalizer"],
 ];
 
 for (const [relativePath, label] of required) {

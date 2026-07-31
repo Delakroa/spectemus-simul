@@ -271,6 +271,8 @@ export function HomePage() {
   const isFilePublishing =
     roomSession.filePublicationStatus === "publishing" ||
     roomSession.filePublicationStatus === "restarting";
+  const isFilePreparing =
+    roomSession.fileStatus === "checking" || roomSession.fileStatus === "normalizing";
   const canPublishFile =
     roomSession.fileStatus === "ready" &&
     roomSession.liveKitStatus === "connected" &&
@@ -521,6 +523,18 @@ export function HomePage() {
     if (file) {
       void roomSession.selectFile(file);
     }
+  }
+
+  async function handleMediaPicker() {
+    const desktop = window.spectemusDesktop;
+    if (desktop?.pickMediaFile) {
+      const selection = await desktop.pickMediaFile();
+      if (selection) {
+        void roomSession.selectDesktopMedia(selection);
+      }
+      return;
+    }
+    fileInputRef.current?.click();
   }
 
   function handleFileDragOver(event: DragEvent<HTMLDivElement>) {
@@ -1002,11 +1016,15 @@ export function HomePage() {
                     className="button file-picker__trigger"
                     type="button"
                     aria-describedby="file-picker-help"
-                    disabled={roomSession.fileStatus === "checking" || isFilePublishing}
-                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isFilePreparing || isFilePublishing}
+                    onClick={() => void handleMediaPicker()}
                   >
                     <FolderOpen size={18} aria-hidden="true" />
-                    {roomSession.fileStatus === "checking" ? "Проверка…" : "Выбрать файл"}
+                    {roomSession.fileStatus === "checking"
+                      ? "Проверка…"
+                      : roomSession.fileStatus === "normalizing"
+                        ? "Подготовка…"
+                        : "Выбрать файл"}
                   </button>
 
                   {roomSession.fileStatus === "ready" && roomSession.fileResult && (
@@ -1028,6 +1046,12 @@ export function HomePage() {
                         <span className="file-picker__experimental">
                           Формат не входит в базовую гарантию: результат зависит от этого
                           устройства.
+                        </span>
+                      )}
+                      {roomSession.fileResult.normalization === "local" && (
+                        <span className="file-picker__experimental">
+                          Подготовлена временная совместимая копия. Оригинальный файл не изменён и
+                          останется только на этом компьютере.
                         </span>
                       )}
                     </div>
@@ -1073,13 +1097,32 @@ export function HomePage() {
                     </div>
                   )}
 
+                  {roomSession.fileStatus === "normalizing" && (
+                    <div className="file-picker__normalizing" role="status">
+                      <span>
+                        Подготавливаем совместимую копию локально
+                        {roomSession.filePreparationProgress !== null
+                          ? ` · ${roomSession.filePreparationProgress}%`
+                          : "…"}
+                      </span>
+                      <button
+                        className="button"
+                        type="button"
+                        onClick={() => roomSession.cancelFilePreparation()}
+                      >
+                        <X size={16} aria-hidden="true" />
+                        Отменить
+                      </button>
+                    </div>
+                  )}
+
                   {roomSession.fileStatus === "error" && roomSession.fileError && (
                     <div className="inline-error" role="alert">
                       <p>{roomSession.fileError}</p>
                       <button
                         className="button"
                         type="button"
-                        onClick={() => fileInputRef.current?.click()}
+                        onClick={() => void handleMediaPicker()}
                       >
                         <FolderOpen size={16} aria-hidden="true" />
                         Другой файл

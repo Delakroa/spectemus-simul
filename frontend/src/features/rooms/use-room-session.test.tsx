@@ -31,7 +31,40 @@ function RoomSessionHarness() {
   );
 }
 
-function makeDeferredVideoStub(pendingMetadata: Map<string, () => void>) {
+function DesktopMediaHarness() {
+  const session = useRoomSession();
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() =>
+          void session.selectDesktopMedia({
+            displayName: "movie.mkv",
+            id: "d77b031d-e42c-452b-8749-b90560e63c42",
+            isNormalized: false,
+            playbackName: "movie.mkv",
+          })
+        }
+      >
+        Desktop файл
+      </button>
+      <span data-testid="file-status">{session.fileStatus}</span>
+      <span data-testid="file-progress">{session.filePreparationProgress ?? "-"}</span>
+      {session.fileResult && (
+        <>
+          <span>{session.fileResult.displayName}</span>
+          <span data-testid="file-normalization">{session.fileResult.normalization}</span>
+        </>
+      )}
+    </>
+  );
+}
+
+function makeDeferredVideoStub(
+  pendingMetadata: Map<string, () => void>,
+  { fail = false }: { fail?: boolean } = {},
+) {
   const videoTrack = { kind: "video", stop: vi.fn() } as unknown as MediaStreamTrack;
   const audioTrack = { kind: "audio", stop: vi.fn() } as unknown as MediaStreamTrack;
   const stream = {
@@ -59,6 +92,10 @@ function makeDeferredVideoStub(pendingMetadata: Map<string, () => void>) {
   Object.defineProperty(stub, "src", {
     set(src: string) {
       pendingMetadata.set(src, () => {
+        if (fail) {
+          (stub.onerror as (() => void) | null)?.();
+          return;
+        }
         (stub.onloadedmetadata as (() => void) | null)?.();
       });
     },
@@ -69,6 +106,7 @@ function makeDeferredVideoStub(pendingMetadata: Map<string, () => void>) {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  delete window.spectemusDesktop;
 });
 
 describe("useRoomSession file diagnostics", () => {
@@ -115,5 +153,113 @@ describe("useRoomSession file diagnostics", () => {
     });
     expect(screen.getByText("second.mp4")).toBeInTheDocument();
     expect(screen.queryByText("first.mp4")).not.toBeInTheDocument();
+  });
+
+  it("готовит desktop MKV локально после decode failure и сохраняет только временный MP4 path", async () => {
+    const user = userEvent.setup();
+    const normalizeMedia = vi.fn().mockResolvedValue({
+      displayName: "movie.mkv",
+      id: "d77b031d-e42c-452b-8749-b90560e63c42",
+      isNormalized: true,
+      playbackName: "movie.mp4",
+    });
+    window.spectemusDesktop = {
+      getRuntimeStatus: vi.fn(),
+      normalizeMedia,
+      onRuntimeStatus: vi.fn(() => () => {}),
+      restartRuntime: vi.fn(),
+    };
+
+    const realCreateElement = document.createElement.bind(document);
+    const failedMetadata = new Map<string, () => void>();
+    const preparedMetadata = new Map<string, () => void>();
+    const failedVideo = makeDeferredVideoStub(failedMetadata, { fail: true });
+    const preparedVideo = makeDeferredVideoStub(preparedMetadata);
+    const videos = [failedVideo, preparedVideo];
+    vi.spyOn(document, "createElement").mockImplementation((tagName: string) =>
+      tagName === "video" ? (videos.shift() as unknown as HTMLElement) : realCreateElement(tagName),
+    );
+
+    render(<DesktopMediaHarness />);
+
+    await user.click(screen.getByRole("button", { name: "Desktop файл" }));
+
+    await waitFor(() =>
+      expect(
+        failedMetadata.get("/_desktop/media/d77b031d-e42c-452b-8749-b90560e63c42"),
+      ).toBeDefined(),
+    );
+    await act(async () => {
+      failedMetadata.get("/_desktop/media/d77b031d-e42c-452b-8749-b90560e63c42")?.();
+    });
+
+    await waitFor(() =>
+      expect(normalizeMedia).toHaveBeenCalledWith("d77b031d-e42c-452b-8749-b90560e63c42"),
+    );
+    await waitFor(() =>
+      expect(
+        preparedMetadata.get("/_desktop/media/d77b031d-e42c-452b-8749-b90560e63c42"),
+      ).toBeDefined(),
+    );
+    await act(async () => {
+      preparedMetadata.get("/_desktop/media/d77b031d-e42c-452b-8749-b90560e63c42")?.();
+    });
+    expect(await screen.findByText("movie.mkv")).toBeInTheDocument();
+    expect(screen.getByTestId("file-status")).toHaveTextContent("ready");
+    expect(screen.getByTestId("file-normalization")).toHaveTextContent("local");
+  });
+
+  it("готовит experimental desktop container до публикации даже при успешной локальной проверке", async () => {
+    const user = userEvent.setup();
+    const normalizeMedia = vi.fn().mockResolvedValue({
+      displayName: "movie.mkv",
+      id: "d77b031d-e42c-452b-8749-b90560e63c42",
+      isNormalized: true,
+      playbackName: "movie.mp4",
+    });
+    window.spectemusDesktop = {
+      getRuntimeStatus: vi.fn(),
+      normalizeMedia,
+      onRuntimeStatus: vi.fn(() => () => {}),
+      restartRuntime: vi.fn(),
+    };
+
+    const realCreateElement = document.createElement.bind(document);
+    const sourceMetadata = new Map<string, () => void>();
+    const preparedMetadata = new Map<string, () => void>();
+    const sourceVideo = makeDeferredVideoStub(sourceMetadata);
+    const preparedVideo = makeDeferredVideoStub(preparedMetadata);
+    const videos = [sourceVideo, preparedVideo];
+    vi.spyOn(document, "createElement").mockImplementation((tagName: string) =>
+      tagName === "video" ? (videos.shift() as unknown as HTMLElement) : realCreateElement(tagName),
+    );
+
+    render(<DesktopMediaHarness />);
+
+    await user.click(screen.getByRole("button", { name: "Desktop файл" }));
+
+    await waitFor(() =>
+      expect(
+        sourceMetadata.get("/_desktop/media/d77b031d-e42c-452b-8749-b90560e63c42"),
+      ).toBeDefined(),
+    );
+    await act(async () => {
+      sourceMetadata.get("/_desktop/media/d77b031d-e42c-452b-8749-b90560e63c42")?.();
+    });
+
+    await waitFor(() =>
+      expect(normalizeMedia).toHaveBeenCalledWith("d77b031d-e42c-452b-8749-b90560e63c42"),
+    );
+    await waitFor(() =>
+      expect(
+        preparedMetadata.get("/_desktop/media/d77b031d-e42c-452b-8749-b90560e63c42"),
+      ).toBeDefined(),
+    );
+    await act(async () => {
+      preparedMetadata.get("/_desktop/media/d77b031d-e42c-452b-8749-b90560e63c42")?.();
+    });
+
+    expect(await screen.findByText("movie.mkv")).toBeInTheDocument();
+    expect(screen.getByTestId("file-normalization")).toHaveTextContent("local");
   });
 });

@@ -1,9 +1,11 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { acquireDesktopInstanceLock } from "./instance-lock.mjs";
+import { DesktopMediaLibrary } from "./media-library.mjs";
+import { DesktopMediaNormalizer } from "./media-normalizer.mjs";
 import {
   LanAddressSelectionRequired,
   resolveLanAddress,
@@ -16,6 +18,7 @@ import {
   DEFAULT_PORTS,
   DesktopSupervisor,
   assertDesktopResources,
+  hasMediaTools,
   resolveSidecarPaths,
 } from "./sidecars.mjs";
 
@@ -24,7 +27,10 @@ let allowQuit = false;
 let localGatewayOrigin;
 let publicGatewayOrigin;
 let startupPromise;
-const supervisor = new DesktopSupervisor();
+const mediaLibrary = new DesktopMediaLibrary();
+const supervisor = new DesktopSupervisor({
+  mediaResolver: (id) => mediaLibrary.resolveForPlayback(id),
+});
 const MAIN_DIRECTORY = join(fileURLToPath(new URL(".", import.meta.url)));
 
 supervisor.subscribe((status) => {
@@ -36,6 +42,52 @@ const isPrimaryInstance = acquireDesktopInstanceLock(app, focusMainWindow);
 if (isPrimaryInstance) {
   app.whenReady().then(async () => {
     ipcMain.handle("spectemus:runtime-status", () => supervisor.status);
+    ipcMain.handle("spectemus:pick-media-file", async () => {
+      const selection = await dialog.showOpenDialog(mainWindow, {
+        filters: [
+          {
+            extensions: [
+              "mp4",
+              "m4v",
+              "webm",
+              "mkv",
+              "mov",
+              "avi",
+              "mpeg",
+              "mpg",
+              "ts",
+              "m2ts",
+              "wmv",
+              "flv",
+            ],
+            name: "Видео",
+          },
+        ],
+        properties: ["openFile"],
+        title: "Выберите фильм для комнаты",
+      });
+      if (selection.canceled || !selection.filePaths[0]) {
+        return null;
+      }
+      return mediaLibrary.registerSource(selection.filePaths[0]);
+    });
+    ipcMain.handle("spectemus:normalize-media", async (_event, id) => {
+      assertMediaId(id);
+      return mediaLibrary.normalize(id, (progress) => {
+        mainWindow?.webContents.send("spectemus:media-normalization-progress", {
+          id,
+          progress,
+        });
+      });
+    });
+    ipcMain.handle("spectemus:cancel-media-normalization", (_event, id) => {
+      assertMediaId(id);
+      mediaLibrary.cancel(id);
+    });
+    ipcMain.handle("spectemus:release-media", async (_event, id) => {
+      assertMediaId(id);
+      await mediaLibrary.release(id);
+    });
     ipcMain.handle(
       "spectemus:public-invite-origin",
       () => publicGatewayOrigin ?? null,
@@ -84,7 +136,20 @@ async function startDesktopHost(preferredLanAddress) {
         platform: process.platform,
         resourcesPath: process.resourcesPath,
       });
-      await assertDesktopResources(paths);
+      await assertDesktopResources(paths, {
+        requireMediaTools: app.isPackaged,
+      });
+      mediaLibrary.normalizer = (await hasMediaTools(paths))
+        ? new DesktopMediaNormalizer({
+            ffmpegPath: paths.ffmpeg,
+            ffprobePath: paths.ffprobe,
+            outputDirectory: join(
+              app.getPath("temp"),
+              "spectemus-simul",
+              "normalized-media",
+            ),
+          })
+        : null;
       const secrets = await loadOrCreateInstallationSecrets(
         join(runtimeDirectory, "installation-secrets.json"),
       );
@@ -140,7 +205,9 @@ if (isPrimaryInstance) {
     }
     event.preventDefault();
     allowQuit = true;
-    void supervisor.stop().finally(() => app.quit());
+    void Promise.allSettled([supervisor.stop(), mediaLibrary.clear()]).finally(
+      () => app.quit(),
+    );
   });
 
   app.on("window-all-closed", () => {
@@ -250,4 +317,10 @@ function escapeHtml(value) {
         "'": "&#39;",
       })[character],
   );
+}
+
+function assertMediaId(value) {
+  if (typeof value !== "string" || !/^[0-9a-f-]{36}$/i.test(value)) {
+    throw new Error("Некорректный идентификатор выбранного файла.");
+  }
 }

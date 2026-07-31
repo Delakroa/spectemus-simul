@@ -48,6 +48,10 @@
       {
         "from": ".sidecars/livekit",
         "to": "sidecars/livekit"
+      },
+      {
+        "from": ".sidecars/media",
+        "to": "sidecars/media"
       }
     ],
     "mac": {

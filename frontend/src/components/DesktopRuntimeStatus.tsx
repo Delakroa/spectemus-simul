@@ -1,22 +1,7 @@
 import { MonitorPlay } from "lucide-react";
 import { useEffect, useState } from "react";
 
-type DesktopRuntimeStatus = {
-  detail: string;
-  state: string;
-  url?: string;
-};
-
-declare global {
-  interface Window {
-    spectemusDesktop?: {
-      getRuntimeStatus: () => Promise<DesktopRuntimeStatus>;
-      getPublicInviteOrigin?: () => Promise<string | null>;
-      restartRuntime: () => Promise<DesktopRuntimeStatus>;
-      onRuntimeStatus: (listener: (status: DesktopRuntimeStatus) => void) => () => void;
-    };
-  }
-}
+import type { DesktopRuntimeStatus } from "../features/rooms/desktop-media";
 
 export function DesktopRuntimeStatusIndicator() {
   const [status, setStatus] = useState<DesktopRuntimeStatus | null>(null);
