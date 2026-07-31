@@ -873,7 +873,10 @@ describe("HomePage", () => {
       ),
     );
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Invite-ссылка или ID комнаты")).toHaveValue(roomId);
+    expect(screen.queryByLabelText("Имя host")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Invite-ссылка или ID комнаты")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Имя гостя")).toHaveValue("Guest");
+    expect(screen.getByText("Войти в комнату")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Войти" })).toBeEnabled();
   });
 
