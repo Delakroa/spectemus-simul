@@ -7,7 +7,8 @@ info:
   description: |
     Контракт product backend. Эндпоинты с `x-implementation-status: planned`
     фиксируют согласованную будущую API surface и не считаются реализованными до
-    соответствующего тикета.
+    соответствующего тикета. Implemented Internet endpoints всё равно fail-closed,
+    пока не настроен отдельный public access runtime.
 
 servers:
   - url: /
@@ -459,10 +460,10 @@ paths:
       operationId: requestEmailChallenge
       summary: Запросить одноразовый email challenge для Internet mode
       description: |
-        Planned endpoint. Возвращает одинаковый `202` для нового и существующего
-        email, чтобы не стать account-enumeration oracle. Одноразовый код
-        передаётся только через будущего configured email provider.
-      x-implementation-status: planned
+        Возвращает одинаковый `202` для нового и существующего email, чтобы не
+        стать account-enumeration oracle. Одноразовый код передаётся только
+        через configured email provider; route выключен без полной конфигурации.
+      x-implementation-status: implemented
       requestBody:
         required: true
         content:
@@ -496,10 +497,10 @@ paths:
       operationId: verifyEmailChallenge
       summary: Подтвердить одноразовый email challenge
       description: |
-        Planned endpoint. Успех создаёт или восстанавливает account и ставит
-        отдельную opaque `wt_account` cookie. Raw code не возвращается в response
-        и не сохраняется в browser storage.
-      x-implementation-status: planned
+        Успех создаёт или восстанавливает account и ставит отдельную opaque
+        `wt_account` cookie. Raw code не возвращается в response и не сохраняется
+        в browser storage.
+      x-implementation-status: implemented
       requestBody:
         required: true
         content:
@@ -534,7 +535,7 @@ paths:
       tags: [Internet access]
       operationId: getAccount
       summary: Получить профиль текущего Internet-mode account
-      x-implementation-status: planned
+      x-implementation-status: implemented
       security:
         - accountSessionCookie: []
       responses:
@@ -558,9 +559,9 @@ paths:
       operationId: createPublicRoom
       summary: Создать private Internet-mode room
       description: |
-        Planned endpoint. Создаёт только product access record; фильм, локальный
-        path и LiveKit credential не передаются в request и не возвращаются.
-      x-implementation-status: planned
+        Создаёт только product access record; фильм, локальный path и LiveKit
+        credential не передаются в request и не возвращаются.
+      x-implementation-status: implemented
       security:
         - accountSessionCookie: []
       parameters:
@@ -589,7 +590,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "409":
-          $ref: "#/components/responses/AccountLimitReached"
+          $ref: "#/components/responses/Conflict"
         "422":
           $ref: "#/components/responses/ValidationFailed"
         "429":
@@ -604,7 +605,7 @@ paths:
       tags: [Internet access]
       operationId: getPublicRoom
       summary: Получить public room только для её member-а
-      x-implementation-status: planned
+      x-implementation-status: implemented
       security:
         - accountSessionCookie: []
       responses:
@@ -663,10 +664,10 @@ paths:
       operationId: createPublicRoomInvite
       summary: Создать отзываемый invite для private Internet-mode room
       description: |
-        Planned endpoint. Raw invite token возвращается только в этом `no-store`
-        response как hash-only browser route. В storage и дальнейших ответах
-        остаются только invite ID и hash token-а.
-      x-implementation-status: planned
+        Raw invite token возвращается только в этом `no-store` response как
+        hash-only browser route. В storage и дальнейших ответах остаются только
+        invite ID и hash token-а.
+      x-implementation-status: implemented
       security:
         - accountSessionCookie: []
       parameters:
@@ -692,7 +693,7 @@ paths:
         "404":
           $ref: "#/components/responses/MembershipRequired"
         "409":
-          $ref: "#/components/responses/AccountLimitReached"
+          $ref: "#/components/responses/Conflict"
         "422":
           $ref: "#/components/responses/ValidationFailed"
         "429":
@@ -708,7 +709,7 @@ paths:
       tags: [Internet access]
       operationId: revokePublicRoomInvite
       summary: Отозвать public room invite
-      x-implementation-status: planned
+      x-implementation-status: implemented
       security:
         - accountSessionCookie: []
       responses:
@@ -729,12 +730,12 @@ paths:
       tags: [Internet access]
       operationId: revokePublicRoomMember
       summary: Удалить member-а из private Internet-mode room
-      x-implementation-status: planned
+      x-implementation-status: implemented
       security:
         - accountSessionCookie: []
       responses:
         "204":
-          description: Membership удалена или уже неактивна; active participant отключён
+          description: Membership удалена или уже неактивна. Отключение active participant появляется в WT-655 вместе с Internet media runtime.
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -748,9 +749,9 @@ paths:
       operationId: redeemPublicInvite
       summary: Обменять hash-only invite token на membership
       description: |
-        Planned endpoint. Invite token приходит только в POST body, а не в
-        server-visible URL/query. Ответ не содержит LiveKit credential.
-      x-implementation-status: planned
+        Invite token приходит только в POST body, а не в server-visible URL/query.
+        Ответ не содержит LiveKit credential.
+      x-implementation-status: implemented
       security:
         - accountSessionCookie: []
       parameters:
@@ -776,7 +777,7 @@ paths:
         "404":
           $ref: "#/components/responses/InviteUnavailable"
         "409":
-          $ref: "#/components/responses/AccountLimitReached"
+          $ref: "#/components/responses/Conflict"
         "422":
           $ref: "#/components/responses/ValidationFailed"
         "429":
@@ -816,7 +817,12 @@ components:
       name: Idempotency-Key
       in: header
       required: true
-      description: Повтор того же запроса возвращает исходный результат; другой payload даёт conflict.
+      description: |
+        Повтор того же запроса возвращает исходный результат; другой payload даёт
+        conflict. Единственное исключение — создание invite: raw token намеренно
+        не хранится, поэтому безопасный replay возвращает `409
+        IDEMPOTENCY_REPLAY_UNAVAILABLE`; клиент создаёт новое приглашение с новым
+        key.
       schema:
         type: string
         minLength: 16

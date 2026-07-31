@@ -2,9 +2,10 @@
 
 ## Статус
 
-Завершено как contract-first design для будущего Internet mode. API помечен
-`planned`: backend, PostgreSQL migration, email delivery, frontend UI и public
-deploy в этой задаче не появляются.
+Завершено как contract-first design. WT-654 реализует account, PostgreSQL
+migration, SMTP delivery и membership/invite endpoints за явным
+`PUBLIC_ACCESS_ENABLED` switch. До WT-655 `livekit-token`, frontend UI и
+public deploy остаются `planned`.
 
 ## Цель
 
@@ -29,8 +30,8 @@ deploy в этой задаче не появляются.
 | Текущий account  | `GET /api/v2/account`                                     | Возвращает минимальный profile без email и credentials               |
 
 Raw одноразовый code не возвращается API, не хранится в localStorage и не
-добавляется в telemetry. Реальная отправка email требует отдельного provider и
-секретов, поэтому остаётся следующей задачей.
+добавляется в telemetry. Реальная отправка требует настроенный SMTP provider,
+подтверждённый sender address и HTTPS origin; без них switch не включается.
 
 ### Invite не является media credential
 
@@ -84,14 +85,15 @@ access record с эфемерной live room, не расширяя текущ�
 `scripts/check-contracts.mjs` теперь проверяет следующие regression invariants:
 
 - `wt_account` не заменяет `wt_session`;
-- Internet endpoints имеют `x-implementation-status: planned`;
+- account/membership/invite endpoints имеют `implemented`, а Internet
+  `livekit-token` остаётся `planned` до WT-655;
 - invite path использует browser-only fragment;
 - `inviteToken` write-only;
 - API не содержит `inviteToken` в path или query parameter.
 
 ## Не входит в задачу
 
-- отправка email, login UI, account persistence и migrations;
+- login UI и экран Internet-комнаты;
 - реальный public LiveKit, VM, DNS, TLS/TURN или production secrets;
 - LiveKit token revoke runtime, member management UI и public room runtime;
 - mobile playback, torrent/URL ingest, media storage, catalog или DRM bypass.
@@ -106,6 +108,7 @@ git diff --check
 
 ## Следующий шаг
 
-WT-654 реализует passwordless account и invite foundation только после
-предоставления email provider/secrets и решения по PostgreSQL migration.
-До этого Internet mode остаётся архитектурой и не открывается пользователям.
+WT-655 подключит к этой access boundary отдельный Internet room runtime:
+public LiveKit, TLS/WSS/TURN, short-lived media token, active participant
+disconnect после revoke и понятную диагностику сети. До готового staging gate
+Internet mode не открывается пользователям.

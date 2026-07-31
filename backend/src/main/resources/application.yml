@@ -9,6 +9,10 @@ spring:
       host: ${REDIS_HOST:127.0.0.1}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:spectemus_simul_redis_dev_only}
+  flyway:
+    # Public access owns its Flyway instance only after the explicit Internet-mode
+    # switch. Keeping Boot's auto migration off preserves the desktop/LAN runtime.
+    enabled: false
 
 server:
   port: 8080
@@ -54,6 +58,38 @@ spectemus-simul:
     telemetry:
       requests: ${RATE_LIMIT_TELEMETRY:60}
       window: ${RATE_LIMIT_TELEMETRY_WINDOW:1m}
+    email-challenge:
+      requests: ${RATE_LIMIT_EMAIL_CHALLENGE:5}
+      window: ${RATE_LIMIT_EMAIL_CHALLENGE_WINDOW:15m}
+    email-challenge-verify:
+      requests: ${RATE_LIMIT_EMAIL_CHALLENGE_VERIFY:10}
+      window: ${RATE_LIMIT_EMAIL_CHALLENGE_VERIFY_WINDOW:15m}
+    public-room:
+      requests: ${RATE_LIMIT_PUBLIC_ROOM:10}
+      window: ${RATE_LIMIT_PUBLIC_ROOM_WINDOW:1h}
+    public-invite:
+      requests: ${RATE_LIMIT_PUBLIC_INVITE:20}
+      window: ${RATE_LIMIT_PUBLIC_INVITE_WINDOW:1h}
+    invite-redemption:
+      requests: ${RATE_LIMIT_INVITE_REDEMPTION:20}
+      window: ${RATE_LIMIT_INVITE_REDEMPTION_WINDOW:15m}
+  public-access:
+    # Internet mode is deliberately fail-closed. LAN `/api/v1` does not depend on
+    # this configuration and remains the only active product surface by default.
+    enabled: ${PUBLIC_ACCESS_ENABLED:false}
+    jdbc-url: ${PUBLIC_ACCESS_JDBC_URL:}
+    jdbc-username: ${PUBLIC_ACCESS_JDBC_USERNAME:}
+    jdbc-password: ${PUBLIC_ACCESS_JDBC_PASSWORD:}
+    identity-pepper: ${PUBLIC_ACCESS_IDENTITY_PEPPER:}
+    session-ttl: ${PUBLIC_ACCESS_SESSION_TTL:14d}
+    cookie-secure: ${PUBLIC_ACCESS_COOKIE_SECURE:true}
+    email:
+      host: ${PUBLIC_ACCESS_EMAIL_HOST:}
+      port: ${PUBLIC_ACCESS_EMAIL_PORT:587}
+      username: ${PUBLIC_ACCESS_EMAIL_USERNAME:}
+      password: ${PUBLIC_ACCESS_EMAIL_PASSWORD:}
+      from: ${PUBLIC_ACCESS_EMAIL_FROM:}
+      starttls: ${PUBLIC_ACCESS_EMAIL_STARTTLS:true}
 
 management:
   endpoints:

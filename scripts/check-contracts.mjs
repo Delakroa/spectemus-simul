@@ -38,9 +38,11 @@ assert.equal(
   "Planned Internet mode must keep account and LAN room cookies separate",
 );
 assert.equal(
-  openApi.paths["/api/v2/public-rooms"].post["x-implementation-status"],
+  openApi.paths["/api/v2/public-rooms/{publicRoomId}/livekit-token"].post[
+    "x-implementation-status"
+  ],
   "planned",
-  "Public room contract must not be presented as implemented before its runtime ticket",
+  "Public LiveKit access must remain planned before its runtime ticket",
 );
 assert.equal(
   publicInviteSchema.properties.invitePath.pattern,
