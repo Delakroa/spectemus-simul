@@ -244,6 +244,7 @@ export function HomePage() {
   const canUseNativeShare = typeof (navigator as NavigatorWithWebShare).share === "function";
   const roomClosed = room?.status === "CLOSED" || room?.status === "EXPIRED";
   const isHost = participant?.role === "HOST";
+  const isInviteEntry = Boolean(routeRoomId && !room && !isUnavailableInviteRoute);
 
   useEffect(() => {
     if (isUnavailableInviteRoute) {
@@ -848,48 +849,55 @@ export function HomePage() {
         )}
 
         {(!room || roomClosed) && (
-          <div className="room-actions">
-            <form className="room-form" onSubmit={handleCreateRoom}>
-              <label htmlFor="host-display-name">Создать комнату</label>
-              <div className="room-form__row">
-                <input
-                  aria-label="Имя host"
-                  id="host-display-name"
-                  maxLength={64}
-                  minLength={1}
-                  name="hostDisplayName"
-                  onChange={(event) => setHostDisplayName(event.target.value)}
-                  required
-                  type="text"
-                  value={hostDisplayName}
-                />
-                <button
-                  className="button button--primary"
-                  disabled={isRoomActionPending}
-                  type="submit"
-                >
-                  <Plus size={18} aria-hidden="true" />
-                  Создать
-                </button>
-              </div>
-            </form>
+          <div className={`room-actions${isInviteEntry ? " room-actions--invite" : ""}`}>
+            {!isInviteEntry && (
+              <form className="room-form" onSubmit={handleCreateRoom}>
+                <label htmlFor="host-display-name">Создать комнату</label>
+                <div className="room-form__row">
+                  <input
+                    aria-label="Имя host"
+                    id="host-display-name"
+                    maxLength={64}
+                    minLength={1}
+                    name="hostDisplayName"
+                    onChange={(event) => setHostDisplayName(event.target.value)}
+                    required
+                    type="text"
+                    value={hostDisplayName}
+                  />
+                  <button
+                    className="button button--primary"
+                    disabled={isRoomActionPending}
+                    type="submit"
+                  >
+                    <Plus size={18} aria-hidden="true" />
+                    Создать
+                  </button>
+                </div>
+              </form>
+            )}
 
             <form className="room-form" onSubmit={handleJoinRoom}>
-              <label htmlFor="join-room-id">Войти гостем</label>
-              <div className="room-form__grid">
-                <input
-                  aria-label="Invite-ссылка или ID комнаты"
-                  id="join-room-id"
-                  maxLength={220}
-                  minLength={1}
-                  name="roomId"
-                  onChange={(event) => setJoinRoomIdDraft(event.target.value)}
-                  required
-                  type="text"
-                  value={joinRoomId}
-                />
+              <label htmlFor={isInviteEntry ? "guest-display-name" : "join-room-id"}>
+                {isInviteEntry ? "Войти в комнату" : "Войти гостем"}
+              </label>
+              <div className={`room-form__grid${isInviteEntry ? " room-form__grid--invite" : ""}`}>
+                {!isInviteEntry && (
+                  <input
+                    aria-label="Invite-ссылка или ID комнаты"
+                    id="join-room-id"
+                    maxLength={220}
+                    minLength={1}
+                    name="roomId"
+                    onChange={(event) => setJoinRoomIdDraft(event.target.value)}
+                    required
+                    type="text"
+                    value={joinRoomId}
+                  />
+                )}
                 <input
                   aria-label="Имя гостя"
+                  id="guest-display-name"
                   maxLength={64}
                   minLength={1}
                   name="guestDisplayName"

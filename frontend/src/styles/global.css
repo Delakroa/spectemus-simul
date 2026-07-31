@@ -479,6 +479,10 @@ a {
   gap: 18px;
 }
 
+.room-actions--invite {
+  grid-template-columns: minmax(280px, 520px);
+}
+
 .room-closed-notice {
   display: flex;
   align-items: flex-start;
@@ -538,6 +542,10 @@ a {
 
 .room-form__grid {
   grid-template-columns: minmax(170px, 1fr) minmax(130px, 0.75fr) auto;
+}
+
+.room-form__grid--invite {
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .room-form input {
@@ -3396,6 +3404,10 @@ html:has(.operator-page) {
   }
 
   .room-form__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .room-form__grid--invite {
     grid-template-columns: minmax(0, 1fr);
   }
 
