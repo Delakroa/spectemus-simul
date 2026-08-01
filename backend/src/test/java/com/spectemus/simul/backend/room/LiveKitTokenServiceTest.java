@@ -71,6 +71,7 @@ class LiveKitTokenServiceTest {
                 .contains("\"canSubscribe\":true")
                 .contains("\"canPublish\":true")
                 .contains("\"canPublishData\":true");
+        assertThat(payload).doesNotContain("\"canPublishSources\"");
         assertValidSignature(response.token());
     }
 
@@ -90,7 +91,8 @@ class LiveKitTokenServiceTest {
                 .contains("\"name\":\"Guest\"")
                 .contains("\"canSubscribe\":true")
                 .contains("\"canPublish\":true")
-                .contains("\"canPublishData\":true");
+                .contains("\"canPublishData\":true")
+                .contains("\"canPublishSources\":[\"microphone\"]");
         assertValidSignature(response.token());
     }
 

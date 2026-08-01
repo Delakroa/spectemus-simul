@@ -7,6 +7,8 @@ const OUTPUT_VIDEO_CODEC = "h264";
 const OUTPUT_AUDIO_CODEC = "aac";
 const OUTPUT_AUDIO_BITRATE = "160k";
 const OUTPUT_VIDEO_BITRATE = "6000k";
+const FORCE_KILL_WAIT_MS = 1_000;
+const PROBE_TIMEOUT_MS = 15_000;
 
 export class MediaNormalizationFailure extends Error {
   constructor(code, message) {
@@ -33,22 +35,24 @@ export class DesktopMediaNormalizer {
 
   async normalize({ inputPath, onProgress, signal }) {
     const sourcePath = resolve(inputPath);
-    const source = await probeMedia(
-      this.ffprobePath,
-      sourcePath,
-      this.spawnProcess,
-    );
-    if (!source.video) {
-      throw new MediaNormalizationFailure(
-        "NO_VIDEO_STREAM",
-        "В выбранном файле не найдена видеодорожка.",
-      );
-    }
-
-    await mkdir(this.outputDirectory, { recursive: true, mode: 0o700 });
-    const outputPath = join(this.outputDirectory, `${randomUUID()}.mp4`);
+    let outputPath;
 
     try {
+      const source = await probeMedia({
+        command: this.ffprobePath,
+        inputPath: sourcePath,
+        signal,
+        spawnProcess: this.spawnProcess,
+      });
+      if (!source.video) {
+        throw new MediaNormalizationFailure(
+          "NO_VIDEO_STREAM",
+          "В выбранном файле не найдена видеодорожка.",
+        );
+      }
+
+      await mkdir(this.outputDirectory, { recursive: true, mode: 0o700 });
+      outputPath = join(this.outputDirectory, `${randomUUID()}.mp4`);
       await runTranscode({
         command: this.ffmpegPath,
         args: buildNormalizationArguments({
@@ -61,11 +65,12 @@ export class DesktopMediaNormalizer {
         signal,
         spawnProcess: this.spawnProcess,
       });
-      const output = await probeMedia(
-        this.ffprobePath,
-        outputPath,
-        this.spawnProcess,
-      );
+      const output = await probeMedia({
+        command: this.ffprobePath,
+        inputPath: outputPath,
+        signal,
+        spawnProcess: this.spawnProcess,
+      });
       assertNormalizedOutput(output);
       const outputStats = await stat(outputPath);
       return {
@@ -75,10 +80,16 @@ export class DesktopMediaNormalizer {
         sizeBytes: outputStats.size,
       };
     } catch (error) {
-      await rm(outputPath, { force: true }).catch(() => {});
+      if (outputPath) {
+        await rm(outputPath, { force: true }).catch(() => {});
+      }
       throw normalizeFailure(error);
     }
   }
+}
+
+export async function clearNormalizedMediaDirectory(outputDirectory) {
+  await rm(resolve(outputDirectory), { force: true, recursive: true });
 }
 
 export function buildNormalizationArguments({
@@ -188,12 +199,14 @@ export function parseProgressLine(line, durationSeconds) {
   );
 }
 
-async function probeMedia(command, inputPath, spawnProcess) {
+async function probeMedia({ command, inputPath, signal, spawnProcess }) {
   const output = await runCommand({
     command,
     args: buildProbeArguments(inputPath),
     label: "ffprobe",
+    signal,
     spawnProcess,
+    timeoutMs: PROBE_TIMEOUT_MS,
   });
   return parseMediaInventory(output.stdout);
 }
@@ -212,12 +225,14 @@ function runTranscode({
     let settled = false;
     let cancelled = false;
     let child;
+    let clearTerminationTimer = () => {};
     const finish = (callback) => {
       if (settled) {
         return;
       }
       settled = true;
       signal?.removeEventListener("abort", abort);
+      clearTerminationTimer();
       callback();
     };
     const abort = () => {
@@ -233,11 +248,12 @@ function runTranscode({
         return;
       }
       cancelled = true;
-      try {
-        child.kill("SIGTERM");
-      } catch (error) {
-        finish(() => rejectPromise(error));
+      const termination = terminateProcess(child);
+      if (termination.error) {
+        finish(() => rejectPromise(termination.error));
+        return;
       }
+      clearTerminationTimer = termination.clearTimer;
     };
 
     if (signal?.aborted) {
@@ -302,20 +318,80 @@ function runTranscode({
   });
 }
 
-function runCommand({ command, args, label, spawnProcess }) {
+export function runCommand({
+  command,
+  args,
+  label,
+  signal,
+  spawnProcess,
+  forceKillWaitMs = FORCE_KILL_WAIT_MS,
+  timeoutMs = PROBE_TIMEOUT_MS,
+}) {
   return new Promise((resolvePromise, rejectPromise) => {
     let stdout = "";
     let stderr = "";
+    let settled = false;
+    let cancelled = false;
+    let timedOut = false;
     let child;
+    let timeout;
+    let clearTerminationTimer = () => {};
+    const finish = (callback) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeout);
+      clearTerminationTimer();
+      signal?.removeEventListener("abort", abort);
+      callback();
+    };
+    const abort = () => {
+      if (!child) {
+        finish(() =>
+          rejectPromise(
+            new MediaNormalizationFailure(
+              "CANCELLED",
+              "Подготовка совместимой копии отменена.",
+            ),
+          ),
+        );
+        return;
+      }
+      cancelled = true;
+      const termination = terminateProcess(child, forceKillWaitMs);
+      if (termination.error) {
+        finish(() => rejectPromise(termination.error));
+        return;
+      }
+      clearTerminationTimer = termination.clearTimer;
+    };
+
+    if (signal?.aborted) {
+      abort();
+      return;
+    }
+
     try {
       child = spawnProcess(command, args, {
         stdio: ["ignore", "pipe", "pipe"],
         windowsHide: true,
       });
     } catch (error) {
-      rejectPromise(error);
+      finish(() => rejectPromise(error));
       return;
     }
+    signal?.addEventListener("abort", abort, { once: true });
+    timeout = setTimeout(() => {
+      timedOut = true;
+      const termination = terminateProcess(child, forceKillWaitMs);
+      if (termination.error) {
+        finish(() => rejectPromise(termination.error));
+        return;
+      }
+      clearTerminationTimer = termination.clearTimer;
+    }, timeoutMs);
+    timeout.unref?.();
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {
       stdout += chunk;
@@ -324,17 +400,61 @@ function runCommand({ command, args, label, spawnProcess }) {
     child.stderr.on("data", (chunk) => {
       stderr = `${stderr}${chunk}`.slice(-4_000);
     });
-    child.once("error", rejectPromise);
+    child.once("error", (error) => finish(() => rejectPromise(error)));
     child.once("close", (code) => {
-      if (code === 0) {
-        resolvePromise({ stdout });
+      if (cancelled) {
+        finish(() =>
+          rejectPromise(
+            new MediaNormalizationFailure(
+              "CANCELLED",
+              "Подготовка совместимой копии отменена.",
+            ),
+          ),
+        );
         return;
       }
-      rejectPromise(
-        new Error(`${label} завершился с кодом ${code}: ${stderr.trim()}`),
+      if (timedOut) {
+        finish(() =>
+          rejectPromise(
+            new MediaNormalizationFailure(
+              "PROBE_FAILED",
+              "Не удалось определить кодеки выбранного видео.",
+            ),
+          ),
+        );
+        return;
+      }
+      if (code === 0) {
+        finish(() => resolvePromise({ stdout }));
+        return;
+      }
+      finish(() =>
+        rejectPromise(
+          new Error(`${label} завершился с кодом ${code}: ${stderr.trim()}`),
+        ),
       );
     });
   });
+}
+
+function terminateProcess(child, forceKillWaitMs = FORCE_KILL_WAIT_MS) {
+  try {
+    child.kill("SIGTERM");
+  } catch (error) {
+    return { clearTimer: () => {}, error };
+  }
+  const forceTimer = setTimeout(() => {
+    try {
+      child.kill("SIGKILL");
+    } catch {
+      // The process has already exited between termination signals.
+    }
+  }, forceKillWaitMs);
+  forceTimer.unref?.();
+  return {
+    clearTimer: () => clearTimeout(forceTimer),
+    error: null,
+  };
 }
 
 function assertNormalizedOutput(inventory) {

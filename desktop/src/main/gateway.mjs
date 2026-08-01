@@ -6,6 +6,7 @@ import { connect } from "node:net";
 import { createReadStream } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
+import { pipeline } from "node:stream/promises";
 
 const CONTENT_TYPES = {
   ".css": "text/css; charset=utf-8",
@@ -38,10 +39,12 @@ export async function startGateway({
   backend = { host: "127.0.0.1", port: 8080 },
   frontendDirectory,
   host = "0.0.0.0",
+  createMediaReadStream,
   mediaResolver,
   port = 8088,
 }) {
   const server = createGatewayServer({
+    createMediaReadStream,
     backend,
     frontendDirectory,
     mediaResolver,
@@ -69,17 +72,29 @@ export async function startGateway({
 
 export function createGatewayServer({
   backend,
+  createMediaReadStream = createReadStream,
   frontendDirectory,
   mediaResolver,
 }) {
   const root = resolve(frontendDirectory);
   const sockets = new Set();
   const server = createHttpServer((request, response) => {
-    void handleRequest({ backend, mediaResolver, request, response, root });
+    void handleRequest({
+      backend,
+      createMediaReadStream,
+      mediaResolver,
+      request,
+      response,
+      root,
+    }).catch(() => respondWithServerError(response));
   });
   server.on("upgrade", (request, socket, head) => {
-    const pathname = new URL(request.url ?? "/", "http://gateway.local")
-      .pathname;
+    const url = parseRequestUrl(request.url);
+    if (!url) {
+      socket.end("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
+      return;
+    }
+    const { pathname } = url;
     if (!pathname.startsWith("/api/")) {
       socket.end("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
       return;
@@ -96,12 +111,17 @@ export function createGatewayServer({
 
 async function handleRequest({
   backend,
+  createMediaReadStream,
   mediaResolver,
   request,
   response,
   root,
 }) {
-  const url = new URL(request.url ?? "/", "http://gateway.local");
+  const url = parseRequestUrl(request.url);
+  if (!url) {
+    respondWithBadRequest(response);
+    return;
+  }
   if (url.pathname === "/gateway-health") {
     response.writeHead(200, {
       "Cache-Control": "no-store",
@@ -116,13 +136,20 @@ async function handleRequest({
   }
   const mediaId = mediaIdFromPath(url.pathname);
   if (mediaId) {
-    await serveDesktopMedia({ mediaId, mediaResolver, request, response });
+    await serveDesktopMedia({
+      createMediaReadStream,
+      mediaId,
+      mediaResolver,
+      request,
+      response,
+    });
     return;
   }
   await serveFrontend({ request, response, root, pathname: url.pathname });
 }
 
 async function serveDesktopMedia({
+  createMediaReadStream,
   mediaId,
   mediaResolver,
   request,
@@ -158,15 +185,24 @@ async function serveDesktopMedia({
     response.end();
     return;
   }
+  if (mediaStats.size === 0) {
+    if (request.headers.range) {
+      respondWithInvalidRange(response, mediaStats.size);
+      return;
+    }
+    response.writeHead(200, {
+      "Accept-Ranges": "bytes",
+      "Cache-Control": "no-store",
+      "Content-Length": "0",
+      "Content-Type": mediaContentType(media.displayName),
+    });
+    response.end();
+    return;
+  }
 
   const range = parseRange(request.headers.range, mediaStats.size);
   if (range === "invalid") {
-    response.writeHead(416, {
-      "Accept-Ranges": "bytes",
-      "Cache-Control": "no-store",
-      "Content-Range": `bytes */${mediaStats.size}`,
-    });
-    response.end();
+    respondWithInvalidRange(response, mediaStats.size);
     return;
   }
   const start = range?.start ?? 0;
@@ -185,9 +221,57 @@ async function serveDesktopMedia({
     response.end();
     return;
   }
-  const stream = createReadStream(media.filePath, { end, start });
-  stream.once("error", () => response.destroy());
-  stream.pipe(response);
+  try {
+    await pipeline(
+      createMediaReadStream(media.filePath, { end, start }),
+      response,
+    );
+  } catch {
+    if (!response.destroyed) {
+      response.destroy();
+    }
+  }
+}
+
+function respondWithInvalidRange(response, size) {
+  response.writeHead(416, {
+    "Accept-Ranges": "bytes",
+    "Cache-Control": "no-store",
+    "Content-Range": `bytes */${size}`,
+  });
+  response.end();
+}
+
+function respondWithBadRequest(response) {
+  if (response.destroyed) {
+    return;
+  }
+  response.writeHead(400, { "Cache-Control": "no-store" });
+  response.end();
+}
+
+function respondWithServerError(response) {
+  if (response.destroyed) {
+    return;
+  }
+  try {
+    if (!response.headersSent) {
+      response.writeHead(500, { "Cache-Control": "no-store" });
+      response.end();
+      return;
+    }
+    response.destroy();
+  } catch {
+    response.destroy();
+  }
+}
+
+function parseRequestUrl(requestUrl) {
+  try {
+    return new URL(requestUrl ?? "/", "http://gateway.local");
+  } catch {
+    return null;
+  }
 }
 
 function proxyHttp({ backend, request, response }) {

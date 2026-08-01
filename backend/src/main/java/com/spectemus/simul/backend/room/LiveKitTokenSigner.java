@@ -6,6 +6,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -27,6 +28,7 @@ class LiveKitTokenSigner {
             String displayName,
             boolean canPublish,
             boolean canPublishData,
+            List<String> canPublishSources,
             Instant issuedAt,
             Instant expiresAt) {
         Map<String, Object> header = new LinkedHashMap<>();
@@ -39,6 +41,9 @@ class LiveKitTokenSigner {
         videoGrant.put("canPublish", canPublish);
         videoGrant.put("canSubscribe", true);
         videoGrant.put("canPublishData", canPublishData);
+        if (!canPublishSources.isEmpty()) {
+            videoGrant.put("canPublishSources", canPublishSources);
+        }
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("iss", properties.apiKey());
@@ -70,6 +75,9 @@ class LiveKitTokenSigner {
             case Number number -> number.toString();
             case Boolean bool -> bool.toString();
             case Map<?, ?> map -> toJson((Map<String, Object>) map);
+            case List<?> list -> list.stream()
+                    .map(this::toJsonValue)
+                    .collect(Collectors.joining(",", "[", "]"));
             case null -> "null";
             default -> throw new IllegalArgumentException(
                     "Unsupported LiveKit token claim value: " + value.getClass().getName());

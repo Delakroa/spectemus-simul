@@ -112,6 +112,28 @@ test("остановка sidecar ждёт подтверждения выход�
   );
 });
 
+test("ошибка подписчика статуса не прерывает остановку sidecars", async () => {
+  let gatewayClosed = 0;
+  const supervisor = new DesktopSupervisor({
+    gatewayFactory: async () => ({
+      close: async () => {
+        gatewayClosed += 1;
+      },
+      port: 8088,
+    }),
+  });
+  supervisor.gateway = await supervisor.gatewayFactory();
+  supervisor.status = { state: "running", detail: "Host готов." };
+  supervisor.subscribe(() => {
+    throw new Error("окно уже уничтожено");
+  });
+
+  await supervisor.stop();
+
+  assert.equal(gatewayClosed, 1);
+  assert.equal(supervisor.status.state, "stopped");
+});
+
 test("gateway сохраняет 8088, а при занятом порте выбирает свободный", async () => {
   const attempts = [];
   const gatewayFactory = async ({ port }) => {

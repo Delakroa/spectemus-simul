@@ -5,7 +5,10 @@ import { fileURLToPath } from "node:url";
 
 import { acquireDesktopInstanceLock } from "./instance-lock.mjs";
 import { DesktopMediaLibrary } from "./media-library.mjs";
-import { DesktopMediaNormalizer } from "./media-normalizer.mjs";
+import {
+  DesktopMediaNormalizer,
+  clearNormalizedMediaDirectory,
+} from "./media-normalizer.mjs";
 import {
   LanAddressSelectionRequired,
   resolveLanAddress,
@@ -21,9 +24,9 @@ import {
   hasMediaTools,
   resolveSidecarPaths,
 } from "./sidecars.mjs";
+import { createShutdownCoordinator } from "./shutdown.mjs";
 
 let mainWindow;
-let allowQuit = false;
 let localGatewayOrigin;
 let publicGatewayOrigin;
 let startupPromise;
@@ -34,7 +37,13 @@ const supervisor = new DesktopSupervisor({
 const MAIN_DIRECTORY = join(fileURLToPath(new URL(".", import.meta.url)));
 
 supervisor.subscribe((status) => {
-  mainWindow?.webContents.send("spectemus:runtime-status", status);
+  sendToMainWindow("spectemus:runtime-status", status);
+});
+
+const shutdownCoordinator = createShutdownCoordinator({
+  clearMedia: () => mediaLibrary.clear(),
+  quit: () => app.quit(),
+  stopSupervisor: () => supervisor.stop(),
 });
 
 const isPrimaryInstance = acquireDesktopInstanceLock(app, focusMainWindow);
@@ -43,7 +52,7 @@ if (isPrimaryInstance) {
   app.whenReady().then(async () => {
     ipcMain.handle("spectemus:runtime-status", () => supervisor.status);
     ipcMain.handle("spectemus:pick-media-file", async () => {
-      const selection = await dialog.showOpenDialog(mainWindow, {
+      const options = {
         filters: [
           {
             extensions: [
@@ -65,7 +74,11 @@ if (isPrimaryInstance) {
         ],
         properties: ["openFile"],
         title: "Выберите фильм для комнаты",
-      });
+      };
+      const window = activeMainWindow();
+      const selection = window
+        ? await dialog.showOpenDialog(window, options)
+        : await dialog.showOpenDialog(options);
       if (selection.canceled || !selection.filePaths[0]) {
         return null;
       }
@@ -74,7 +87,7 @@ if (isPrimaryInstance) {
     ipcMain.handle("spectemus:normalize-media", async (_event, id) => {
       assertMediaId(id);
       return mediaLibrary.normalize(id, (progress) => {
-        mainWindow?.webContents.send("spectemus:media-normalization-progress", {
+        sendToMainWindow("spectemus:media-normalization-progress", {
           id,
           progress,
         });
@@ -139,15 +152,17 @@ async function startDesktopHost(preferredLanAddress) {
       await assertDesktopResources(paths, {
         requireMediaTools: app.isPackaged,
       });
+      const normalizedMediaDirectory = join(
+        app.getPath("temp"),
+        "spectemus-simul",
+        "normalized-media",
+      );
+      await clearNormalizedMediaDirectory(normalizedMediaDirectory);
       mediaLibrary.normalizer = (await hasMediaTools(paths))
         ? new DesktopMediaNormalizer({
             ffmpegPath: paths.ffmpeg,
             ffprobePath: paths.ffprobe,
-            outputDirectory: join(
-              app.getPath("temp"),
-              "spectemus-simul",
-              "normalized-media",
-            ),
+            outputDirectory: normalizedMediaDirectory,
           })
         : null;
       const secrets = await loadOrCreateInstallationSecrets(
@@ -168,7 +183,10 @@ async function startDesktopHost(preferredLanAddress) {
       const localUrl = new URL(publicUrl);
       localUrl.hostname = "127.0.0.1";
       localGatewayOrigin = localUrl.origin;
-      await mainWindow.loadURL(localUrl.toString());
+      const window = activeMainWindow();
+      if (window) {
+        await window.loadURL(localUrl.toString());
+      }
     } catch (error) {
       if (
         error instanceof LanAddressSelectionRequired &&
@@ -200,14 +218,7 @@ async function waitForStartupToSettle() {
 
 if (isPrimaryInstance) {
   app.on("before-quit", (event) => {
-    if (allowQuit) {
-      return;
-    }
-    event.preventDefault();
-    allowQuit = true;
-    void Promise.allSettled([supervisor.stop(), mediaLibrary.clear()]).finally(
-      () => app.quit(),
-    );
+    shutdownCoordinator.handleBeforeQuit(event);
   });
 
   app.on("window-all-closed", () => {
@@ -216,14 +227,15 @@ if (isPrimaryInstance) {
 }
 
 function focusMainWindow() {
-  if (!mainWindow) {
+  const window = activeMainWindow();
+  if (!window) {
     return;
   }
-  if (mainWindow.isMinimized()) {
-    mainWindow.restore();
+  if (window.isMinimized()) {
+    window.restore();
   }
-  mainWindow.show();
-  mainWindow.focus();
+  window.show();
+  window.focus();
 }
 
 function createWindow() {
@@ -247,7 +259,31 @@ function createWindow() {
       event.preventDefault();
     }
   });
+  window.once("closed", () => {
+    if (mainWindow === window) {
+      mainWindow = undefined;
+    }
+  });
   return window;
+}
+
+function activeMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return undefined;
+  }
+  return mainWindow;
+}
+
+function sendToMainWindow(channel, payload) {
+  const window = activeMainWindow();
+  if (!window) {
+    return;
+  }
+  try {
+    window.webContents.send(channel, payload);
+  } catch {
+    // Window destruction must not interrupt runtime cleanup.
+  }
 }
 
 function isLocalGatewayUrl(targetUrl) {
@@ -291,7 +327,11 @@ async function showLanAddressSelection(candidates) {
 }
 
 async function loadDesktopPage(content) {
-  await mainWindow.loadURL(
+  const window = activeMainWindow();
+  if (!window) {
+    return;
+  }
+  await window.loadURL(
     `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html><html lang="ru"><meta charset="utf-8"><title>Spectemus Simul</title><body style="margin:0;display:grid;min-height:100vh;place-items:center;background:#f5f7f8;color:#17191c;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">${content}</body></html>`)}`,
   );
 }

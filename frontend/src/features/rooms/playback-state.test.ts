@@ -112,6 +112,19 @@ describe("playback-state", () => {
     );
   });
 
+  it("не создаёт unhandled rejection, если LiveKit временно недоступен", async () => {
+    vi.useFakeTimers();
+    const room = createRoom();
+    room.localParticipant.publishData.mockRejectedValueOnce(new Error("reconnecting"));
+    const videoElement = document.createElement("video");
+    setVideoState(videoElement, { paused: true, readyState: 4 });
+
+    createHostPlaybackStatePublisher(room as never, videoElement, "movie.mp4");
+    await Promise.resolve();
+
+    expect(room.localParticipant.publishData).toHaveBeenCalledTimes(1);
+  });
+
   it("guest receiver применяет свежие host messages и игнорирует устаревшие revision", () => {
     const room = createRoom();
     const onStateChange = vi.fn();
