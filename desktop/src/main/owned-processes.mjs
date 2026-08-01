@@ -11,6 +11,8 @@ export async function recoverOwnedSidecars({
   inspectCommand = inspectProcessCommand,
   terminate = terminateProcess,
   waitForExit = waitForProcessExit,
+  gracefulShutdownWaitMs = 5_000,
+  forceKillWaitMs = 1_000,
 } = {}) {
   const filePath = join(runtimeDirectory, FILE_NAME);
   const record = await readRecord(filePath);
@@ -24,8 +26,13 @@ export async function recoverOwnedSidecars({
       !process.commandIncludes.every((value) => command.includes(value))
     )
       continue;
-    await terminate(process.pid);
-    await waitForExit(process.pid);
+    await terminate(process.pid, "SIGTERM");
+    try {
+      await waitForExit(process.pid, gracefulShutdownWaitMs);
+    } catch {
+      await terminate(process.pid, "SIGKILL");
+      await waitForExit(process.pid, forceKillWaitMs);
+    }
     recovered.push(process.name);
   }
   await rm(filePath, { force: true });
@@ -88,9 +95,9 @@ async function inspectProcessCommand(pid) {
   }
 }
 
-function terminateProcess(pid) {
+function terminateProcess(pid, signal = "SIGTERM") {
   try {
-    process.kill(pid, "SIGTERM");
+    process.kill(pid, signal);
   } catch (error) {
     if (error?.code !== "ESRCH") throw error;
   }

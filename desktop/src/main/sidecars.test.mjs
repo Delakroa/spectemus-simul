@@ -112,6 +112,15 @@ test("остановка sidecar ждёт подтверждения выход�
   );
 });
 
+test("не считает process, завершённый сигналом, неостановленным sidecar", async () => {
+  const child = new EventEmitter();
+  child.exitCode = null;
+  child.signalCode = "SIGKILL";
+  child.kill = () => false;
+
+  await stopChild(child);
+});
+
 test("ошибка подписчика статуса не прерывает остановку sidecars", async () => {
   let gatewayClosed = 0;
   const supervisor = new DesktopSupervisor({
@@ -202,6 +211,31 @@ test("не запускает sidecars, если их фиксированный
   assert.match(supervisor.status.detail, /Backend: порт 8080 уже занят/);
 });
 
+test("не запускает sidecars после остановки во время recovery", async () => {
+  const recovery = createDeferred();
+  let spawned = 0;
+  const supervisor = new DesktopSupervisor({
+    recoverOwnedSidecars: () => recovery.promise,
+    spawnProcess: () => {
+      spawned += 1;
+      throw new Error("sidecar не должен запускаться");
+    },
+  });
+  const starting = supervisor.start({
+    lanAddress: "192.168.1.42",
+    paths: {},
+    runtimeDirectory: "/tmp/runtime",
+    secrets: { livekitApiKey: "key", livekitApiSecret: "secret" },
+  });
+
+  await supervisor.stop();
+  recovery.resolve();
+
+  await assert.rejects(starting, /Запуск desktop host был остановлен/);
+  assert.equal(spawned, 0);
+  assert.equal(supervisor.status.state, "stopped");
+});
+
 test("аварийный выход sidecar останавливает gateway и оставшиеся процессы", async () => {
   const children = [];
   let closedGateway = 0;
@@ -250,6 +284,57 @@ test("аварийный выход sidecar останавливает gateway �
   assert.match(supervisor.status.detail, /LiveKit завершился неожиданно/);
   assert.equal(closedGateway, 1);
   assert.equal(backend.killed, true);
+});
+
+test("закрывает gateway, открывшийся после аварийной остановки sidecar", async () => {
+  const gateway = createDeferred();
+  const children = [];
+  let gatewayClosed = 0;
+  const supervisor = new DesktopSupervisor({
+    assertPortsAvailable: async () => {},
+    gatewayFactory: async () => gateway.promise,
+    spawnProcess: () => {
+      const child = new EventEmitter();
+      child.exitCode = null;
+      child.kill = () => {
+        child.exitCode = 0;
+        queueMicrotask(() => child.emit("exit", 0, "SIGTERM"));
+        return true;
+      };
+      children.push(child);
+      return child;
+    },
+    waitForHealthy: async () => {},
+    waitForLiveKitReady: async () => {},
+  });
+  const starting = supervisor.start({
+    lanAddress: "192.168.1.42",
+    paths: {
+      backendJar: "/tmp/backend.jar",
+      frontendDirectory: "/tmp/frontend",
+      javaCommand: "/tmp/java",
+      livekitServer: "/tmp/livekit-server",
+    },
+    runtimeDirectory: "/tmp/runtime",
+    secrets: { livekitApiKey: "key", livekitApiSecret: "secret" },
+  });
+  await waitFor(() => children.length === 2);
+
+  const [, livekit] = children;
+  livekit.exitCode = 1;
+  livekit.emit("exit", 1, null);
+  await waitFor(() => children[0].exitCode === 0);
+  gateway.resolve({
+    close: async () => {
+      gatewayClosed += 1;
+    },
+    port: 8088,
+  });
+
+  await assert.rejects(starting, /LiveKit завершился неожиданно/);
+  await waitFor(() => gatewayClosed === 1);
+  assert.equal(supervisor.gateway, undefined);
+  assert.equal(supervisor.status.state, "error");
 });
 
 test("stop не оставляет sidecars, если gateway вернул ошибку при закрытии", async () => {
@@ -309,4 +394,12 @@ async function waitFor(predicate, timeoutMs = 1_000) {
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
   throw new Error("Ожидаемое состояние supervisor не наступило.");
+}
+
+function createDeferred() {
+  let resolvePromise;
+  const promise = new Promise((resolve) => {
+    resolvePromise = resolve;
+  });
+  return { promise, resolve: resolvePromise };
 }

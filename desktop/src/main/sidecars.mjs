@@ -146,6 +146,7 @@ export class DesktopSupervisor {
     waitForHealthy = waitForHealthyHttp,
     waitForLiveKitReady = waitForLiveKitTcpReady,
     assertPortsAvailable = assertDesktopPortsAvailable,
+    recoverOwnedSidecars: recoverOwnedSidecarsFn = recoverOwnedSidecars,
     mediaResolver,
   } = {}) {
     this.gatewayFactory = gatewayFactory;
@@ -153,6 +154,7 @@ export class DesktopSupervisor {
     this.waitForHealthy = waitForHealthy;
     this.waitForLiveKitReady = waitForLiveKitReady;
     this.assertPortsAvailable = assertPortsAvailable;
+    this.recoverOwnedSidecars = recoverOwnedSidecarsFn;
     this.mediaResolver = mediaResolver;
     this.status = { state: "stopped", detail: "Host не запущен." };
     this.listeners = new Set();
@@ -161,6 +163,7 @@ export class DesktopSupervisor {
     this.failureDetail = undefined;
     this.runtimeDirectory = undefined;
     this.ownedSidecars = [];
+    this.startInterrupted = false;
   }
 
   subscribe(listener) {
@@ -181,14 +184,21 @@ export class DesktopSupervisor {
     }
 
     this.failureDetail = undefined;
+    this.startInterrupted = false;
+    this.setStatus(
+      "recovering",
+      "Проверяем процессы от предыдущего запуска desktop host.",
+    );
     try {
       this.runtimeDirectory = runtimeDirectory;
-      await recoverOwnedSidecars({ runtimeDirectory });
+      await this.recoverOwnedSidecars({ runtimeDirectory });
+      this.assertStartupIsActive();
       this.setStatus(
         "checking-ports",
         "Проверяем, что порты desktop host свободны.",
       );
       await this.assertPortsAvailable(ports);
+      this.assertStartupIsActive();
       this.setStatus("starting-backend", "Запускаем локальный backend.");
       const backend = this.spawnBackend({ lanAddress, paths, ports, secrets });
       this.trackChild(backend, "Backend");
@@ -236,23 +246,39 @@ export class DesktopSupervisor {
         mediaResolver: this.mediaResolver,
         port: ports.gateway,
       });
+      try {
+        this.assertStartupIsActive();
+      } catch (error) {
+        await gateway.instance.close().catch(() => {});
+        throw error;
+      }
       this.gateway = gateway.instance;
-      this.assertStartupIsActive();
 
       const url = `http://${lanAddress}:${gateway.port}`;
       this.setStatus("running", `Host готов: ${url}`, { lanAddress, url });
       return { url };
     } catch (error) {
-      await this.stop();
-      this.setStatus(
-        "error",
-        error instanceof Error ? error.message : "Desktop host не запустился.",
-      );
+      const wasInterrupted = this.startInterrupted;
+      if (wasInterrupted) {
+        await this.stopPromise;
+        if (this.failureDetail) {
+          this.setStatus("error", this.failureDetail);
+        }
+      } else {
+        await this.stop();
+        this.setStatus(
+          "error",
+          error instanceof Error
+            ? error.message
+            : "Desktop host не запустился.",
+        );
+      }
       throw error;
     }
   }
 
   async stop() {
+    this.startInterrupted = true;
     if (this.stopPromise) {
       return this.stopPromise;
     }
@@ -606,7 +632,7 @@ export function stopChild(
   child,
   { forceKillWaitMs = 1_000, gracefulShutdownWaitMs = 5_000 } = {},
 ) {
-  if (child.exitCode !== null) {
+  if (hasChildExited(child)) {
     return Promise.resolve();
   }
   return new Promise((resolveStop, rejectStop) => {
@@ -633,7 +659,7 @@ export function stopChild(
     const forceKill = () => {
       try {
         const killed = child.kill("SIGKILL");
-        if (!killed && child.exitCode === null) {
+        if (!killed && !hasChildExited(child)) {
           finish(() =>
             rejectStop(
               new Error(
@@ -665,7 +691,7 @@ export function stopChild(
 
     try {
       const killed = child.kill("SIGTERM");
-      if (!killed && child.exitCode === null) {
+      if (!killed && !hasChildExited(child)) {
         finish(() =>
           rejectStop(new Error("Не удалось остановить локальный сервис.")),
         );
@@ -674,6 +700,13 @@ export function stopChild(
       finish(() => rejectStop(error));
     }
   });
+}
+
+function hasChildExited(child) {
+  return (
+    (child.exitCode !== null && child.exitCode !== undefined) ||
+    (child.signalCode !== null && child.signalCode !== undefined)
+  );
 }
 
 function waitForChildReadiness(child, name, waitForHealthy) {
