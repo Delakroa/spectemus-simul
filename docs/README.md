@@ -22,6 +22,9 @@
 - [WT-654_PASSWORDLESS_ACCOUNTS_AND_INVITES.md](WT-654_PASSWORDLESS_ACCOUNTS_AND_INVITES.md) —
   passwordless account/invite foundation, fail-closed конфигурация и граница
   перед будущей Internet room runtime.
+- [WT-690_PRODUCT_ROADMAP_STATE.md](WT-690_PRODUCT_ROADMAP_STATE.md) —
+  фактический статус LAN hardening, public access foundation и внешний gate
+  перед Internet mode.
 
 ## Быстрый порядок чтения
 
