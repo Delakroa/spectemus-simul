@@ -158,6 +158,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [WT-684_DESKTOP_RUNTIME_RESILIENCE.md](WT-684_DESKTOP_RUNTIME_RESILIENCE.md) — desktop host устойчиво останавливается при закрытии окна, а сбой одного LAN-клиента не рвёт gateway или room fan-out.
 - [WT-685_DESKTOP_SUPERVISOR_LIFECYCLE.md](WT-685_DESKTOP_SUPERVISOR_LIFECYCLE.md) — остановка во время preflight не создаёт sidecars, а поздно открытый gateway не остаётся в LAN без host-а.
 - [WT-686_PLAYBACK_RECOVERY_RESILIENCE.md](WT-686_PLAYBACK_RECOVERY_RESILIENCE.md) — playback state переживает restart host-а, signal reconnect не выглядит как idle, а terminal LiveKit disconnect даёт явный retry.
+- [WT-687_BACKEND_SESSION_CONSISTENCY.md](WT-687_BACKEND_SESSION_CONSISTENCY.md) — trusted proxy не отдаёт rate limit под контроль клиента, а desktop room сохраняет lifecycle при reconnect и WebSocket-гонке.
 - [WT-652_INTERNET_MODE_ARCHITECTURE.md](WT-652_INTERNET_MODE_ARCHITECTURE.md) — отдельный public Internet mode: account/invite, TLS/TURN, privacy, cost gates и последовательность запуска.
 - [WT-653_PUBLIC_ACCESS_CONTRACTS.md](WT-653_PUBLIC_ACCESS_CONTRACTS.md) — контракт изолированного `/api/v2` для account, membership и hash-only invite; LAN API не меняется.
 - [WT-657_DESKTOP_INSTALL_SMOKE.md](WT-657_DESKTOP_INSTALL_SMOKE.md) — CI монтирует DMG и устанавливает NSIS, затем проверяет runtime-компоненты готового приложения.

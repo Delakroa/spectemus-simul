@@ -89,19 +89,51 @@ class InMemoryRoomStoreTest {
                 .isEqualTo(RoomRealtimeStore.AuthenticationOutcome.ROOM_UNAVAILABLE);
     }
 
+    @Test
+    void preservesPlayingStatusWhenGuestsJoinOrLeaveDuringHostReconnectGracePeriod() {
+        create(RoomStatus.PLAYING);
+        UUID guestId = UUID.fromString("8e7d79a8-a49f-48cc-a409-f07890dd3218");
+        String guestSession = "guest-session";
+        StoredParticipant guest = new StoredParticipant(
+                guestId, "Guest", ParticipantRole.GUEST, false, NOW, guestSession);
+
+        assertThat(store.markHostDisconnected(ROOM_ID, NOW.plusSeconds(1)).changed()).isTrue();
+        assertThat(store.join(ROOM_ID, guestSession, guest, NOW.plusSeconds(2), 4).outcome())
+                .isEqualTo(RoomJoinStore.JoinOutcome.JOINED);
+        assertThat(store.leave(ROOM_ID, guestSession, NOW.plusSeconds(3)).outcome())
+                .isEqualTo(RoomLifecycleStore.LeaveOutcome.LEFT);
+
+        var recovery = store.recoverHost(ROOM_ID, NOW.plusSeconds(4));
+
+        assertThat(recovery.changed()).isTrue();
+        assertThat(recovery.room().status()).isEqualTo(RoomStatus.PLAYING);
+    }
+
     private void create() {
-        store.saveOrGet("request", creation(), Duration.ofHours(4), Duration.ofHours(1));
+        create(RoomStatus.CREATED);
+    }
+
+    private void create(RoomStatus status) {
+        store.saveOrGet("request", creation(status), Duration.ofHours(4), Duration.ofHours(1));
     }
 
     private StoredRoomCreation creation() {
-        return creationAt(NOW);
+        return creation(RoomStatus.CREATED);
+    }
+
+    private StoredRoomCreation creation(RoomStatus status) {
+        return creationAt(NOW, status);
     }
 
     private StoredRoomCreation creationAt(Instant createdAt) {
+        return creationAt(createdAt, RoomStatus.CREATED);
+    }
+
+    private StoredRoomCreation creationAt(Instant createdAt, RoomStatus status) {
         StoredParticipant host = new StoredParticipant(
                 HOST_ID, "Host", ParticipantRole.HOST, false, createdAt, HOST_SESSION);
         StoredRoom room = new StoredRoom(
-                ROOM_ID, RoomStatus.CREATED, HOST_ID, List.of(host), 0,
+                ROOM_ID, status, HOST_ID, List.of(host), 0,
                 createdAt.plus(Duration.ofHours(4)), createdAt, "host-secret-hash");
         return new StoredRoomCreation("fingerprint", room, "secret", HOST_SESSION);
     }
