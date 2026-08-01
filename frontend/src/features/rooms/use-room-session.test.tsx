@@ -31,6 +31,12 @@ function RoomSessionHarness() {
   );
 }
 
+function RouteRestoreHarness({ roomId }: { roomId?: string }) {
+  const session = useRoomSession(roomId);
+
+  return <span data-testid="pending-action">{session.pendingAction ?? ""}</span>;
+}
+
 function DesktopMediaHarness() {
   const session = useRoomSession();
 
@@ -106,6 +112,7 @@ function makeDeferredVideoStub(
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   delete window.spectemusDesktop;
 });
 
@@ -261,5 +268,30 @@ describe("useRoomSession file diagnostics", () => {
 
     expect(await screen.findByText("movie.mkv")).toBeInTheDocument();
     expect(screen.getByTestId("file-normalization")).toHaveTextContent("local");
+  });
+});
+
+describe("useRoomSession route restore", () => {
+  it("снимает pending restore, когда пользователь уходит со страницы до ответа", async () => {
+    const fetchMock = vi.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            reject(new DOMException("Запрос отменён.", "AbortError"));
+          });
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const view = render(<RouteRestoreHarness roomId="AbCdEfGhIjKlMnOpQrStUv" />);
+    await waitFor(() => {
+      expect(screen.getByTestId("pending-action")).toHaveTextContent("restore");
+    });
+
+    view.rerender(<RouteRestoreHarness />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("pending-action")).toHaveTextContent("");
+    });
   });
 });

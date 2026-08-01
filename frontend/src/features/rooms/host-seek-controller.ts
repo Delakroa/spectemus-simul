@@ -71,7 +71,9 @@ export function createHostSeekController(videoElement: SeekableVideoElement): Ho
     seekCompletionTimer = window.setTimeout(() => {
       seekCompletionTimer = null;
       seekInFlight = false;
+      const onComplete = queuedSeek === null ? activeSeekComplete : undefined;
       activeSeekComplete = undefined;
+      onComplete?.();
       flush();
     }, SEEK_COMPLETION_TIMEOUT_MS);
   };

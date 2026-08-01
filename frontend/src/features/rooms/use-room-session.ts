@@ -2157,7 +2157,12 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
     const controller = new AbortController();
     restoredRouteRoomIdRef.current = routeRoomId;
     void restore(routeRoomId, controller.signal);
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      setState((current) =>
+        current.pendingAction === "restore" ? { ...current, pendingAction: null } : current,
+      );
+    };
   }, [restore, routeRoomId]);
 
   useEffect(
