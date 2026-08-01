@@ -11,6 +11,7 @@ import {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
@@ -125,6 +126,21 @@ describe("playback-state", () => {
     expect(room.localParticipant.publishData).toHaveBeenCalledTimes(1);
   });
 
+  it("создаёт publisher session ID и в HTTP LAN без crypto.randomUUID", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("crypto", undefined);
+    const room = createRoom();
+    const videoElement = document.createElement("video");
+    setVideoState(videoElement, { paused: true, readyState: 4 });
+
+    const publisher = createHostPlaybackStatePublisher(room as never, videoElement, "movie.mp4");
+
+    expect(getPublishedMessage(room, 0)?.publisherSessionId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
+    publisher.disconnect();
+  });
+
   it("guest receiver применяет свежие host messages и игнорирует устаревшие revision", () => {
     const room = createRoom();
     const onStateChange = vi.fn();
@@ -187,6 +203,72 @@ describe("playback-state", () => {
 
     receiver.disconnect();
     expect(room.off).toHaveBeenCalledWith("dataReceived", expect.any(Function));
+  });
+
+  it("принимает состояние нового запуска host-а с revision заново и не откатывается к старому", () => {
+    const room = createRoom();
+    const onStateChange = vi.fn();
+    const receiver = createGuestPlaybackStateReceiver(room as never, "host-participant", {
+      onStateChange,
+    });
+    const firstSessionId = "11111111-1111-4111-8111-111111111111";
+    const restartedSessionId = "22222222-2222-4222-8222-222222222222";
+
+    room.emit(
+      "dataReceived",
+      encodePlaybackStateMessage(
+        createMessage({
+          publisherSessionId: firstSessionId,
+          revision: 24,
+          sentAt: "2026-07-10T10:30:00.000Z",
+          status: "playing",
+        }),
+      ),
+      { identity: "host-participant" },
+      undefined,
+      PLAYBACK_STATE_TOPIC,
+    );
+
+    room.emit(
+      "dataReceived",
+      encodePlaybackStateMessage(
+        createMessage({
+          publisherSessionId: restartedSessionId,
+          revision: 1,
+          sentAt: "2026-07-10T10:31:00.000Z",
+          status: "paused",
+        }),
+      ),
+      { identity: "host-participant" },
+      undefined,
+      PLAYBACK_STATE_TOPIC,
+    );
+
+    room.emit(
+      "dataReceived",
+      encodePlaybackStateMessage(
+        createMessage({
+          publisherSessionId: firstSessionId,
+          revision: 25,
+          sentAt: "2026-07-10T10:30:30.000Z",
+          status: "playing",
+        }),
+      ),
+      { identity: "host-participant" },
+      undefined,
+      PLAYBACK_STATE_TOPIC,
+    );
+
+    expect(onStateChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        publisherSessionId: restartedSessionId,
+        revision: 1,
+        status: "paused",
+      }),
+    );
+    expect(onStateChange).toHaveBeenCalledTimes(3);
+
+    receiver.disconnect();
   });
 });
 

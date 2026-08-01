@@ -88,6 +88,7 @@ const MAX_CHAT_MESSAGE_LENGTH = 1000;
 const HOST_SECRET_STORAGE_PREFIX = "spectemus-simul.host-secret.";
 const MAX_ROOM_RECONNECT_ATTEMPTS = 10;
 const ROOM_RECONNECT_DELAYS_MS = [1_000, 2_000, 5_000, 10_000, 15_000] as const;
+const LIVEKIT_DISCONNECTED_MESSAGE = "Связь с просмотром прервана. Подключитесь к LiveKit ещё раз.";
 // Server closes the room WebSocket with a normal code (1000) on intentional
 // shutdown (room.closed, participant.left) — those must not trigger a reconnect.
 const NORMAL_WS_CLOSE_CODE = 1000;
@@ -1229,14 +1230,21 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
                 status === "disconnected" ? "idle" : current.filePublicationStatus,
               filePublicationTrackCount:
                 status === "disconnected" ? 0 : current.filePublicationTrackCount,
-              liveKitError: status === "error" ? current.liveKitError : null,
+              liveKitError:
+                status === "disconnected"
+                  ? LIVEKIT_DISCONNECTED_MESSAGE
+                  : status === "error"
+                    ? current.liveKitError
+                    : null,
               liveKitStatus: status,
               qualityIndicators:
                 status === "disconnected" ? idleQualityIndicatorsState : current.qualityIndicators,
               userError:
-                status === "connected" && current.userError?.area === "livekit"
-                  ? null
-                  : current.userError,
+                status === "disconnected"
+                  ? createLiveKitMessageUserError(LIVEKIT_DISCONNECTED_MESSAGE)
+                  : status === "connected" && current.userError?.area === "livekit"
+                    ? null
+                    : current.userError,
               voiceError: status === "disconnected" ? null : current.voiceError,
               voiceStatus: status === "disconnected" ? "idle" : current.voiceStatus,
             }));
