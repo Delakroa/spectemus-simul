@@ -29,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @WebMvcTest(PublicAccessController.class)
@@ -119,6 +120,21 @@ class PublicAccessControllerTest {
                 .andExpect(jsonPath("$.inviteId").value(INVITE_ID.toString()))
                 .andExpect(jsonPath("$.invitePath").value("/join#invite=" + "B".repeat(43)))
                 .andExpect(content().string(org.hamcrest.Matchers.not(containsString("?invite"))));
+    }
+
+    @Test
+    void rejectsMissingInviteTokenBeforeCallingService() throws Exception {
+        mockMvc.perform(post("/api/v2/invite-redemptions")
+                        .cookie(new jakarta.servlet.http.Cookie("wt_account", ACCOUNT_SESSION))
+                        .header("Idempotency-Key", "invite-redeem-0001")
+                        .contentType("application/json")
+                        .content("{}"))
+                .andExpect(status().is(422))
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.violations[0].field").value("inviteToken"))
+                .andExpect(jsonPath("$.violations[0].message").value("Приглашение обязательно."));
+
+        verifyNoInteractions(service);
     }
 
     @TestConfiguration(proxyBeanMethods = false)
