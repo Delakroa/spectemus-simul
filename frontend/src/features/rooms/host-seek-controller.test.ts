@@ -108,6 +108,18 @@ describe("createHostSeekController", () => {
     expect(video.writtenTimes).toEqual([15, 42]);
   });
 
+  it("подтверждает последнее положение по timeout, если seeked не пришёл", () => {
+    vi.useFakeTimers();
+    const video = createVideoElement();
+    const controller = createHostSeekController(asVideoElement(video));
+    const complete = vi.fn();
+
+    controller.seek(42, complete);
+    vi.advanceTimersByTime(1_500);
+
+    expect(complete).toHaveBeenCalledTimes(1);
+  });
+
   it("не позволяет перемотать за границу длительности", () => {
     const video = createVideoElement({ currentTime: 20, duration: 120 });
     const controller = createHostSeekController(asVideoElement(video));
