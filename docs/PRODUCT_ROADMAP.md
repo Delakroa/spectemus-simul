@@ -28,7 +28,9 @@ LAN desktop preview уже умеет создать комнату, подел�
 синхронно передавать видео и звук, чат и восстановление сессии. WT-682 добавил
 локальную подготовку распространённых контейнеров в временный H.264/AAC MP4.
 Готовые installers проходят CI install smoke на Apple Silicon, Intel Mac и
-Windows.
+Windows. Последующий hardening WT-684–WT-689 закрыл cleanup sidecars,
+gateway/proxy, reconnect room, race WebSocket и конечные состояния playback UI;
+каждый change прошёл полный local и GitHub CI.
 
 Это ещё не обещание «любой фильм работает». Перед следующим публичным заявлением
 нужны реальные прогоны Mac ↔ Windows с MP4, MKV H.264/AAC, MKV HEVC/AAC и MKV
@@ -36,36 +38,41 @@ H.264/DTS: изображение, звук, пауза, перемотка и �
 
 ## Порядок задач
 
-| Фаза | Задача                                   | Результат                                                                                       | Gate перехода                                                                                            |
-| ---- | ---------------------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| 0    | WT-682 local media normalizer            | Надёжная локальная подготовка видео без изменения оригинала                                     | Реальная Mac ↔ Windows matrix на свежих installers; нет регрессии MP4/WebM                               |
-| 1    | WT-654 passwordless accounts and invites | Изолированный `/api/v2`: account, одноразовый email challenge, membership, отзыв invite и audit | Выбран PostgreSQL migration path и email provider; expired/revoked invite не даёт access или media token |
-| 2    | WT-655 internet room runtime             | Отдельный выбор Internet room, краткоживущий LiveKit token, revoke/disconnect, диагностика сети | Staging VM, DNS, HTTPS/WSS, TURN и firewall прошли проверку из WT-680/WT-610                             |
-| 3    | WT-656 private Internet alpha            | Ограниченная invite-only проверка «host дома → гость в другом городе»                           | Сессии из разных сетей, включая сложную сеть; измерены QoS, TURN usage, стоимость и support load         |
-| 4    | Closed beta → release                    | Понятная установка, операционный контур и честный UX для малых private rooms                    | Успешность сессий, privacy/deletion policy, incident/revoke runbook и проверенная экономика              |
+| Фаза | Состояние                              | Результат                                                                                        | Незавершённый gate                                                                                        |
+| ---- | -------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| 0    | Код готов: WT-682, WT-684–WT-689       | Локальная подготовка видео и hardening desktop/LAN без изменения оригинала                       | Реальная Mac ↔ Windows matrix на свежих installers; MP4/WebM и заявленные MKV-сценарии без регрессии      |
+| 1    | Код готов, feature выключена: WT-654   | Изолированный `/api/v2`: account, одноразовый email challenge, membership, отзыв invite и audit  | Выбран и проверен PostgreSQL migration path, SMTP provider и sender domain; revoked invite не даёт access |
+| 2    | Запланировано: WT-655 internet runtime | Отдельный выбор Internet room, короткоживущий LiveKit token, revoke/disconnect, диагностика сети | Staging VM, DNS, HTTPS/WSS, TURN и firewall прошли проверку из WT-680/WT-610                              |
+| 3    | Запланировано: WT-656 private alpha    | Ограниченная invite-only проверка «host дома → гость в другом городе»                            | Сессии из разных сетей, включая сложную сеть; измерены QoS, TURN usage, стоимость и support load          |
+| 4    | Запланировано: closed beta → release   | Понятная установка, операционный контур и честный UX для малых private rooms                     | Успешность сессий, privacy/deletion policy, incident/revoke runbook и проверенная экономика               |
 
 ## Что делаем следующим
 
-**WT-654** реализует изолированную основу public access: passwordless account,
-одноразовый email challenge, membership, отзыв invite и audit. По умолчанию она
-выключена и не открывает сервис в интернет; `/api/v1` LAN rooms не меняется.
-Следующая продуктовая ветка после физического Mac ↔ Windows прогона из фазы 0
-— **WT-655 Internet room runtime**.
+WT-654 уже реализовал изолированную основу public access и оставил её
+выключенной по умолчанию: LAN `/api/v1` не стал публичным. Следующий
+продуктовый gate — **физический Mac ↔ Windows прогон фазы 0**. Его результат
+определяет, достаточно ли local normalizer и текущего desktop runtime для
+перехода к Internet mode, или сначала нужен ещё один LAN fix.
 
-WT-655 начнётся только вместе с внешними ресурсами и проверкой staging. Она
-добавит именно отдельный Internet mode, а не сделает LAN-комнату публичной.
-Граница и контракт зафиксированы в
+После успешного evidence фазы 0 следующей веткой станет **WT-655 Internet room
+runtime**. Она добавит отдельный Internet mode, а не сделает LAN-комнату
+публичной. Граница и контракт уже зафиксированы в
 [WT-652](WT-652_INTERNET_MODE_ARCHITECTURE.md) и
 [WT-653](WT-653_PUBLIC_ACCESS_CONTRACTS.md).
 
-До начала реальной отправки писем и внешнего deploy понадобятся решения,
-которые нельзя выдумать в коде:
+До начала реальной отправки писем и внешнего deploy понадобятся внешние
+ресурсы, которые нельзя безопасно выдумать в коде:
 
 1. PostgreSQL для persistent accounts/invites: локальная разработка и
    последующий staging путь.
 2. Почтовый provider и подтверждённый sender domain для одноразовых кодов.
-3. VM, три DNS-имени (`app`, `rtc`, `turn`) и доступ администратора — только
-   перед WT-655/staging, не раньше.
+3. VM, три DNS-имени (`app`, `rtc`, `turn`) и доступ администратора — перед
+   WT-655/staging.
+
+Без этого third-party guest не сможет открыть ссылку host-а из другого города:
+нужен публичный control plane для account/invite и доступный с обеих сторон
+WebRTC/TURN relay. Это не «лишняя виртуальная машина», а необходимая часть
+надёжного соединения через домашний NAT.
 
 ## Рабочее правило для каждой задачи
 
