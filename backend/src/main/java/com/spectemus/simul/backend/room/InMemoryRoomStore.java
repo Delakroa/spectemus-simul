@@ -103,7 +103,8 @@ class InMemoryRoomStore
         }
         List<StoredParticipant> participants = new ArrayList<>(room.participants());
         participants.add(candidate);
-        StoredRoom updated = copy(room, room.status(), participants, updatedAt, null);
+        StoredRoom updated = copy(
+                room, room.status(), participants, updatedAt, room.statusBeforeHostDisconnect());
         rooms.put(roomId, updated);
         return JoinResult.joined(updated, candidate.participantId());
     }
@@ -175,7 +176,8 @@ class InMemoryRoomStore
                 .filter(item -> !item.participantId().equals(leaving.participantId()))
                 .toList();
         clearPresence(roomId, leaving.participantId());
-        StoredRoom updated = copy(room, room.status(), participants, leftAt, null);
+        StoredRoom updated = copy(
+                room, room.status(), participants, leftAt, room.statusBeforeHostDisconnect());
         rooms.put(roomId, updated);
         return LeaveResult.left(updated, leaving.participantId());
     }

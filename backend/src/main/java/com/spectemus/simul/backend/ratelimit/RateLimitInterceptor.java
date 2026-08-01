@@ -13,8 +13,8 @@ import org.springframework.web.servlet.HandlerInterceptor;
 
 /**
  * Enforces one endpoint's rate-limit budget per client (WT-606). Only mutating POSTs are counted;
- * the client is identified by the first {@code X-Forwarded-For} hop (the gateway sets it) falling
- * back to the socket address. Over-budget requests get {@code 429 RATE_LIMITED} with a
+ * the client is identified by the gateway-overwritten {@code X-Forwarded-For} value, falling back
+ * to the socket address. Over-budget requests get {@code 429 RATE_LIMITED} with a
  * {@code Retry-After} header and a privacy-safe rejection metric (tagged by bucket, no client id).
  */
 class RateLimitInterceptor implements HandlerInterceptor {

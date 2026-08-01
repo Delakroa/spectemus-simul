@@ -11,6 +11,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.spectemus.simul.backend.room.RoomRealtimeStore.AuthenticationOutcome;
 import com.spectemus.simul.backend.room.RoomRealtimeStore.AuthenticationResult;
@@ -486,17 +487,22 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
 
     private void unregister(
             String roomId, UUID participantId, UUID connectionId, WebSocketSession session) {
-        Set<WebSocketSession> roomSessions = sessionsByRoom.get(roomId);
-        if (roomSessions != null) {
+        AtomicBoolean roomBecameEmpty = new AtomicBoolean(false);
+        sessionsByRoom.computeIfPresent(roomId, (key, roomSessions) -> {
             roomSessions.remove(session);
-            if (roomSessions.isEmpty()) {
-                sessionsByRoom.remove(roomId, roomSessions);
-                forgetChatRateWindows(roomId);
-                // No sessions remain to serve, so an abandoned-room grace timer has
-                // nothing to close — TTL expiry handles cleanup. Cancelling here also
-                // prevents a pending timer from firing after the room is deserted.
-                cancelHostReconnect(roomId);
+            if (!roomSessions.isEmpty()) {
+                return roomSessions;
             }
+
+            roomBecameEmpty.set(true);
+            return null;
+        });
+        if (roomBecameEmpty.get() && !sessionsByRoom.containsKey(roomId)) {
+            forgetChatRateWindows(roomId);
+            // No sessions remain to serve, so an abandoned-room grace timer has
+            // nothing to close — TTL expiry handles cleanup. Cancelling here also
+            // prevents a pending timer from firing after the room is deserted.
+            cancelHostReconnect(roomId);
         }
 
         connectionsByParticipant.remove(
