@@ -79,6 +79,62 @@ test("проксирует WebSocket upgrade только в локальный 
   assert.equal(receivedCookie, "spectemus-simul-session=secret");
 });
 
+test("не дописывает HTTP-ошибку в уже открытый WebSocket", async (t) => {
+  const backend = createServer();
+  backend.on("upgrade", (_request, socket) => {
+    socket.write(
+      "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n",
+    );
+    setImmediate(() => socket.resetAndDestroy());
+  });
+  const backendPort = await listen(backend);
+  t.after(() => close(backend));
+
+  const frontendDirectory = await mkdtemp(join(tmpdir(), "spectemus-gateway-"));
+  await writeFile(join(frontendDirectory, "index.html"), "ok");
+  const gateway = await startGateway({
+    backend: { host: "127.0.0.1", port: backendPort },
+    frontendDirectory,
+    host: "127.0.0.1",
+    port: 0,
+  });
+  t.after(() => gateway.close());
+
+  const response = await websocketUpgradeUntilClose(gateway.port);
+
+  assert.match(response, /^HTTP\/1\.1 101 Switching Protocols/m);
+  assert.doesNotMatch(response, /HTTP\/1\.1 502 Bad Gateway/);
+});
+
+test("обрывает backend response, когда HTTP-клиент gateway отключился", async (t) => {
+  let backendResponseClosed = false;
+  const backend = createServer((_request, response) => {
+    response.writeHead(200, { "Content-Type": "application/octet-stream" });
+    response.write("first chunk");
+    const interval = setInterval(() => response.write("next chunk"), 5);
+    response.once("close", () => {
+      clearInterval(interval);
+      backendResponseClosed = true;
+    });
+  });
+  const backendPort = await listen(backend);
+  t.after(() => close(backend));
+
+  const frontendDirectory = await mkdtemp(join(tmpdir(), "spectemus-gateway-"));
+  await writeFile(join(frontendDirectory, "index.html"), "ok");
+  const gateway = await startGateway({
+    backend: { host: "127.0.0.1", port: backendPort },
+    frontendDirectory,
+    host: "127.0.0.1",
+    port: 0,
+  });
+  t.after(() => gateway.close());
+
+  await abortRequest(gateway.port, "/api/v1/slow-response");
+  await waitFor(() => backendResponseClosed);
+  assert.equal(backendResponseClosed, true);
+});
+
 test("раздаёт выбранный host-ом media file только через loopback и поддерживает Range", async (t) => {
   const frontendDirectory = await mkdtemp(join(tmpdir(), "spectemus-gateway-"));
   const movie = join(frontendDirectory, "prepared.mp4");
@@ -253,6 +309,38 @@ function websocketUpgrade(port) {
       }
     });
     socket.once("error", reject);
+  });
+}
+
+function websocketUpgradeUntilClose(port) {
+  return new Promise((resolve, reject) => {
+    const socket = connect(port, "127.0.0.1");
+    let response = "";
+    let settled = false;
+    const finish = () => {
+      if (!settled) {
+        settled = true;
+        resolve(response);
+      }
+    };
+    socket.once("connect", () => {
+      socket.write(
+        "GET /api/v1/rooms/AbCdEfGhIjKlMnOpQrStUv/events HTTP/1.1\r\nHost: 192.168.1.42:8088\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nCookie: spectemus-simul-session=secret\r\n\r\n",
+      );
+    });
+    socket.on("data", (chunk) => {
+      response += chunk.toString("utf8");
+    });
+    socket.once("close", finish);
+    socket.once("error", finish);
+    setTimeout(() => {
+      socket.destroy();
+      reject(
+        new Error(
+          "WebSocket gateway не закрыл соединение после backend failure.",
+        ),
+      );
+    }, 1_000).unref();
   });
 }
 

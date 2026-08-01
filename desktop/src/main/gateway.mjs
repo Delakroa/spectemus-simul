@@ -275,7 +275,22 @@ function parseRequestUrl(requestUrl) {
 }
 
 function proxyHttp({ backend, request, response }) {
-  const upstream = requestHttp(
+  let upstream;
+  let upstreamResponse;
+  const abortUpstream = () => {
+    if (upstreamResponse && !upstreamResponse.destroyed) {
+      upstreamResponse.destroy();
+    }
+    if (upstream && !upstream.destroyed) {
+      upstream.destroy();
+    }
+  };
+  const abortWhenClientDisconnects = () => {
+    if (!response.writableEnded) {
+      abortUpstream();
+    }
+  };
+  upstream = requestHttp(
     {
       host: backend.host,
       port: backend.port,
@@ -284,18 +299,26 @@ function proxyHttp({ backend, request, response }) {
       headers: trustedForwardHeaders(request),
       timeout: UPSTREAM_TIMEOUT_MS,
     },
-    (upstreamResponse) => {
+    (receivedResponse) => {
+      upstreamResponse = receivedResponse;
+      if (response.destroyed) {
+        abortUpstream();
+        return;
+      }
       response.writeHead(
         upstreamResponse.statusCode ?? 502,
         upstreamResponse.headers,
       );
-      upstreamResponse.pipe(response);
+      void pipeline(upstreamResponse, response).catch(abortUpstream);
     },
   );
   upstream.once("timeout", () => {
     upstream.destroy(new Error("Backend timeout"));
   });
   upstream.once("error", () => {
+    if (response.destroyed || response.writableEnded) {
+      return;
+    }
     if (!response.headersSent) {
       response.writeHead(502, {
         "Content-Type": "application/json",
@@ -306,21 +329,43 @@ function proxyHttp({ backend, request, response }) {
     }
     response.destroy();
   });
+  request.once("aborted", abortUpstream);
+  request.once("error", abortUpstream);
+  response.once("close", abortWhenClientDisconnects);
+  upstream.once("close", () => {
+    request.off("aborted", abortUpstream);
+    request.off("error", abortUpstream);
+    response.off("close", abortWhenClientDisconnects);
+  });
   request.pipe(upstream);
 }
 
 function proxyUpgrade({ backend, request, socket, head }) {
   const upstream = connect(backend.port, backend.host);
+  let responseStarted = false;
+  let failureHandled = false;
   const fail = () => {
-    if (!socket.destroyed) {
-      socket.end("HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n");
+    if (failureHandled || socket.destroyed) {
+      return;
     }
+    failureHandled = true;
+    if (responseStarted) {
+      socket.destroy();
+      return;
+    }
+    socket.end("HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n");
   };
+  upstream.setTimeout(UPSTREAM_TIMEOUT_MS, () => {
+    upstream.destroy(new Error("Backend timeout"));
+  });
   upstream.once("error", fail);
+  upstream.once("close", fail);
   socket.once("error", () => upstream.destroy());
   socket.once("close", () => upstream.destroy());
-  upstream.once("close", () => socket.destroy());
   upstream.once("connect", () => {
+    upstream.once("data", () => {
+      responseStarted = true;
+    });
     const headLines = [
       `${request.method} ${request.url} HTTP/${request.httpVersion}`,
     ];
