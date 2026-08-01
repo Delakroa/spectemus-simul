@@ -25,6 +25,8 @@
 - [WT-690_PRODUCT_ROADMAP_STATE.md](WT-690_PRODUCT_ROADMAP_STATE.md) —
   фактический статус LAN hardening, public access foundation и внешний gate
   перед Internet mode.
+- [WT-691_INVITE_TOKEN_VALIDATION.md](WT-691_INVITE_TOKEN_VALIDATION.md) —
+  явная проверка обязательного токена при входе по приглашению.
 
 ## Быстрый порядок чтения
 
