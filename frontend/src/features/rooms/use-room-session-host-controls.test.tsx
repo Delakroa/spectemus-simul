@@ -293,6 +293,9 @@ function HostControlsHarness() {
       <button type="button" onClick={() => void session.requestMediaRecovery()}>
         Сигнал о зависании
       </button>
+      <button type="button" onClick={() => session.retryLiveKitConnection()}>
+        Повторить LiveKit
+      </button>
 
       <span data-testid="pub-status">{session.filePublicationStatus}</span>
       <span data-testid="pub-error">{session.filePublicationError ?? ""}</span>
@@ -302,6 +305,8 @@ function HostControlsHarness() {
       <span data-testid="pb-error">{session.hostPlaybackError ?? ""}</span>
       <span data-testid="recovery-request-status">{session.mediaRecoveryRequestStatus}</span>
       <span data-testid="recovery-host-status">{session.mediaRecoveryHostStatus}</span>
+      <span data-testid="livekit-status">{session.liveKitStatus}</span>
+      <span data-testid="user-error-action">{session.userError?.action ?? ""}</span>
     </>
   );
 }
@@ -521,6 +526,26 @@ describe("useRoomSession host playback controls", () => {
       { startAtSeconds: 45.5, startPaused: false },
     );
     expect(screen.getByTestId("pub-status")).toHaveTextContent("live");
+  });
+
+  it("после terminal LiveKit disconnect предлагает ручное переподключение", async () => {
+    const user = userEvent.setup();
+    render(<HostControlsHarness />);
+    vi.stubGlobal("WebSocket", MockWebSocket);
+
+    await user.click(screen.getByRole("button", { name: "Создать" }));
+    await waitFor(() => expect(liveKitHandlers).toHaveLength(1));
+
+    act(() => {
+      liveKitHandlers[0]?.onStatusChange("disconnected");
+    });
+
+    expect(screen.getByTestId("livekit-status")).toHaveTextContent("disconnected");
+    expect(screen.getByTestId("user-error-action")).toHaveTextContent("retry-livekit");
+
+    await user.click(screen.getByRole("button", { name: "Повторить LiveKit" }));
+    await waitFor(() => expect(liveKitHandlers).toHaveLength(2));
+    expect(screen.getByTestId("livekit-status")).toHaveTextContent("connected");
   });
 
   it("перезапускает поток host-а с текущей позиции и состоянием паузы", async () => {

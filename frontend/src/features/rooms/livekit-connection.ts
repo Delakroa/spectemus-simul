@@ -71,6 +71,7 @@ function toStatus(state: ConnectionState): LiveKitConnectionStatus {
     case "connecting":
       return "connecting";
     case "reconnecting":
+    case "signalReconnecting":
       return "reconnecting";
     case "disconnected":
       return "disconnected";

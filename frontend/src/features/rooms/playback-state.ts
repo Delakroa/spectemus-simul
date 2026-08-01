@@ -20,6 +20,7 @@ const playbackEventSchema = z.enum([
 
 const playbackStateMessageSchema = z.object({
   schemaVersion: z.literal(1),
+  publisherSessionId: z.string().uuid().optional(),
   revision: z.number().int().nonnegative(),
   event: playbackEventSchema,
   status: playbackStatusSchema,
@@ -47,6 +48,7 @@ export type HostPlaybackStatePublisher = {
 export type HostPlaybackStatePublisherOptions = {
   initialRevision?: number;
   onRevisionChange?: (revision: number) => void;
+  publisherSessionId?: string;
 };
 
 export type GuestPlaybackStateReceiver = {
@@ -88,6 +90,7 @@ export function createHostPlaybackStatePublisher(
   options: HostPlaybackStatePublisherOptions = {},
 ): HostPlaybackStatePublisher {
   let disconnected = false;
+  const publisherSessionId = options.publisherSessionId ?? createPublisherSessionId();
   let revision = options.initialRevision ?? 0;
   let heartbeatTimer: number | null = null;
 
@@ -101,7 +104,7 @@ export function createHostPlaybackStatePublisher(
     void room.localParticipant
       .publishData(
         encodePlaybackStateMessage(
-          createPlaybackStateMessage(videoElement, fileName, revision, event),
+          createPlaybackStateMessage(videoElement, fileName, revision, event, publisherSessionId),
         ),
         {
           reliable: true,
@@ -162,6 +165,7 @@ export function createGuestPlaybackStateReceiver(
   handlers: GuestPlaybackStateHandlers,
 ): GuestPlaybackStateReceiver {
   let disconnected = false;
+  let latestPublisherSessionId: string | null = null;
   let latestRevision = 0;
   let latestState: PlaybackStateView = idlePlaybackState;
   let videoElement: HTMLVideoElement | null = null;
@@ -210,6 +214,17 @@ export function createGuestPlaybackStateReceiver(
 
     try {
       const message = decodePlaybackStateMessage(payload);
+      const publisherSessionId = message.publisherSessionId ?? null;
+      const isNewPublisherSession = publisherSessionId !== latestPublisherSessionId;
+      if (isNewPublisherSession && !isNewerThanLatestState(message, latestState)) {
+        return;
+      }
+
+      if (isNewPublisherSession) {
+        latestPublisherSessionId = publisherSessionId;
+        latestRevision = 0;
+      }
+
       if (message.revision <= latestRevision) {
         return;
       }
@@ -254,11 +269,13 @@ function createPlaybackStateMessage(
   fileName: string,
   revision: number,
   event: PlaybackEvent,
+  publisherSessionId?: string,
 ): PlaybackStateMessage {
   const duration = Number.isFinite(videoElement.duration) ? videoElement.duration : null;
 
   return {
     schemaVersion: 1,
+    publisherSessionId,
     revision,
     event,
     status: getPlaybackStatus(videoElement, event),
@@ -269,6 +286,28 @@ function createPlaybackStateMessage(
     sentAt: new Date().toISOString(),
     fileName,
   };
+}
+
+function isNewerThanLatestState(
+  message: PlaybackStateMessage,
+  latestState: PlaybackStateView,
+): boolean {
+  const messageSentAt = Date.parse(message.sentAt);
+  const latestSentAt = Date.parse(latestState.sentAt);
+  return (
+    Number.isFinite(messageSentAt) &&
+    (!Number.isFinite(latestSentAt) || messageSentAt > latestSentAt)
+  );
+}
+
+function createPublisherSessionId() {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+
+  return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (char) =>
+    (Number(char) ^ (Math.floor(Math.random() * 16) >> (Number(char) / 4))).toString(16),
+  );
 }
 
 function getPlaybackStatus(videoElement: HTMLVideoElement, event: PlaybackEvent): PlaybackStatus {
