@@ -165,7 +165,7 @@ export class DesktopSupervisor {
 
   subscribe(listener) {
     this.listeners.add(listener);
-    listener(this.status);
+    this.notifyListener(listener);
     return () => this.listeners.delete(listener);
   }
 
@@ -349,7 +349,15 @@ export class DesktopSupervisor {
   setStatus(state, detail, additional = {}) {
     this.status = { state, detail, ...additional };
     for (const listener of this.listeners) {
+      this.notifyListener(listener);
+    }
+  }
+
+  notifyListener(listener) {
+    try {
       listener(this.status);
+    } catch {
+      // A renderer subscriber must not interrupt sidecar lifecycle handling.
     }
   }
 

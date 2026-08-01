@@ -64,6 +64,7 @@ class LiveKitTokenService {
 
         boolean host = participant.role() == ParticipantRole.HOST;
         boolean canPublish = true;
+        List<String> canPublishSources = host ? List.of() : List.of("microphone");
         // Guests send the recovery request through LiveKit data packets; the client accepts only
         // the validated recovery schema and the recipient is still constrained to this room.
         boolean canPublishData = true;
@@ -77,6 +78,7 @@ class LiveKitTokenService {
                 participant.displayName(),
                 canPublish,
                 canPublishData,
+                canPublishSources,
                 issuedAt,
                 expiresAt);
 

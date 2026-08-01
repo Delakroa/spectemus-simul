@@ -98,15 +98,17 @@ export function createHostPlaybackStatePublisher(
 
     revision += 1;
     options.onRevisionChange?.(revision);
-    void room.localParticipant.publishData(
-      encodePlaybackStateMessage(
-        createPlaybackStateMessage(videoElement, fileName, revision, event),
-      ),
-      {
-        reliable: true,
-        topic: PLAYBACK_STATE_TOPIC,
-      },
-    );
+    void room.localParticipant
+      .publishData(
+        encodePlaybackStateMessage(
+          createPlaybackStateMessage(videoElement, fileName, revision, event),
+        ),
+        {
+          reliable: true,
+          topic: PLAYBACK_STATE_TOPIC,
+        },
+      )
+      .catch(() => {});
   };
 
   const handleLoadedMetadata = () => send("metadata");

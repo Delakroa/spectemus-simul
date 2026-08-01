@@ -435,8 +435,24 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
         Set<WebSocketSession> roomSessions = sessionsByRoom.getOrDefault(roomId, Set.of());
         for (WebSocketSession roomSession : roomSessions) {
             if (roomSession.isOpen() && !Objects.equals(roomSession.getId(), excludedId)) {
-                sendTo(roomSession, payload);
+                sendToRecipient(roomSession, payload);
             }
+        }
+    }
+
+    private void sendToRecipient(WebSocketSession session, String payload) {
+        try {
+            sendTo(session, payload);
+        } catch (IOException ignored) {
+            // A disconnected recipient must not prevent delivery to the rest of the room.
+        }
+    }
+
+    private void closeRecipient(WebSocketSession session) {
+        try {
+            session.close(CloseStatus.NORMAL);
+        } catch (IOException ignored) {
+            // The remote peer has already disconnected.
         }
     }
 
@@ -517,7 +533,7 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
         for (WebSocketSession roomSession : roomSessions) {
             if (!Objects.equals(roomSession.getId(), excludedSession == null ? null : excludedSession.getId())
                     && roomSession.isOpen()) {
-                sendTo(roomSession, payload);
+                sendToRecipient(roomSession, payload);
             }
         }
     }
@@ -540,7 +556,7 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
         Set<WebSocketSession> roomSessions = sessionsByRoom.getOrDefault(room.roomId(), Set.of());
         for (WebSocketSession roomSession : roomSessions) {
             if (roomSession.isOpen()) {
-                sendTo(roomSession, payload);
+                sendToRecipient(roomSession, payload);
             }
         }
         metrics.participantJoined();
@@ -567,8 +583,8 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
                 sessionsByRoom.getOrDefault(room.roomId(), Set.of()));
         for (WebSocketSession roomSession : roomSessions) {
             if (roomSession.isOpen()) {
-                sendTo(roomSession, payload);
-                roomSession.close(CloseStatus.NORMAL);
+                sendToRecipient(roomSession, payload);
+                closeRecipient(roomSession);
             }
         }
         metrics.roomClosed(reason);
@@ -591,11 +607,11 @@ class RoomWebSocketHandler extends TextWebSocketHandler implements RoomEventPubl
             if (!roomSession.isOpen()) {
                 continue;
             }
-            sendTo(roomSession, payload);
+            sendToRecipient(roomSession, payload);
             if (participantId.equals(optionalUuid(
                     roomSession.getAttributes(),
                     RoomWebSocketAuthenticationInterceptor.PARTICIPANT_ID_ATTRIBUTE))) {
-                roomSession.close(CloseStatus.NORMAL);
+                closeRecipient(roomSession);
             }
         }
         metrics.participantLeft();
