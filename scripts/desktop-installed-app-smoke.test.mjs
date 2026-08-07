@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -34,12 +34,17 @@ test("install smoke ловит присутствующий, но незапус
   try {
     await createMacApp(appPath);
     // Файл на месте и непустой, но не исполняемый — ровно то, что даёт карантин
-    // Gatekeeper или отсутствие подписи у вложенного бинарника.
-    await writeFile(
-      join(appPath, "Contents/Resources/sidecars/media/bin/ffmpeg"),
-      "test",
-      { mode: 0o644 },
+    // Gatekeeper или отсутствие подписи у вложенного бинарника. Права снимаем
+    // отдельным chmod: опция mode у writeFile применяется только при создании файла,
+    // а созданная выше заглушка уже исполняемая. Без этого на Linux execvp
+    // откатывается на /bin/sh, тот выполняет содержимое как команду, и сценарий
+    // подменяется на «завершился с кодом N».
+    const brokenFfmpeg = join(
+      appPath,
+      "Contents/Resources/sidecars/media/bin/ffmpeg",
     );
+    await writeFile(brokenFfmpeg, "test");
+    await chmod(brokenFfmpeg, 0o644);
 
     const result = spawnSync(
       process.execPath,
