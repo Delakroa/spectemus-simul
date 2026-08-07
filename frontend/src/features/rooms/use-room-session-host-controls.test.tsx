@@ -255,6 +255,12 @@ class MockWebSocket {
   removeEventListener() {}
 }
 
+// jsdom does not implement HTMLMediaElement.play, and a plain stub keeps the element
+// independent of vi.clearAllMocks between tests.
+const hostPreviewElement = Object.assign(document.createElement("video"), {
+  play: () => Promise.resolve(),
+});
+
 function HostControlsHarness() {
   const session = useRoomSession();
 
@@ -295,6 +301,9 @@ function HostControlsHarness() {
       </button>
       <button type="button" onClick={() => session.retryLiveKitConnection()}>
         Повторить LiveKit
+      </button>
+      <button type="button" onClick={() => session.setHostPreviewElement(hostPreviewElement)}>
+        Привязать preview
       </button>
 
       <span data-testid="pub-status">{session.filePublicationStatus}</span>
@@ -346,6 +355,19 @@ afterEach(() => {
 });
 
 describe("useRoomSession host playback controls", () => {
+  it("привязка host preview не включает звук, выключенный пользователем", async () => {
+    const user = userEvent.setup();
+    await setupLivePublication(user);
+
+    // Пользователь выключил звук локального preview.
+    hostPreviewElement.muted = true;
+
+    // Повторная привязка происходит при republish и восстановлении показа.
+    await user.click(screen.getByRole("button", { name: "Привязать preview" }));
+
+    expect(hostPreviewElement.muted).toBe(true);
+  });
+
   it("показывает timed_out, если started не завершился итоговым status", async () => {
     const user = userEvent.setup();
     render(<HostControlsHarness />);

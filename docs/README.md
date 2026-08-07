@@ -27,6 +27,9 @@
   перед Internet mode.
 - [WT-691_INVITE_TOKEN_VALIDATION.md](WT-691_INVITE_TOKEN_VALIDATION.md) —
   явная проверка обязательного токена при входе по приглашению.
+- [SPS-692_HOST_PREVIEW_MUTE.md](SPS-692_HOST_PREVIEW_MUTE.md) —
+  повторная привязка локального preview больше не включает выключенный звук;
+  первый тикет с префиксом `SPS-`.
 
 ## Быстрый порядок чтения
 

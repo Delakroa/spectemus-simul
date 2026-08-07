@@ -560,7 +560,9 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
     }
 
     videoElement.autoplay = true;
-    videoElement.muted = false;
+    // `muted` stays owned by the playback sound control. React writes that prop only when
+    // its value changes, so forcing it here would silently unmute the host on every
+    // re-attach (republish, recovery) while the UI still shows the sound as muted.
     videoElement.playsInline = true;
     videoElement.srcObject = publication.stream;
     void videoElement.play().catch((error: unknown) => {
