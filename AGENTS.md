@@ -1,86 +1,45 @@
 # AGENTS.md
 
-## Project
+Точка входа для ИИ-агентов. Здесь только карта проекта и правила работы самого
+агента. Всё остальное имеет единственный источник истины в `docs/` и намеренно
+не пересказывается: две копии одного правила рано или поздно разъезжаются, и
+агент начинает читать устаревшую.
 
-Spectemus Simul is a private, local-media co-watch application. The host keeps
-movie bytes locally; guests receive synchronized playback through LiveKit.
+## Что за проект
 
-## Repository layout
+Spectemus Simul — приватный совместный просмотр локального видео. Байты фильма
+остаются на машине host и не загружаются в backend; гости получают синхронный
+поток по локальной сети.
 
-- `backend/` — Spring Boot server-side product state, REST/WebSocket APIs, and
-  Redis-backed room lifecycle.
-- `frontend/` — React browser UI and browser media lifecycle.
-- `desktop/` — Electron host application and packaging.
-- `contracts/` — REST OpenAPI, WebSocket JSON Schemas, and examples.
-- `infra/` — Docker Compose, LAN, and staging infrastructure.
-- `e2e/` — Playwright multi-user tests.
-- `poc/` — reference prototypes only; do not treat them as product code.
-- `docs/` — ADRs, ticket notes, evidence, and project conventions.
+Продукт и установка — [README.md](README.md). Куда движется продукт и какой gate
+сейчас открыт — [docs/PRODUCT_ROADMAP.md](docs/PRODUCT_ROADMAP.md).
 
-Read `docs/CONVENTIONS.md` and the nearest README/ticket document before
-changing a subsystem.
+## Где искать правила
 
-## Working rules
+| Что нужно                                                                                     | Документ                                                 |
+| --------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Границы подсистем, приватность, контракты, стиль backend/frontend, именование тикетов и веток | [docs/CONVENTIONS.md](docs/CONVENTIONS.md)               |
+| Когда тикет считается завершённым                                                             | [docs/DEFINITION_OF_DONE.md](docs/DEFINITION_OF_DONE.md) |
+| REST, WebSocket и error contracts                                                             | [contracts/README.md](contracts/README.md)               |
+| Локальная и staging инфраструктура                                                            | [infra/README.md](infra/README.md)                       |
+| Решения, ADR и отчёты по тикетам                                                              | [docs/README.md](docs/README.md)                         |
 
-- Keep one change set focused on one backlog ticket or coherent bug fix.
-- Keep user-facing text and documentation in Russian; keep code identifiers,
-  protocol fields, and standard technical names in English.
-- Preserve the backend/frontend/infra ownership boundaries above.
-- Do not upload local movie files to the application backend, log full local
-  file paths, commit secrets, or expose LiveKit API secrets to frontend code.
-- Use root package-manager commands from the repository root. Use the Gradle
-  wrapper rather than a system Gradle installation for backend tasks.
+Перед изменением подсистемы прочитайте `docs/CONVENTIONS.md` и ближайший
+README или отчёт тикета.
 
-## Contracts and implementation
+## Правила работы агента
 
-- `contracts/openapi.yaml` is the REST source of truth.
-- `contracts/schemas/` is the source of truth for WebSocket and shared payloads.
-- Add or update contracts and valid/invalid boundary tests with any product API
-  or event change. Breaking changes need a new API version or `schemaVersion`.
-- Validate all network and WebSocket payloads at the boundary. Unknown server
-  events are ignored; unknown client commands are rejected.
-- REST paths use lowercase nouns beneath `/api/v1`; external errors use
-  `application/problem+json` and include a safe `correlationId`.
-- Backend: prefer constructor injection, records for immutable DTOs, `Instant`
-  in UTC, and explicit DTOs over untyped maps. Check permission and validation
-  before changing authoritative state.
-- Frontend: TypeScript stays strict, without `any` at API/media boundaries.
-  Use runtime schema validation, avoid duplicating server room state, and clean
-  up every network or media resource on effect teardown/reconnect.
+Единственный раздел, которого нет в других документах.
 
-## Tests and verification
-
-Run the narrowest relevant check while iterating. Before handoff, run the
-applicable root quality commands:
-
-```bash
-pnpm contracts:check
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
-pnpm check
-```
-
-Useful targeted commands:
-
-```bash
-pnpm backend:test
-pnpm backend:build
-pnpm backend:bootRun
-pnpm dev:frontend
-pnpm infra:up
-pnpm infra:check
-pnpm test:e2e
-```
-
-Add regression coverage for defect fixes and cover error, malformed-payload,
-unknown-event/code, and stale-version paths where applicable. Do not claim a
-check passed unless it was run successfully.
-
-## Documentation and completion
-
-Update the nearest README and relevant ticket document for product changes.
-Record how to run and verify the change, known limitations, and risks/follow-up
-work. Follow `docs/DEFINITION_OF_DONE.md`: no hidden TODOs/debug code, safe
-configuration defaults, and no sensitive data in logs, errors, or fixtures.
+- **Ветка заводится до начала правок:** `SPS-<номер>--<слаг>`. Прямой коммит и
+  push в `main` заблокированы локальными хуками (`.git/hooks/pre-commit`,
+  `.git/hooks/pre-push`); изменения попадают в `main` только через pull request.
+- **Коммит и push выполняет владелец репозитория.** Готовые изменения
+  оставляйте в рабочем дереве и сообщайте, что именно готово.
+- **Не сообщайте, что проверка прошла, пока она не выполнена успешно.**
+  Прогоняйте команды сами и приводите фактический результат, а не ожидаемый.
+- **Проверяйте, что уходит в коммит.** Посторонний файл, случайно попавший в
+  рабочее дерево, не должен уезжать вместе с тикетом.
+- Каждое изменение сопровождается отчётом `docs/SPS-<номер>_*.md` и вписывается
+  в подходящую цепочку `format:*` в `package.json` — иначе CI не проверит его
+  форматирование.
