@@ -71,9 +71,12 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      - name: Собрать preview DMG
+      # identity=- даёт ad-hoc подпись: без неё вложенные Mach-O (livekit-server, ffmpeg,
+      # ffprobe) остаются неподписанными, и на чистом Mac Gatekeeper убивает их при
+      # запуске — приложение стартует «зелёным», а падает media-половина прогона.
+      - name: Собрать preview DMG (ad-hoc подпись)
         if: ${{ !inputs.signed }}
-        run: pnpm --dir desktop exec electron-builder --mac dmg zip --${{ matrix.arch }} -c.mac.forceCodeSigning=false -c.mac.identity=null -c.mac.hardenedRuntime=false
+        run: pnpm --dir desktop exec electron-builder --mac dmg zip --${{ matrix.arch }} -c.mac.forceCodeSigning=false -c.mac.identity=- -c.mac.hardenedRuntime=false
       - name: Собрать signed и notarized DMG
         if: ${{ inputs.signed }}
         run: pnpm --dir desktop exec electron-builder --mac dmg zip --${{ matrix.arch }}

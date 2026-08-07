@@ -9,8 +9,9 @@ function normalizedName(fileName) {
 }
 
 export class DesktopMediaLibrary {
-  constructor({ normalizer = null } = {}) {
+  constructor({ normalizer = null, normalizerUnavailableReason = null } = {}) {
     this.normalizer = normalizer;
+    this.normalizerUnavailableReason = normalizerUnavailableReason;
     this.entries = new Map();
     this.running = new Map();
   }
@@ -61,7 +62,13 @@ export class DesktopMediaLibrary {
       throw new Error("Выбранный файл больше недоступен. Выберите его заново.");
     }
     if (!this.normalizer) {
-      throw new Error("В этой сборке нет средства подготовки видео.");
+      // Если причина известна, показываем её: «нет в сборке» и «есть, но не стартует» —
+      // разные дефекты и разные тикеты.
+      throw new Error(
+        this.normalizerUnavailableReason
+          ? `Средство подготовки видео не запускается. ${this.normalizerUnavailableReason}`
+          : "В этой сборке нет средства подготовки видео.",
+      );
     }
     if (entry.normalizedPath) {
       return this.describe(id);
