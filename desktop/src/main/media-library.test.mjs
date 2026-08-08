@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -68,5 +69,56 @@ test("media library дожидается отмены подготовки пе�
 
   assert.equal(wasCancelled, true);
   await assert.rejects(normalizing, /cancelled/);
+  assert.equal(library.resolveForPlayback(selection.id), null);
+});
+
+test("media library не копит копии, если renderer потерял свой id", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "spectemus-media-orphan-"));
+  const source = join(directory, "film.mkv");
+  const firstOutput = join(directory, "first.mp4");
+  const secondOutput = join(directory, "second.mp4");
+  await writeFile(source, "movie");
+  await writeFile(firstOutput, "normalized");
+  await writeFile(secondOutput, "normalized");
+
+  let nextOutput = firstOutput;
+  const library = new DesktopMediaLibrary({
+    normalizer: { normalize: async () => ({ outputPath: nextOutput }) },
+  });
+
+  const first = await library.registerSource(source);
+  await library.normalize(first.id);
+  assert.equal(existsSync(firstOutput), true);
+
+  // Перезагрузка страницы: renderer забыл id и не может освободить запись сам,
+  // поэтому следующий выбор файла обязан освободить её за него.
+  nextOutput = secondOutput;
+  const second = await library.registerSource(source);
+  await library.normalize(second.id);
+
+  assert.equal(
+    existsSync(firstOutput),
+    false,
+    "первая копия должна быть удалена",
+  );
+  assert.equal(existsSync(secondOutput), true);
+  assert.equal(library.resolveForPlayback(first.id), null);
+});
+
+test("media library переживает сбой удаления временной копии", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "spectemus-media-unlink-"));
+  const source = join(directory, "film.mkv");
+  await writeFile(source, "movie");
+  const library = new DesktopMediaLibrary({
+    // Каталог вместо файла даёт реальную ошибку удаления, как открытый хендл на Windows.
+    normalizer: { normalize: async () => ({ outputPath: directory }) },
+  });
+
+  const selection = await library.registerSource(source);
+  await library.normalize(selection.id);
+
+  // Сбой удаления не должен превращаться в исключение: запись всё равно освобождается,
+  // а файл подметёт свип при следующем запуске.
+  await library.release(selection.id);
   assert.equal(library.resolveForPlayback(selection.id), null);
 });

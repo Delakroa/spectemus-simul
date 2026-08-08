@@ -60,6 +60,9 @@
 - [SPS-704_DESKTOP_FEEDBACK_PERSISTENCE.md](SPS-704_DESKTOP_FEEDBACK_PERSISTENCE.md) —
   отзывы desktop host переживают выход из приложения, а operator-эндпоинты
   получают токен установки: канал сбора дефектов перестал быть write-only.
+- [SPS-705_TEMP_COPY_LIFECYCLE.md](SPS-705_TEMP_COPY_LIFECYCLE.md) —
+  временная копия удаляется только когда действительно не нужна: свип один раз за
+  запуск, одна активная запись, отказ удаления больше не молчит.
 
 ## Быстрый порядок чтения
 

@@ -30,6 +30,7 @@ let mainWindow;
 let localGatewayOrigin;
 let publicGatewayOrigin;
 let startupPromise;
+let normalizedMediaDirectory;
 const mediaLibrary = new DesktopMediaLibrary();
 const supervisor = new DesktopSupervisor({
   mediaResolver: (id) => mediaLibrary.resolveForPlayback(id),
@@ -50,6 +51,27 @@ const isPrimaryInstance = acquireDesktopInstanceLock(app, focusMainWindow);
 
 if (isPrimaryInstance) {
   app.whenReady().then(async () => {
+    normalizedMediaDirectory = join(
+      app.getPath("temp"),
+      "spectemus-simul",
+      "normalized-media",
+    );
+    // Подметаем ровно один раз за запуск приложения и до старта host.
+    //
+    // Раньше свип жил внутри startDesktopHost, и это давало два дефекта сразу.
+    // Он выполнялся при каждом рестарте рантайма, включая кнопку «Перезапустить»,
+    // и удалял копию, которую текущая сессия прямо сейчас отдаёт гостю — а
+    // подготовка MKV занимает десятки минут. И он был недостижим, если раньше
+    // падал выбор LAN-адреса или проверка сайдкаров, поэтому копия, оставшаяся
+    // после аварийного завершения, могла пережить сколько угодно запусков.
+    try {
+      await clearNormalizedMediaDirectory(normalizedMediaDirectory);
+    } catch (error) {
+      console.error(
+        `[media] не удалось подмести временные копии: ${error?.message ?? error}`,
+      );
+    }
+
     ipcMain.handle("spectemus:runtime-status", () => supervisor.status);
     ipcMain.handle("spectemus:pick-media-file", async () => {
       const options = {
@@ -153,12 +175,6 @@ async function startDesktopHost(preferredLanAddress) {
       await assertDesktopResources(paths, {
         requireMediaTools: app.isPackaged,
       });
-      const normalizedMediaDirectory = join(
-        app.getPath("temp"),
-        "spectemus-simul",
-        "normalized-media",
-      );
-      await clearNormalizedMediaDirectory(normalizedMediaDirectory);
       const mediaTools = await probeMediaTools(paths);
       mediaLibrary.normalizer = mediaTools.available
         ? new DesktopMediaNormalizer({

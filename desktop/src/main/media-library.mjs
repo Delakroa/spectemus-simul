@@ -22,6 +22,11 @@ export class DesktopMediaLibrary {
     if (!sourceStat.isFile()) {
       throw new Error("Выберите обычный видеофайл.");
     }
+    // Host смотрит один фильм за раз, поэтому прежние записи здесь освобождаются.
+    // Без этого перезагрузка страницы «сиротила» запись: renderer терял свой id и
+    // больше не мог её освободить, а следующий выбор файла создавал вторую
+    // многогигабайтную копию — на ноутбуке этого достаточно, чтобы забить том.
+    await this.clear();
     const id = randomUUID();
     this.entries.set(id, {
       displayName: basename(sourcePath),
@@ -115,7 +120,17 @@ export class DesktopMediaLibrary {
     const entry = this.entries.get(id);
     this.entries.delete(id);
     if (entry?.normalizedPath) {
-      await rm(entry.normalizedPath, { force: true });
+      try {
+        await rm(entry.normalizedPath, { force: true });
+      } catch (error) {
+        // На Windows удаление файла с открытым хендлом падает EPERM/EBUSY. Раньше
+        // ошибка терялась молча, и приложение рапортовало об успешной очистке, оставив
+        // копию на диске. Сообщаем причину; сам файл подметёт свип при следующем
+        // запуске, потому что каталог временных копий очищается целиком.
+        console.error(
+          `[media] не удалось удалить временную копию ${entry.normalizedPath}: ${error?.code ?? error?.message ?? error}`,
+        );
+      }
     }
   }
 
