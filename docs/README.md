@@ -69,6 +69,9 @@
 - [SPS-707_TRANSCODE_ERROR_DIAGNOSTICS.md](SPS-707_TRANSCODE_ERROR_DIAGNOSTICS.md) —
   ошибка транскода различает отказ видео- и аудиокодека и сохраняет stderr
   ffmpeg в лог-каталог сайдкаров.
+- [SPS-708_SAFE_MEDIA_REPLACEMENT.md](SPS-708_SAFE_MEDIA_REPLACEMENT.md) —
+  выбор нового файла заблокирован во время live-показа, чтобы не рвать доступ
+  гостя к уже опубликованной копии.
 
 ## Быстрый порядок чтения
 

@@ -1533,6 +1533,128 @@ describe("HomePage", () => {
     expect(audioTrack.stop).toHaveBeenCalled();
   });
 
+  it("во время live-показа выбор файла заблокирован и не освобождает опубликованную копию", async () => {
+    vi.stubGlobal("WebSocket", MockWebSocket);
+    const user = userEvent.setup();
+
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const url = String(input);
+
+      if (url.endsWith("/health")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ status: "UP", checkedAt: "2026-07-10T10:00:00Z" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url.endsWith("/version")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              name: "spectemus-simul-backend",
+              version: "0.1.0",
+              buildTime: "2026-07-10T10:00:00Z",
+              apiVersion: "v1",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      if (url.endsWith("/api/v1/rooms") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              room: createRoomSnapshot(),
+              hostSecret: "a".repeat(43),
+              invitePath: `/rooms/${roomId}`,
+            }),
+            { status: 201 },
+          ),
+        );
+      }
+
+      if (url.endsWith(`/api/v1/rooms/${roomId}/livekit-token`) && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              token: "header.payload.signature",
+              liveKitUrl: "ws://127.0.0.1:7880",
+              roomName: roomId,
+              participantId: hostId,
+              participantIdentity: hostId,
+              role: "HOST",
+              canPublish: true,
+              canPublishData: true,
+              expiresAt: "2026-07-10T11:00:00Z",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response(null, { status: 404 }));
+    });
+
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:movie-url");
+    vi.spyOn(URL, "revokeObjectURL");
+
+    const videoTrack = createTrack("video");
+    const audioTrack = createTrack("audio");
+    const publishStream = createStream([videoTrack], [audioTrack]);
+    const realCreateElement = document.createElement.bind(document);
+    const videoStubs = [
+      createVideoStub(undefined, realCreateElement),
+      createVideoStub(publishStream, realCreateElement),
+    ];
+    vi.spyOn(document, "createElement").mockImplementation((tagName: string) =>
+      tagName === "video"
+        ? (videoStubs.shift() ?? createVideoStub(publishStream, realCreateElement))
+        : realCreateElement(tagName),
+    );
+
+    // Кнопка picker в desktop-сборке зовёт main-процесс напрямую, минуя
+    // roomSession — регресс SPS-705 был именно в этом вызове, а не в hook-е.
+    const pickMediaFile = vi.fn().mockResolvedValue(null);
+    window.spectemusDesktop = {
+      getRuntimeStatus: vi.fn().mockResolvedValue({ detail: "", state: "ready" }),
+      onRuntimeStatus: vi.fn().mockReturnValue(() => {}),
+      pickMediaFile,
+      restartRuntime: vi.fn().mockResolvedValue({ detail: "", state: "ready" }),
+    };
+
+    renderPage();
+
+    await screen.findByText("Сервис готов");
+    await user.clear(screen.getByLabelText("Имя host"));
+    await user.type(screen.getByLabelText("Имя host"), "Dima");
+    await user.click(screen.getByRole("button", { name: "Создать" }));
+
+    await screen.findByText("LiveKit: подключён");
+    await screen.findByText("Видеофайл");
+
+    const file = new File([""], "movie.mp4", { type: "video/mp4" });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(input, file);
+
+    await screen.findByText("movie.mp4");
+    await user.click(screen.getByRole("button", { name: "Опубликовать" }));
+
+    expect(await screen.findByText("Live · 2 дорожки")).toBeInTheDocument();
+
+    const pickerButton = screen.getByRole("button", { name: "Выбрать файл" });
+    expect(pickerButton).toBeDisabled();
+    expect(
+      screen.getByText("Сначала остановите показ, чтобы выбрать другой файл."),
+    ).toBeInTheDocument();
+
+    await user.click(pickerButton);
+    expect(pickMediaFile).not.toHaveBeenCalled();
+
+    delete window.spectemusDesktop;
+  });
+
   it("ошибка диагностики файла отображается в file picker", async () => {
     vi.stubGlobal("WebSocket", MockWebSocket);
     const user = userEvent.setup();
