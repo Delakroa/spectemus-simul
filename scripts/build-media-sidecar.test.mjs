@@ -165,6 +165,7 @@ test("загрузка FFmpeg повторяется после curl (35) и н�
   const binDirectory = join(root, "bin");
   const destination = join(root, "ffmpeg.tar.xz");
   const attemptsFile = join(root, "attempts");
+  const urlsFile = join(root, "urls");
 
   try {
     await mkdir(binDirectory, { recursive: true });
@@ -179,8 +180,10 @@ printf "%s" "$attempts" > "$CURL_FAKE_ATTEMPTS"
 output=""
 while [[ $# -gt 0 ]]; do
   if [[ "$1" == "--output" ]]; then output="$2"; shift 2; continue; fi
+  url="$1"
   shift
 done
+printf "%s\\n" "$url" >> "$CURL_FAKE_URLS"
 if [[ "$attempts" == "1" ]]; then
   printf "partial" > "$output"
   exit 35
@@ -194,11 +197,12 @@ printf "complete" > "$output"
       "bash",
       [
         "-c",
-        'source "$1"; download_with_retry "$2" "$3"',
+        'source "$1"; download_with_retry "$2" "$3" "$4"',
         "bash",
         script,
         destination,
-        "https://example.test/ffmpeg.tar.xz",
+        "https://official.example.test/ffmpeg.tar.xz",
+        "https://mirror.example.test/ffmpeg.tar.xz",
       ],
       {
         encoding: "utf8",
@@ -206,6 +210,7 @@ printf "complete" > "$output"
           ...process.env,
           PATH: `${binDirectory}:${process.env.PATH}`,
           CURL_FAKE_ATTEMPTS: attemptsFile,
+          CURL_FAKE_URLS: urlsFile,
           DOWNLOAD_RETRY_ATTEMPTS: "2",
           DOWNLOAD_RETRY_DELAY_SECONDS: "0",
         },
@@ -215,10 +220,31 @@ printf "complete" > "$output"
     assert.equal(result.status, 0, result.stderr);
     assert.equal(await readFile(destination, "utf8"), "complete");
     assert.equal(await readFile(attemptsFile, "utf8"), "2");
+    assert.equal(
+      await readFile(urlsFile, "utf8"),
+      "https://official.example.test/ffmpeg.tar.xz\nhttps://mirror.example.test/ffmpeg.tar.xz\n",
+    );
     await assert.rejects(readFile(`${destination}.partial`));
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("загрузка FFmpeg требует хотя бы один URL", () => {
+  const result = spawnSync(
+    "bash",
+    [
+      "-c",
+      'source "$1"; download_with_retry "$2"',
+      "bash",
+      script,
+      "/tmp/ffmpeg.tar.xz",
+    ],
+    { encoding: "utf8" },
+  );
+
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /Не указан URL для загрузки/);
 });
 
 test("загрузка FFmpeg увеличивает паузу между временными сетевыми ошибками", async () => {

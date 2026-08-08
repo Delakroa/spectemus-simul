@@ -49,6 +49,8 @@
   зависит от его повторной сетевой загрузки.
 - [SPS-700_FFMPEG_KEY_ARMOUR_INTEGRITY.md](SPS-700_FFMPEG_KEY_ARMOUR_INTEGRITY.md) —
   исправление повреждённого OpenPGP armour и проверка его CRC-24 до runner-а.
+- [SPS-701_FFMPEG_MIRROR_FALLBACK.md](SPS-701_FFMPEG_MIRROR_FALLBACK.md) —
+  проверяемое переключение между официальным release-сервером FFmpeg и зеркалами.
 
 ## Быстрый порядок чтения
 

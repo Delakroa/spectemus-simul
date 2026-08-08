@@ -3,7 +3,12 @@ set -euo pipefail
 
 readonly FFMPEG_VERSION="8.1.2"
 readonly FFMPEG_ARCHIVE="ffmpeg-${FFMPEG_VERSION}.tar.xz"
-readonly FFMPEG_BASE_URL="https://ffmpeg.org/releases"
+# Начинаем с официального release URL. Зеркала ниже используются только когда он
+# временно недоступен; доверие к архиву всё равно появляется лишь после GPG
+# verification закреплённым ключом FFmpeg.
+readonly FFMPEG_OFFICIAL_RELEASES_URL="https://ffmpeg.org/releases"
+readonly FFMPEG_VIDEOLAN_MIRROR_URL="https://download.videolan.org/pub/contrib/ffmpeg"
+readonly FFMPEG_ALIYUN_MIRROR_URL="https://mirrors.aliyun.com/slackware/slackware-current/source/l/ffmpeg"
 readonly SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Отпечаток и открытая часть релизного ключа FFmpeg закреплены намеренно. Не получаем
 # ключ с того же хоста, что и архив: его временная недоступность не должна останавливать
@@ -19,12 +24,20 @@ readonly DOWNLOAD_CONNECT_TIMEOUT_SECONDS="${DOWNLOAD_CONNECT_TIMEOUT_SECONDS:-6
 
 download_with_retry() {
   local destination="$1"
-  local url="$2"
+  shift
+  local -a urls=("$@")
   local partial="${destination}.partial"
   local attempt
   local delay_seconds="$DOWNLOAD_RETRY_DELAY_SECONDS"
+  local url
+
+  if ((${#urls[@]} == 0)); then
+    echo "Не указан URL для загрузки ${destination}." >&2
+    return 2
+  fi
 
   for ((attempt = 1; attempt <= DOWNLOAD_RETRY_ATTEMPTS; attempt += 1)); do
+    url="${urls[$(((attempt - 1) % ${#urls[@]}))]}"
     rm -f "$partial"
     # --max-time нужен вдобавок к --connect-timeout: соединение может установиться и
     # затем встать, и без общего лимита job висит до своего таймаута.
@@ -44,7 +57,7 @@ download_with_retry() {
     fi
   done
 
-  echo "Не удалось скачать ${url} после ${DOWNLOAD_RETRY_ATTEMPTS} попыток." >&2
+  echo "Не удалось скачать ${destination} после ${DOWNLOAD_RETRY_ATTEMPTS} попыток." >&2
   return 1
 }
 
@@ -102,8 +115,13 @@ main() {
 
   archive="$work_directory/$FFMPEG_ARCHIVE"
   signature="$archive.asc"
-  download_with_retry "$archive" "$FFMPEG_BASE_URL/$FFMPEG_ARCHIVE"
-  download_with_retry "$signature" "$FFMPEG_BASE_URL/$FFMPEG_ARCHIVE.asc"
+  download_with_retry "$archive" \
+    "$FFMPEG_OFFICIAL_RELEASES_URL/$FFMPEG_ARCHIVE" \
+    "$FFMPEG_VIDEOLAN_MIRROR_URL/$FFMPEG_ARCHIVE" \
+    "$FFMPEG_ALIYUN_MIRROR_URL/$FFMPEG_ARCHIVE"
+  download_with_retry "$signature" \
+    "$FFMPEG_OFFICIAL_RELEASES_URL/$FFMPEG_ARCHIVE.asc" \
+    "$FFMPEG_ALIYUN_MIRROR_URL/$FFMPEG_ARCHIVE.asc"
 
   # Изолированный keyring: проверка не зависит от ключей, уже лежащих у пользователя или
   # на переиспользуемом runner, и не засоряет их. Каталог лежит внутри work_directory,
@@ -186,7 +204,7 @@ main() {
 Spectemus Simul includes FFmpeg ${FFMPEG_VERSION} as separate dynamically linked executables and libraries.
 FFmpeg is licensed under LGPL version 2.1 or later.
 Source archive: ${FFMPEG_ARCHIVE}
-Source URL: ${FFMPEG_BASE_URL}/${FFMPEG_ARCHIVE}
+Official source URL: ${FFMPEG_OFFICIAL_RELEASES_URL}/${FFMPEG_ARCHIVE}
 Configure command:
 ./configure ${configure_options[*]}
 No FFmpeg source patches are applied by this build.
