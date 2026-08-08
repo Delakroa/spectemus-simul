@@ -66,6 +66,9 @@
 - [SPS-706_DISK_SPACE_PREFLIGHT.md](SPS-706_DISK_SPACE_PREFLIGHT.md) —
   подготовка отказывает до запуска ffmpeg с понятной ошибкой, если на диске не
   хватит места под оценённый объём копии.
+- [SPS-707_TRANSCODE_ERROR_DIAGNOSTICS.md](SPS-707_TRANSCODE_ERROR_DIAGNOSTICS.md) —
+  ошибка транскода различает отказ видео- и аудиокодека и сохраняет stderr
+  ffmpeg в лог-каталог сайдкаров.
 
 ## Быстрый порядок чтения
 
