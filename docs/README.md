@@ -38,6 +38,8 @@
 - [SPS-695_FFMPEG_DOWNLOAD_RESILIENCE.md](SPS-695_FFMPEG_DOWNLOAD_RESILIENCE.md) —
   повторяемая безопасная загрузка FFmpeg для desktop installer после временного
   сетевого сбоя.
+- [SPS-696_AGENT_PUBLICATION_POLICY.md](SPS-696_AGENT_PUBLICATION_POLICY.md) —
+  правило, когда агент может довести разрешённую задачу до PR и merge.
 
 ## Быстрый порядок чтения
 
