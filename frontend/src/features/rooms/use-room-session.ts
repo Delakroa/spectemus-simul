@@ -1583,7 +1583,7 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
         ...current,
         connectionStatus: "error",
         error: userError.message,
-        userError,
+        userError: keepUnresolvedUserError(current, userError),
       }));
       return;
     }
@@ -1696,7 +1696,7 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
           setState((current) => ({
             ...current,
             error: userError.message,
-            userError,
+            userError: keepUnresolvedUserError(current, userError),
           }));
         }
       };
@@ -2590,6 +2590,18 @@ function clearUserErrorFor(
   return {
     userError: current.userError?.area === area ? null : current.userError,
   };
+}
+
+/**
+ * Не позволяет свежей ошибке затереть ещё не решённую ошибку ДРУГОЙ области.
+ *
+ * Иначе теряется единственный способ починить первую: retry своей области снимает
+ * ошибку по совпадению `area`, поэтому websocket-ошибка, легшая поверх livekit-ошибки,
+ * после успешного переподключения websocket уносит с собой и livekit-ошибку — вместе с
+ * кнопкой «Повторить LiveKit», которую больше нечем воссоздать.
+ */
+function keepUnresolvedUserError(current: RoomSessionState, next: RoomUserError): RoomUserError {
+  return current.userError && current.userError.area !== next.area ? current.userError : next;
 }
 
 function getProblemMessage(
