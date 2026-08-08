@@ -25,32 +25,43 @@ async function runWithStubs({ reportedFingerprint }) {
   const binDirectory = join(root, "bin");
   await mkdir(binDirectory, { recursive: true });
 
-  // curl создаёт пустой файл там, куда его просят записать (--output <path>).
+  // curl создаёт пустой файл там, куда его просят записать (--output <path>), но
+  // намеренно отказывает, если скрипт попробует снова скачать открытый ключ.
   await writeFile(
     join(binDirectory, "curl"),
     `#!/bin/sh
 destination=""
+url=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --output) destination="$2"; shift 2 ;;
-    *) shift ;;
+    *) url="$1"; shift ;;
   esac
 done
+case "$url" in
+  *ffmpeg-devel.asc) echo "Ключ не должен скачиваться" >&2; exit 91 ;;
+esac
 [ -n "$destination" ] && : > "$destination"
 exit 0
 `,
   );
 
-  // gpg отвечает заданным отпечатком на --fingerprint и успехом на импорт и проверку.
+  // gpg отвечает заданным отпечатком на --fingerprint и проверяет, что импортируется
+  // закреплённый file из репозитория, а не скачанный runtime key.
   await writeFile(
     join(binDirectory, "gpg"),
     `#!/bin/sh
+last=""
 for argument in "$@"; do
+  last="$argument"
   if [ "$argument" = "--fingerprint" ]; then
     echo "fpr:::::::::${reportedFingerprint}:"
     exit 0
   fi
 done
+case "$*" in
+  *--import*) test "$last" = "$FFMPEG_SIGNING_KEY_PATH" || exit 92 ;;
+esac
 exit 0
 `,
   );
@@ -69,7 +80,15 @@ exit 0
     ],
     {
       encoding: "utf8",
-      env: { ...process.env, PATH: `${binDirectory}:${process.env.PATH}` },
+      env: {
+        ...process.env,
+        PATH: `${binDirectory}:${process.env.PATH}`,
+        FFMPEG_SIGNING_KEY_PATH: join(
+          process.cwd(),
+          "scripts",
+          "ffmpeg-release-signing-key.asc",
+        ),
+      },
     },
   );
 
@@ -96,6 +115,7 @@ test("сборка media sidecar проходит проверку ключа п
   // Дальше скрипт распаковывает пустой архив и падает уже на tar/configure — важно лишь,
   // что причина не в проверке ключа.
   assert.doesNotMatch(result.stderr, /не совпал с закреплённым отпечатком/);
+  assert.doesNotMatch(result.stderr, /Ключ не должен скачиваться/);
 });
 
 test("загрузка FFmpeg повторяется после curl (35) и не публикует partial-файл", async () => {

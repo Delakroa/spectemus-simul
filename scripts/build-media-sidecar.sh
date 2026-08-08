@@ -4,12 +4,14 @@ set -euo pipefail
 readonly FFMPEG_VERSION="8.1.2"
 readonly FFMPEG_ARCHIVE="ffmpeg-${FFMPEG_VERSION}.tar.xz"
 readonly FFMPEG_BASE_URL="https://ffmpeg.org/releases"
-readonly FFMPEG_KEY_URL="https://ffmpeg.org/ffmpeg-devel.asc"
-# Отпечаток релизного ключа FFmpeg закреплён намеренно. Ключ отдаёт тот же хост, что и
-# архив, поэтому сама по себе подпись независимой гарантии не даёт: хост, отдавший
-# подменённый архив, отдал бы и подходящий к нему ключ. Проверяем, что импортирован
-# именно ожидаемый ключ (last-16 отпечатка — общеизвестный key id B4322F04D67658D8).
+readonly SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Отпечаток и открытая часть релизного ключа FFmpeg закреплены намеренно. Не получаем
+# ключ с того же хоста, что и архив: его временная недоступность не должна останавливать
+# installer, а хост с подменённым архивом мог бы отдать подходящий поддельный ключ.
+# Проверяем, что импортирован именно ожидаемый ключ (last-16 отпечатка — общеизвестный
+# key id B4322F04D67658D8).
 readonly FFMPEG_SIGNING_KEY_FINGERPRINT="FCF986EA15E6E293A5644F10B4322F04D67658D8"
+readonly FFMPEG_SIGNING_KEY="$SCRIPT_DIRECTORY/ffmpeg-release-signing-key.asc"
 readonly DOWNLOAD_RETRY_ATTEMPTS="${DOWNLOAD_RETRY_ATTEMPTS:-7}"
 readonly DOWNLOAD_RETRY_DELAY_SECONDS="${DOWNLOAD_RETRY_DELAY_SECONDS:-5}"
 readonly DOWNLOAD_RETRY_MAX_DELAY_SECONDS="${DOWNLOAD_RETRY_MAX_DELAY_SECONDS:-60}"
@@ -58,7 +60,6 @@ main() {
   local work_directory
   local archive
   local signature
-  local developer_key
   local source_directory
   local ffmpeg_binary
   local ffprobe_binary
@@ -69,6 +70,10 @@ main() {
   fi
   command -v "$gpg_command" >/dev/null 2>&1 || {
     echo "Для проверки подписи FFmpeg нужен gpg." >&2
+    exit 1
+  }
+  [[ -r "$FFMPEG_SIGNING_KEY" ]] || {
+    echo "Не найден закреплённый открытый ключ подписи FFmpeg: $FFMPEG_SIGNING_KEY" >&2
     exit 1
   }
 
@@ -97,10 +102,8 @@ main() {
 
   archive="$work_directory/$FFMPEG_ARCHIVE"
   signature="$archive.asc"
-  developer_key="$work_directory/ffmpeg-devel.asc"
   download_with_retry "$archive" "$FFMPEG_BASE_URL/$FFMPEG_ARCHIVE"
   download_with_retry "$signature" "$FFMPEG_BASE_URL/$FFMPEG_ARCHIVE.asc"
-  download_with_retry "$developer_key" "$FFMPEG_KEY_URL"
 
   # Изолированный keyring: проверка не зависит от ключей, уже лежащих у пользователя или
   # на переиспользуемом runner, и не засоряет их. Каталог лежит внутри work_directory,
@@ -109,7 +112,7 @@ main() {
   mkdir -p "$GNUPGHOME"
   chmod 700 "$GNUPGHOME"
 
-  "$gpg_command" --batch --import "$developer_key"
+  "$gpg_command" --batch --import "$FFMPEG_SIGNING_KEY"
   if ! "$gpg_command" --batch --with-colons --fingerprint \
     | grep -q "^fpr:::::::::${FFMPEG_SIGNING_KEY_FINGERPRINT}:"; then
     echo "Ключ подписи FFmpeg не совпал с закреплённым отпечатком ${FFMPEG_SIGNING_KEY_FINGERPRINT}." >&2
