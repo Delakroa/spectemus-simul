@@ -211,6 +211,11 @@ export function HomePage() {
   const [guestDisplayName, setGuestDisplayName] = useState("Guest");
   const [joinRoomIdDraft, setJoinRoomIdDraft] = useState("");
   const [isFileDropActive, setIsFileDropActive] = useState(false);
+  const [isDesktopDropRejected, setIsDesktopDropRejected] = useState(false);
+  // В desktop-сборке файл выбирается только системным диалогом: он отдаёт путь на диске,
+  // без которого локальная подготовка совместимой копии не запускается.
+  const isDesktopPickerAvailable =
+    typeof window !== "undefined" && Boolean(window.spectemusDesktop?.pickMediaFile);
   const [inviteCopied, setInviteCopied] = useState(false);
   const [isInviteShareSheetOpen, setIsInviteShareSheetOpen] = useState(false);
   const [inviteShareStatus, setInviteShareStatus] = useState<InviteShareStatus>("idle");
@@ -539,13 +544,19 @@ export function HomePage() {
 
   function handleFileDragOver(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
-    event.dataTransfer.dropEffect = "copy";
-    setIsFileDropActive(true);
+    // В desktop-сборке перетаскивание не поддерживается: у файла из drop нет пути на
+    // диске, поэтому он ушёл бы в браузерный путь мимо локальной подготовки копии.
+    event.dataTransfer.dropEffect = isDesktopPickerAvailable ? "none" : "copy";
+    setIsFileDropActive(!isDesktopPickerAvailable);
   }
 
   function handleFileDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
     setIsFileDropActive(false);
+    if (isDesktopPickerAvailable) {
+      setIsDesktopDropRejected(true);
+      return;
+    }
     selectLocalFile(event.dataTransfer.files?.[0]);
   }
 
@@ -1026,6 +1037,13 @@ export function HomePage() {
                         ? "Подготовка…"
                         : "Выбрать файл"}
                   </button>
+
+                  {isDesktopDropRejected && (
+                    <p className="file-picker__hint" role="status">
+                      Перетаскивание здесь не поддерживается. Нажмите «Выбрать файл» — тогда
+                      приложение сможет при необходимости подготовить совместимую копию.
+                    </p>
+                  )}
 
                   {roomSession.fileStatus === "ready" && roomSession.fileResult && (
                     <div className="file-picker__info">

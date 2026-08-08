@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createSocket } from "node:dgram";
-import { access, constants } from "node:fs/promises";
+import { closeSync, openSync, statSync, truncateSync } from "node:fs";
+import { access, constants, mkdir } from "node:fs/promises";
 import { createConnection, createServer } from "node:net";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -112,31 +113,95 @@ export async function assertDesktopResources(
   }
 }
 
-export async function hasMediaTools(paths) {
-  try {
-    if (paths.ffmpeg.includes("/") || paths.ffmpeg.includes("\\")) {
-      await access(paths.ffmpeg, constants.X_OK);
+/**
+ * Проверяет media-сайдкары и ВОЗВРАЩАЕТ ПРИЧИНУ отказа. Раньше любой сбой сводился к
+ * `false`, и интерфейс говорил «в этой сборке нет средства подготовки видео» — хотя
+ * бинарник лежит на месте и просто не стартует (карантин Gatekeeper, отсутствующая
+ * библиотека, слишком высокий deployment target). Из-за этого дефект уезжал не в ту
+ * подсистему.
+ *
+ * @returns {Promise<{available: boolean, reason?: string}>}
+ */
+export async function probeMediaTools(paths) {
+  for (const [label, binary] of [
+    ["ffmpeg", paths.ffmpeg],
+    ["ffprobe", paths.ffprobe],
+  ]) {
+    if (binary.includes("/") || binary.includes("\\")) {
+      try {
+        await access(binary, constants.X_OK);
+      } catch (error) {
+        return {
+          available: false,
+          reason: `${label} недоступен для запуска: ${binary} (${error?.code ?? "нет доступа"})`,
+        };
+      }
     }
-    if (paths.ffprobe.includes("/") || paths.ffprobe.includes("\\")) {
-      await access(paths.ffprobe, constants.X_OK);
-    }
-    const ffmpeg = spawnSync(paths.ffmpeg, ["-version"], {
+
+    const probe = spawnSync(binary, ["-version"], {
       encoding: "utf8",
       windowsHide: true,
     });
-    const ffprobe = spawnSync(paths.ffprobe, ["-version"], {
-      encoding: "utf8",
-      windowsHide: true,
-    });
-    return (
-      !ffmpeg.error &&
-      ffmpeg.status === 0 &&
-      !ffprobe.error &&
-      ffprobe.status === 0
-    );
-  } catch {
-    return false;
+    if (probe.error) {
+      return {
+        available: false,
+        reason: `${label} не запускается: ${probe.error.code ?? probe.error.message} (${binary})`,
+      };
+    }
+    if (probe.signal) {
+      return {
+        available: false,
+        // На macOS неподписанный или карантинный бинарник убивается сигналом.
+        reason: `${label} остановлен системой по сигналу ${probe.signal}: возможен карантин или отсутствие подписи (${binary})`,
+      };
+    }
+    if (probe.status !== 0) {
+      const firstLine = String(probe.stderr ?? "")
+        .split("\n")
+        .find((line) => line.trim().length > 0);
+      return {
+        available: false,
+        reason: `${label} завершился с кодом ${probe.status}${firstLine ? `: ${firstLine.trim()}` : ""}`,
+      };
+    }
   }
+
+  return { available: true };
+}
+
+export async function hasMediaTools(paths) {
+  return (await probeMediaTools(paths)).available;
+}
+
+const MAX_SIDECAR_LOG_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Открывает файл лога сайдкара на дозапись. Раньше backend и LiveKit спавнились с
+ * `stdio: "ignore"`, поэтому упавший прогон нельзя было превратить в тикет: на экране
+ * оставалась единственная строка вида «LiveKit завершился неожиданно (код 1)».
+ * Возвращает `null`, если каталог недоступен — отсутствие лога не должно мешать старту.
+ */
+export async function openSidecarLog(logDirectory, name) {
+  try {
+    await mkdir(logDirectory, { recursive: true, mode: 0o700 });
+    const logPath = join(logDirectory, `${name}.log`);
+    try {
+      if (statSync(logPath).size > MAX_SIDECAR_LOG_BYTES) {
+        truncateSync(logPath, 0);
+      }
+    } catch {
+      // Файла ещё нет — откроем его ниже.
+    }
+    return { fd: openSync(logPath, "a"), path: logPath };
+  } catch {
+    return null;
+  }
+}
+
+function sidecarStdio(outputFd) {
+  return outputFd === undefined || outputFd === null
+    ? "ignore"
+    : ["ignore", outputFd, outputFd];
 }
 
 export class DesktopSupervisor {
@@ -147,6 +212,7 @@ export class DesktopSupervisor {
     waitForLiveKitReady = waitForLiveKitTcpReady,
     assertPortsAvailable = assertDesktopPortsAvailable,
     recoverOwnedSidecars: recoverOwnedSidecarsFn = recoverOwnedSidecars,
+    openSidecarLog: openSidecarLogFn = openSidecarLog,
     mediaResolver,
   } = {}) {
     this.gatewayFactory = gatewayFactory;
@@ -155,6 +221,7 @@ export class DesktopSupervisor {
     this.waitForLiveKitReady = waitForLiveKitReady;
     this.assertPortsAvailable = assertPortsAvailable;
     this.recoverOwnedSidecars = recoverOwnedSidecarsFn;
+    this.openSidecarLog = openSidecarLogFn;
     this.mediaResolver = mediaResolver;
     this.status = { state: "stopped", detail: "Host не запущен." };
     this.listeners = new Set();
@@ -164,6 +231,8 @@ export class DesktopSupervisor {
     this.runtimeDirectory = undefined;
     this.ownedSidecars = [];
     this.startInterrupted = false;
+    this.logDirectory = undefined;
+    this.sidecarLogs = [];
   }
 
   subscribe(listener) {
@@ -174,6 +243,7 @@ export class DesktopSupervisor {
 
   async start({
     lanAddress,
+    logDirectory,
     paths,
     ports = DEFAULT_PORTS,
     runtimeDirectory,
@@ -191,6 +261,7 @@ export class DesktopSupervisor {
     );
     try {
       this.runtimeDirectory = runtimeDirectory;
+      this.logDirectory = logDirectory ?? join(runtimeDirectory, "logs");
       await this.recoverOwnedSidecars({ runtimeDirectory });
       this.assertStartupIsActive();
       this.setStatus(
@@ -200,7 +271,18 @@ export class DesktopSupervisor {
       await this.assertPortsAvailable(ports);
       this.assertStartupIsActive();
       this.setStatus("starting-backend", "Запускаем локальный backend.");
-      const backend = this.spawnBackend({ lanAddress, paths, ports, secrets });
+      const backendLog = await this.openSidecarLog(
+        this.logDirectory,
+        "backend",
+      );
+      this.sidecarLogs.push(backendLog);
+      const backend = this.spawnBackend({
+        lanAddress,
+        outputFd: backendLog?.fd,
+        paths,
+        ports,
+        secrets,
+      });
       this.trackChild(backend, "Backend");
       await this.rememberOwnedSidecar({
         child: backend,
@@ -215,7 +297,13 @@ export class DesktopSupervisor {
       this.assertStartupIsActive();
 
       this.setStatus("starting-livekit", "Запускаем локальный media server.");
+      const livekitLog = await this.openSidecarLog(
+        this.logDirectory,
+        "livekit",
+      );
+      this.sidecarLogs.push(livekitLog);
       const livekit = this.spawnLiveKit({
+        outputFd: livekitLog?.fd,
         lanAddress,
         paths,
         ports,
@@ -294,7 +382,7 @@ export class DesktopSupervisor {
     }
   }
 
-  spawnBackend({ lanAddress, paths, ports, secrets }) {
+  spawnBackend({ lanAddress, outputFd, paths, ports, secrets }) {
     return this.spawnProcess(
       paths.javaCommand,
       [
@@ -314,13 +402,20 @@ export class DesktopSupervisor {
           SESSION_COOKIE_SECURE: "false",
           SPRING_PROFILES_ACTIVE: "desktop",
         },
-        stdio: "ignore",
+        stdio: sidecarStdio(outputFd),
         windowsHide: true,
       },
     );
   }
 
-  spawnLiveKit({ lanAddress, paths, ports, runtimeDirectory, secrets }) {
+  spawnLiveKit({
+    lanAddress,
+    outputFd,
+    paths,
+    ports,
+    runtimeDirectory,
+    secrets,
+  }) {
     return this.spawnProcess(
       paths.livekitServer,
       [
@@ -336,7 +431,7 @@ export class DesktopSupervisor {
           ...process.env,
           LIVEKIT_KEYS: `${secrets.livekitApiKey}: ${secrets.livekitApiSecret}`,
         },
-        stdio: "ignore",
+        stdio: sidecarStdio(outputFd),
         windowsHide: true,
       },
     );
@@ -430,6 +525,18 @@ export class DesktopSupervisor {
     if (!cleanupFailed && this.runtimeDirectory) {
       await clearOwnedSidecars(this.runtimeDirectory);
       this.ownedSidecars = [];
+    }
+    // Дескрипторы логов закрываем только после остановки детей: пока процесс жив, он
+    // продолжает писать в них.
+    for (const log of this.sidecarLogs.splice(0)) {
+      if (typeof log?.fd !== "number") {
+        continue;
+      }
+      try {
+        closeSync(log.fd);
+      } catch {
+        // Дескриптор мог закрыться вместе с процессом.
+      }
     }
     this.setStatus(
       "stopped",

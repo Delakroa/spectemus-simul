@@ -21,7 +21,7 @@ import {
   DEFAULT_PORTS,
   DesktopSupervisor,
   assertDesktopResources,
-  hasMediaTools,
+  probeMediaTools,
   resolveSidecarPaths,
 } from "./sidecars.mjs";
 import { createShutdownCoordinator } from "./shutdown.mjs";
@@ -143,6 +143,7 @@ async function startDesktopHost(preferredLanAddress) {
     try {
       const lan = resolveLanAddress(undefined, preferredLanAddress);
       const runtimeDirectory = join(app.getPath("userData"), "runtime");
+      const sidecarLogDirectory = join(app.getPath("userData"), "logs");
       await mkdir(runtimeDirectory, { recursive: true, mode: 0o700 });
       const paths = resolveSidecarPaths({
         packaged: app.isPackaged,
@@ -158,13 +159,20 @@ async function startDesktopHost(preferredLanAddress) {
         "normalized-media",
       );
       await clearNormalizedMediaDirectory(normalizedMediaDirectory);
-      mediaLibrary.normalizer = (await hasMediaTools(paths))
+      const mediaTools = await probeMediaTools(paths);
+      mediaLibrary.normalizer = mediaTools.available
         ? new DesktopMediaNormalizer({
             ffmpegPath: paths.ffmpeg,
             ffprobePath: paths.ffprobe,
             outputDirectory: normalizedMediaDirectory,
           })
         : null;
+      // Причина недоступности объясняет разницу между «сборка без ffmpeg» и «ffmpeg на
+      // месте, но не стартует»: без неё дефект уходит не в ту подсистему.
+      mediaLibrary.normalizerUnavailableReason = mediaTools.reason ?? null;
+      if (!mediaTools.available) {
+        console.error(`[media] нормализатор недоступен: ${mediaTools.reason}`);
+      }
       const secrets = await loadOrCreateInstallationSecrets(
         join(runtimeDirectory, "installation-secrets.json"),
       );
@@ -174,6 +182,7 @@ async function startDesktopHost(preferredLanAddress) {
       );
       const { url } = await supervisor.start({
         lanAddress: lan.address,
+        logDirectory: sidecarLogDirectory,
         paths,
         runtimeDirectory,
         secrets,

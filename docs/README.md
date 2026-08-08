@@ -30,6 +30,11 @@
 - [SPS-692_HOST_PREVIEW_MUTE.md](SPS-692_HOST_PREVIEW_MUTE.md) —
   повторная привязка локального preview больше не включает выключенный звук;
   первый тикет с префиксом `SPS-`.
+- [SPS-693_PHASE0_RUN_READINESS.md](SPS-693_PHASE0_RUN_READINESS.md) —
+  готовность к физическому прогону Mac ↔ Windows: ad-hoc подпись preview,
+  нормализация HEVC, логи сайдкаров, причина отказа ffmpeg, запуск сайдкаров в CI.
+- [SPS-694_AGENTS_ENTRY_POINT.md](SPS-694_AGENTS_ENTRY_POINT.md) —
+  `AGENTS.md` сведён к карте и правилам агента; конвенции остались в одном месте.
 
 ## Быстрый порядок чтения
 

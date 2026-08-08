@@ -2635,7 +2635,15 @@ function isBenignPlayInterruption(error: unknown) {
 function isNormalizableDiagnosticFailure(error: unknown) {
   return (
     error instanceof FileDiagnosticsFailure &&
-    ["UNSUPPORTED_FORMAT", "METADATA_LOAD_FAILED", "CAPTURE_PREVIEW_FAILED"].includes(error.code)
+    // NO_VIDEO_TRACK тоже нормализуем: браузер демуксит контейнер, но не находит
+    // декодируемое видео (например MKV HEVC без платформенного декодера на Windows).
+    // Файлы действительно без видеодорожки отсеет ffprobe в нормализаторе.
+    [
+      "UNSUPPORTED_FORMAT",
+      "METADATA_LOAD_FAILED",
+      "CAPTURE_PREVIEW_FAILED",
+      "NO_VIDEO_TRACK",
+    ].includes(error.code)
   );
 }
 

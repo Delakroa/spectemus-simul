@@ -18,7 +18,10 @@
 
 - `backend/` отвечает за server-side product state и API.
 - `frontend/` отвечает за product UI и browser media lifecycle.
+- `desktop/` содержит Electron host application и packaging.
+- `contracts/` содержит REST OpenAPI, WebSocket JSON Schema и примеры.
 - `infra/` отвечает за локальную и deployment-инфраструктуру.
+- `e2e/` содержит Playwright multi-user tests.
 - `poc/` содержит только reference prototypes.
 - `docs/` содержит ADR, заметки по совместимости и качеству, контракты и отчёты по тикетам.
 
@@ -94,6 +97,8 @@ pnpm check
 ```
 
 Ticket-specific commands можно добавлять, но root checks должны оставаться основным quality gate.
+
+Списки prettier разбиты по темам: `format:check`, `format:installer`, `format:lan`, `format:staging`, `format:media-poc`, `format:media-compatibility`. Новый документ нужно дописать в ту цепочку, где лежат его соседи по теме, иначе CI не проверит его форматирование.
 
 ## Завершение
 
