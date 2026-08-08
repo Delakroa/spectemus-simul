@@ -29,6 +29,6 @@ class DesktopProfileContextTest {
         assertThat(rateLimiter.getClass().getSimpleName()).isEqualTo("InMemoryRateLimiter");
         assertThat(context.containsBean("redisRoomCreationStore")).isFalse();
         assertThat(context.containsBean("redisRateLimiter")).isFalse();
-        assertThat(context.containsBean("inMemoryFeedbackStore")).isTrue();
+        assertThat(context.containsBean("desktopFeedbackStore")).isTrue();
     }
 }

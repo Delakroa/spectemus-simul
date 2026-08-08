@@ -6,7 +6,18 @@ export async function loadOrCreateInstallationSecrets(filePath) {
   try {
     const parsed = JSON.parse(await readFile(filePath, "utf8"));
     if (isInstallationSecrets(parsed)) {
-      return parsed;
+      if (
+        typeof parsed.feedbackAdminToken === "string" &&
+        parsed.feedbackAdminToken
+      ) {
+        return parsed;
+      }
+      // Установка, созданная до появления operator-доступа к отзывам: дописываем токен,
+      // не трогая уже выданные LiveKit-секреты.
+      return writeInstallationSecrets(filePath, {
+        ...parsed,
+        feedbackAdminToken: createFeedbackAdminToken(),
+      });
     }
     throw new Error("Файл секретов desktop host повреждён.");
   } catch (error) {
@@ -15,10 +26,18 @@ export async function loadOrCreateInstallationSecrets(filePath) {
     }
   }
 
-  const secrets = {
+  return writeInstallationSecrets(filePath, {
+    feedbackAdminToken: createFeedbackAdminToken(),
     livekitApiKey: `s2_${randomBytes(12).toString("hex")}`,
     livekitApiSecret: randomBytes(32).toString("base64url"),
-  };
+  });
+}
+
+function createFeedbackAdminToken() {
+  return randomBytes(32).toString("base64url");
+}
+
+async function writeInstallationSecrets(filePath, secrets) {
   await mkdir(dirname(filePath), { recursive: true, mode: 0o700 });
   const temporaryPath = `${filePath}.${process.pid}.tmp`;
   await writeFile(temporaryPath, `${JSON.stringify(secrets)}\n`, {

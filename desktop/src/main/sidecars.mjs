@@ -242,6 +242,7 @@ export class DesktopSupervisor {
   }
 
   async start({
+    feedbackStoragePath,
     lanAddress,
     logDirectory,
     paths,
@@ -277,6 +278,7 @@ export class DesktopSupervisor {
       );
       this.sidecarLogs.push(backendLog);
       const backend = this.spawnBackend({
+        feedbackStoragePath,
         lanAddress,
         outputFd: backendLog?.fd,
         paths,
@@ -382,7 +384,14 @@ export class DesktopSupervisor {
     }
   }
 
-  spawnBackend({ lanAddress, outputFd, paths, ports, secrets }) {
+  spawnBackend({
+    feedbackStoragePath,
+    lanAddress,
+    outputFd,
+    paths,
+    ports,
+    secrets,
+  }) {
     return this.spawnProcess(
       paths.javaCommand,
       [
@@ -395,6 +404,10 @@ export class DesktopSupervisor {
       {
         env: {
           ...process.env,
+          // Без токена operator-эндпоинты отвечают 403, и собранные за прогон отзывы
+          // нечем прочитать; без пути они не переживают выход из приложения.
+          FEEDBACK_ADMIN_TOKEN: secrets.feedbackAdminToken ?? "",
+          FEEDBACK_STORAGE_PATH: feedbackStoragePath ?? "",
           LIVEKIT_API_KEY: secrets.livekitApiKey,
           LIVEKIT_API_SECRET: secrets.livekitApiSecret,
           LIVEKIT_URL: `ws://${lanAddress}:${ports.livekitHttp}`,

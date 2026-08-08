@@ -181,6 +181,7 @@ async function startDesktopHost(preferredLanAddress) {
         DEFAULT_PORTS,
       );
       const { url } = await supervisor.start({
+        feedbackStoragePath: join(runtimeDirectory, "feedback-reports.json"),
         lanAddress: lan.address,
         logDirectory: sidecarLogDirectory,
         paths,

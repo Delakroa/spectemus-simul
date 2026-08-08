@@ -8,7 +8,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record FeedbackOperationsProperties(
         String adminToken,
         Duration retention,
-        Integer exportLimit) {
+        Integer exportLimit,
+        String storagePath) {
 
     private static final Duration DEFAULT_RETENTION = Duration.ofDays(30);
     private static final int DEFAULT_EXPORT_LIMIT = 200;
@@ -18,6 +19,8 @@ public record FeedbackOperationsProperties(
         adminToken = adminToken == null ? "" : adminToken.strip();
         retention = normalizeRetention(retention);
         exportLimit = normalizeLimit(exportLimit);
+        // Пустой путь оставляет desktop-хранилище чисто в памяти — прежнее поведение.
+        storagePath = storagePath == null ? "" : storagePath.strip();
     }
 
     public boolean adminEnabled() {
