@@ -29,11 +29,12 @@ LAN desktop preview уже умеет создать комнату, подел�
 локальную подготовку распространённых контейнеров в временный H.264/AAC MP4.
 Предыдущие installer-runs выявили три packaging-дефекта: нестабильную загрузку
 FFmpeg signature/key и некорректные symbolic links в macOS bundle. SPS-695,
-SPS-697, SPS-698 и SPS-699 закрывают их кодом, но финальный install smoke на
-Apple Silicon, Intel Mac и Windows ещё должен пройти повторно. Последующий
-hardening WT-684–WT-689 закрыл cleanup sidecars, gateway/proxy, reconnect room,
-race WebSocket и конечные состояния playback UI; каждый change прошёл полный
-local и GitHub CI.
+SPS-697, SPS-698 и SPS-699 закрыли их кодом; SPS-700 исправляет обнаруженную
+на runner-е повреждённую OpenPGP armour ключа и добавляет локальную проверку
+CRC-24. Финальный install smoke на Apple Silicon, Intel Mac и Windows должен
+пройти повторно. Последующий hardening WT-684–WT-689 закрыл cleanup sidecars,
+gateway/proxy, reconnect room, race WebSocket и конечные состояния playback UI;
+каждый change прошёл полный local и GitHub CI.
 
 Это ещё не обещание «любой фильм работает». Перед следующим публичным заявлением
 нужны реальные прогоны Mac ↔ Windows с MP4, MKV H.264/AAC, MKV HEVC/AAC и MKV

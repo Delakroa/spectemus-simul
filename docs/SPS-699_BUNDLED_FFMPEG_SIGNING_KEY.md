@@ -24,9 +24,9 @@ FCF986EA15E6E293A5644F10B4322F04D67658D8
   сверяет fingerprint и проверяет `.asc` подпись архива;
 - сетевыми остаются только архив FFmpeg и его signature. Повторная загрузка
   открытого ключа больше не нужна;
-- regression test делает fake `curl` ошибочным для `ffmpeg-devel.asc` и
-  подтверждает, что сборщик импортирует именно versioned key file из
-  репозитория.
+- regression test делает fake `curl` ошибочным для `ffmpeg-devel.asc`,
+  подтверждает импорт ключа именно из репозитория и проверяет checksum
+  OpenPGP ASCII-armour.
 
 ## Проверка
 
