@@ -51,6 +51,9 @@
   исправление повреждённого OpenPGP armour и проверка его CRC-24 до runner-а.
 - [SPS-701_FFMPEG_MIRROR_FALLBACK.md](SPS-701_FFMPEG_MIRROR_FALLBACK.md) —
   проверяемое переключение между официальным release-сервером FFmpeg и зеркалами.
+- [SPS-702_PINNED_FFMPEG_ARCHIVE_SIGNATURE.md](SPS-702_PINNED_FFMPEG_ARCHIVE_SIGNATURE.md) —
+  закреплённая detached-подпись исходного архива: сборщик больше не загружает её
+  из сети.
 
 ## Быстрый порядок чтения
 

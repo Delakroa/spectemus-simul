@@ -31,10 +31,11 @@ LAN desktop preview уже умеет создать комнату, подел�
 FFmpeg, некорректные symbolic links в macOS bundle и повреждённый OpenPGP
 armour ключа. SPS-695, SPS-697, SPS-698 и SPS-699 закрыли первые варианты
 сетевой нестабильности и packaging; SPS-700 исправил armour и добавил локальную
-проверку CRC-24. SPS-701 добавляет чередование официального источника и
-проверенных зеркал для архива, не ослабляя проверку подписи. Финальный install
-smoke на Apple Silicon, Intel Mac и Windows должен пройти повторно. Последующий
-hardening WT-684–WT-689 закрыл cleanup sidecars,
+проверку CRC-24. SPS-701 добавил чередование официального источника и
+проверенных зеркал для архива, не ослабляя проверку подписи. SPS-702 закрепляет
+detached-подпись в репозитории, поэтому её доступность больше не зависит от
+сети. Финальный install smoke на Apple Silicon, Intel Mac и Windows должен
+пройти повторно. Последующий hardening WT-684–WT-689 закрыл cleanup sidecars,
 gateway/proxy, reconnect room, race WebSocket и конечные состояния playback UI;
 каждый change прошёл полный local и GitHub CI.
 
