@@ -35,6 +35,9 @@
   нормализация HEVC, логи сайдкаров, причина отказа ffmpeg, запуск сайдкаров в CI.
 - [SPS-694_AGENTS_ENTRY_POINT.md](SPS-694_AGENTS_ENTRY_POINT.md) —
   `AGENTS.md` сведён к карте и правилам агента; конвенции остались в одном месте.
+- [SPS-695_FFMPEG_DOWNLOAD_RESILIENCE.md](SPS-695_FFMPEG_DOWNLOAD_RESILIENCE.md) —
+  повторяемая безопасная загрузка FFmpeg для desktop installer после временного
+  сетевого сбоя.
 
 ## Быстрый порядок чтения
 
