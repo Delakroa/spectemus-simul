@@ -27,12 +27,14 @@
 LAN desktop preview уже умеет создать комнату, поделиться ссылкой/QR,
 синхронно передавать видео и звук, чат и восстановление сессии. WT-682 добавил
 локальную подготовку распространённых контейнеров в временный H.264/AAC MP4.
-Предыдущие installer-runs выявили три packaging-дефекта: нестабильную загрузку
-FFmpeg signature/key и некорректные symbolic links в macOS bundle. SPS-695,
-SPS-697, SPS-698 и SPS-699 закрыли их кодом; SPS-700 исправляет обнаруженную
-на runner-е повреждённую OpenPGP armour ключа и добавляет локальную проверку
-CRC-24. Финальный install smoke на Apple Silicon, Intel Mac и Windows должен
-пройти повторно. Последующий hardening WT-684–WT-689 закрыл cleanup sidecars,
+Предыдущие installer-runs выявили packaging-дефекты: нестабильную загрузку
+FFmpeg, некорректные symbolic links в macOS bundle и повреждённый OpenPGP
+armour ключа. SPS-695, SPS-697, SPS-698 и SPS-699 закрыли первые варианты
+сетевой нестабильности и packaging; SPS-700 исправил armour и добавил локальную
+проверку CRC-24. SPS-701 добавляет чередование официального источника и
+проверенных зеркал для архива, не ослабляя проверку подписи. Финальный install
+smoke на Apple Silicon, Intel Mac и Windows должен пройти повторно. Последующий
+hardening WT-684–WT-689 закрыл cleanup sidecars,
 gateway/proxy, reconnect room, race WebSocket и конечные состояния playback UI;
 каждый change прошёл полный local и GitHub CI.
 
