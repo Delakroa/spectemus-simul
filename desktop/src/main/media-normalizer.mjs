@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
-import { mkdir, rm, stat } from "node:fs/promises";
+import { mkdir, rm, stat, statfs } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 
 const OUTPUT_VIDEO_CODEC = "h264";
@@ -9,6 +9,9 @@ const OUTPUT_AUDIO_BITRATE = "160k";
 const OUTPUT_VIDEO_BITRATE = "6000k";
 const FORCE_KILL_WAIT_MS = 1_000;
 const PROBE_TIMEOUT_MS = 15_000;
+// Оценка по битрейту выхода игнорирует контейнерные накладные расходы и
+// колебания энкодера вокруг целевого битрейта — запас закрывает и то, и другое.
+const DISK_SPACE_SAFETY_MARGIN = 1.15;
 
 export class MediaNormalizationFailure extends Error {
   constructor(code, message) {
@@ -25,12 +28,14 @@ export class DesktopMediaNormalizer {
     outputDirectory,
     platform = process.platform,
     spawnProcess = spawn,
+    statDiskSpace = statfs,
   }) {
     this.ffmpegPath = ffmpegPath;
     this.ffprobePath = ffprobePath;
     this.outputDirectory = resolve(outputDirectory);
     this.platform = platform;
     this.spawnProcess = spawnProcess;
+    this.statDiskSpace = statDiskSpace;
   }
 
   async normalize({ inputPath, onProgress, signal }) {
@@ -53,6 +58,11 @@ export class DesktopMediaNormalizer {
 
       await mkdir(this.outputDirectory, { recursive: true, mode: 0o700 });
       outputPath = join(this.outputDirectory, `${randomUUID()}.mp4`);
+      await assertSufficientDiskSpace({
+        outputDirectory: this.outputDirectory,
+        requiredBytes: estimateOutputBytes(source.durationSeconds),
+        statDiskSpace: this.statDiskSpace,
+      });
       await runTranscode({
         command: this.ffmpegPath,
         args: buildNormalizationArguments({
@@ -90,6 +100,53 @@ export class DesktopMediaNormalizer {
 
 export async function clearNormalizedMediaDirectory(outputDirectory) {
   await rm(resolve(outputDirectory), { force: true, recursive: true });
+}
+
+export function estimateOutputBytes(durationSeconds) {
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+    return null;
+  }
+  const bytesPerSecond =
+    bitrateToBytesPerSecond(OUTPUT_VIDEO_BITRATE) +
+    bitrateToBytesPerSecond(OUTPUT_AUDIO_BITRATE);
+  return Math.ceil(durationSeconds * bytesPerSecond * DISK_SPACE_SAFETY_MARGIN);
+}
+
+export async function assertSufficientDiskSpace({
+  outputDirectory,
+  requiredBytes,
+  statDiskSpace = statfs,
+}) {
+  // Без длительности источника (повреждённый или нестандартный контейнер) оценить
+  // объём нечем — полагаемся на нативную ошибку ffmpeg при реальной нехватке места.
+  if (!requiredBytes) {
+    return;
+  }
+  let volume;
+  try {
+    volume = await statDiskSpace(outputDirectory);
+  } catch {
+    // statfs недоступен или каталог ещё не виден файловой системе — не блокируем
+    // подготовку из-за диагностики, которая сама не смогла отработать.
+    return;
+  }
+  const availableBytes = volume.bavail * volume.bsize;
+  if (availableBytes >= requiredBytes) {
+    return;
+  }
+  throw new MediaNormalizationFailure(
+    "INSUFFICIENT_DISK_SPACE",
+    `Недостаточно места на диске для подготовки копии: нужно приблизительно ${formatGigabytes(requiredBytes)} ГБ, доступно ${formatGigabytes(availableBytes)} ГБ. Освободите место и попробуйте снова.`,
+  );
+}
+
+function bitrateToBytesPerSecond(bitrate) {
+  const kilobits = Number(bitrate.replace(/k$/i, ""));
+  return (kilobits * 1_000) / 8;
+}
+
+function formatGigabytes(bytes) {
+  return (bytes / 1024 ** 3).toFixed(1);
 }
 
 export function buildNormalizationArguments({

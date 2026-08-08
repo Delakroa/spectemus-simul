@@ -6,10 +6,13 @@ import { join } from "node:path";
 import test from "node:test";
 
 import {
+  DesktopMediaNormalizer,
   MediaNormalizationFailure,
+  assertSufficientDiskSpace,
   buildNormalizationArguments,
   buildProbeArguments,
   clearNormalizedMediaDirectory,
+  estimateOutputBytes,
   parseMediaInventory,
   parseProgressLine,
   resolveVideoEncoder,
@@ -141,6 +144,94 @@ test("normalizer принудительно завершает ffprobe, если
       error.code === "PROBE_FAILED",
   );
   assert.deepEqual(child.signals, ["SIGTERM", "SIGKILL"]);
+});
+
+test("estimateOutputBytes растёт с длительностью и не считает неизвестную длительность", () => {
+  assert.equal(estimateOutputBytes(0), null);
+  assert.equal(estimateOutputBytes(null), null);
+  assert.equal(estimateOutputBytes(Number.NaN), null);
+
+  const twoHourFilm = estimateOutputBytes(2 * 60 * 60);
+  const oneHourFilm = estimateOutputBytes(60 * 60);
+  assert.ok(twoHourFilm > oneHourFilm * 1.9);
+  // 2 часа при 6000k видео + 160k аудио — около 5,5 ГБ с учётом запаса.
+  assert.ok(twoHourFilm > 5 * 1024 ** 3);
+  assert.ok(twoHourFilm < 6.5 * 1024 ** 3);
+});
+
+test("assertSufficientDiskSpace пропускает подготовку, когда места достаточно", async () => {
+  await assert.doesNotReject(
+    assertSufficientDiskSpace({
+      outputDirectory: "/private/output",
+      requiredBytes: 1_000,
+      statDiskSpace: async () => ({ bavail: 10, bsize: 1_000 }),
+    }),
+  );
+});
+
+test("assertSufficientDiskSpace отказывает подготовку при нехватке места на диске", async () => {
+  await assert.rejects(
+    assertSufficientDiskSpace({
+      outputDirectory: "/private/output",
+      requiredBytes: 10_000,
+      statDiskSpace: async () => ({ bavail: 1, bsize: 1_000 }),
+    }),
+    (error) =>
+      error instanceof MediaNormalizationFailure &&
+      error.code === "INSUFFICIENT_DISK_SPACE",
+  );
+});
+
+test("assertSufficientDiskSpace не блокирует подготовку, если statfs недоступен", async () => {
+  await assert.doesNotReject(
+    assertSufficientDiskSpace({
+      outputDirectory: "/private/output",
+      requiredBytes: 10_000,
+      statDiskSpace: async () => {
+        throw new Error("statfs не реализован на этой платформе");
+      },
+    }),
+  );
+});
+
+test("normalizer останавливается до запуска ffmpeg, если на диске не хватает места", async () => {
+  const directory = await mkdtemp(
+    join(tmpdir(), "spectemus-normalized-media-"),
+  );
+  let ffmpegSpawned = false;
+  const normalizer = new DesktopMediaNormalizer({
+    ffmpegPath: "ffmpeg",
+    ffprobePath: "ffprobe",
+    outputDirectory: directory,
+    platform: "darwin",
+    spawnProcess: (command) => {
+      if (command === "ffprobe") {
+        const child = createChild();
+        queueMicrotask(() => {
+          child.stdout.emit(
+            "data",
+            JSON.stringify({
+              format: { duration: "7200", size: "1" },
+              streams: [{ codec_type: "video", codec_name: "h264" }],
+            }),
+          );
+          child.emit("close", 0);
+        });
+        return child;
+      }
+      ffmpegSpawned = true;
+      return createChild();
+    },
+    statDiskSpace: async () => ({ bavail: 1, bsize: 1_000 }),
+  });
+
+  await assert.rejects(
+    normalizer.normalize({ inputPath: "/private/movie.mkv" }),
+    (error) =>
+      error instanceof MediaNormalizationFailure &&
+      error.code === "INSUFFICIENT_DISK_SPACE",
+  );
+  assert.equal(ffmpegSpawned, false);
 });
 
 function createChild({ closeOnSignal } = {}) {
