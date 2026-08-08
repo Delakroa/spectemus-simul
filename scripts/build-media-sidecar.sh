@@ -17,6 +17,7 @@ readonly SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # key id B4322F04D67658D8).
 readonly FFMPEG_SIGNING_KEY_FINGERPRINT="FCF986EA15E6E293A5644F10B4322F04D67658D8"
 readonly FFMPEG_SIGNING_KEY="$SCRIPT_DIRECTORY/ffmpeg-release-signing-key.asc"
+readonly FFMPEG_ARCHIVE_SIGNATURE="$SCRIPT_DIRECTORY/$FFMPEG_ARCHIVE.asc"
 readonly DOWNLOAD_RETRY_ATTEMPTS="${DOWNLOAD_RETRY_ATTEMPTS:-7}"
 readonly DOWNLOAD_RETRY_DELAY_SECONDS="${DOWNLOAD_RETRY_DELAY_SECONDS:-5}"
 readonly DOWNLOAD_RETRY_MAX_DELAY_SECONDS="${DOWNLOAD_RETRY_MAX_DELAY_SECONDS:-60}"
@@ -89,6 +90,10 @@ main() {
     echo "Не найден закреплённый открытый ключ подписи FFmpeg: $FFMPEG_SIGNING_KEY" >&2
     exit 1
   }
+  [[ -r "$FFMPEG_ARCHIVE_SIGNATURE" ]] || {
+    echo "Не найдена закреплённая подпись архива FFmpeg: $FFMPEG_ARCHIVE_SIGNATURE" >&2
+    exit 1
+  }
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -119,9 +124,7 @@ main() {
     "$FFMPEG_OFFICIAL_RELEASES_URL/$FFMPEG_ARCHIVE" \
     "$FFMPEG_VIDEOLAN_MIRROR_URL/$FFMPEG_ARCHIVE" \
     "$FFMPEG_ALIYUN_MIRROR_URL/$FFMPEG_ARCHIVE"
-  download_with_retry "$signature" \
-    "$FFMPEG_OFFICIAL_RELEASES_URL/$FFMPEG_ARCHIVE.asc" \
-    "$FFMPEG_ALIYUN_MIRROR_URL/$FFMPEG_ARCHIVE.asc"
+  cp "$FFMPEG_ARCHIVE_SIGNATURE" "$signature"
 
   # Изолированный keyring: проверка не зависит от ключей, уже лежащих у пользователя или
   # на переиспользуемом runner, и не засоряет их. Каталог лежит внутри work_directory,

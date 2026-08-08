@@ -18,6 +18,11 @@ const signingKey = join(
   "scripts",
   "ffmpeg-release-signing-key.asc",
 );
+const archiveSignature = join(
+  process.cwd(),
+  "scripts",
+  "ffmpeg-8.1.2.tar.xz.asc",
+);
 const PINNED_FINGERPRINT = "FCF986EA15E6E293A5644F10B4322F04D67658D8";
 
 function openPgpCrc24(bytes) {
@@ -41,7 +46,28 @@ test("закреплённый ключ FFmpeg имеет корректный O
   const lines = armor.trim().split(/\r?\n/);
   const checksumLine = lines.find((line) => line.startsWith("="));
   const payload = lines
-    .filter((line) => /^[A-Za-z0-9+/]+$/.test(line))
+    .filter((line) => /^[A-Za-z0-9+/]+={0,2}$/.test(line))
+    .join("");
+
+  assert.ok(checksumLine, "ASCII-armour должен содержать checksum");
+  assert.ok(payload, "ASCII-armour должен содержать payload");
+
+  const checksum = openPgpCrc24(Buffer.from(payload, "base64"));
+  const actualChecksum = Buffer.from([
+    (checksum >>> 16) & 0xff,
+    (checksum >>> 8) & 0xff,
+    checksum & 0xff,
+  ]).toString("base64");
+
+  assert.equal(actualChecksum, checksumLine.slice(1));
+});
+
+test("закреплённая подпись архива FFmpeg имеет корректный OpenPGP ASCII-armour checksum", async () => {
+  const armor = await readFile(archiveSignature, "utf8");
+  const lines = armor.trim().split(/\r?\n/);
+  const checksumLine = lines.find((line) => line.startsWith("="));
+  const payload = lines
+    .filter((line) => /^[A-Za-z0-9+/]+={0,2}$/.test(line))
     .join("");
 
   assert.ok(checksumLine, "ASCII-armour должен содержать checksum");
@@ -81,7 +107,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 case "$url" in
-  *ffmpeg-devel.asc) echo "Ключ не должен скачиваться" >&2; exit 91 ;;
+  *ffmpeg-devel.asc|*.tar.xz.asc) echo "Ключ или подпись не должны скачиваться" >&2; exit 91 ;;
 esac
 [ -n "$destination" ] && : > "$destination"
 exit 0
@@ -157,7 +183,7 @@ test("сборка media sidecar проходит проверку ключа п
   // Дальше скрипт распаковывает пустой архив и падает уже на tar/configure — важно лишь,
   // что причина не в проверке ключа.
   assert.doesNotMatch(result.stderr, /не совпал с закреплённым отпечатком/);
-  assert.doesNotMatch(result.stderr, /Ключ не должен скачиваться/);
+  assert.doesNotMatch(result.stderr, /Ключ или подпись не должны скачиваться/);
 });
 
 test("загрузка FFmpeg повторяется после curl (35) и не публикует partial-файл", async () => {
