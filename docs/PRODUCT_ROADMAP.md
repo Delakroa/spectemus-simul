@@ -27,8 +27,9 @@
 LAN desktop preview уже умеет создать комнату, поделиться ссылкой/QR,
 синхронно передавать видео и звук, чат и восстановление сессии. WT-682 добавил
 локальную подготовку распространённых контейнеров в временный H.264/AAC MP4.
-Предыдущий installer-run выявил два packaging-дефекта FFmpeg и macOS bundle;
-SPS-695, SPS-697 и SPS-698 закрывают их кодом, но финальный install smoke на
+Предыдущие installer-runs выявили три packaging-дефекта: нестабильную загрузку
+FFmpeg signature/key и некорректные symbolic links в macOS bundle. SPS-695,
+SPS-697, SPS-698 и SPS-699 закрывают их кодом, но финальный install smoke на
 Apple Silicon, Intel Mac и Windows ещё должен пройти повторно. Последующий
 hardening WT-684–WT-689 закрыл cleanup sidecars, gateway/proxy, reconnect room,
 race WebSocket и конечные состояния playback UI; каждый change прошёл полный
