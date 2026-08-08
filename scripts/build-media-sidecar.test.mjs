@@ -85,6 +85,7 @@ test("сборка media sidecar останавливается, если клю
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /не совпал с закреплённым отпечатком/);
   assert.match(result.stderr, new RegExp(PINNED_FINGERPRINT));
+  assert.doesNotMatch(result.stderr, /unbound variable/);
 });
 
 test("сборка media sidecar проходит проверку ключа при совпадении отпечатка", async () => {
@@ -153,6 +154,74 @@ printf "complete" > "$output"
     assert.equal(await readFile(destination, "utf8"), "complete");
     assert.equal(await readFile(attemptsFile, "utf8"), "2");
     await assert.rejects(readFile(`${destination}.partial`));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("загрузка FFmpeg увеличивает паузу между временными сетевыми ошибками", async () => {
+  const root = await mkdtemp(join(tmpdir(), "spectemus-media-backoff-"));
+  const binDirectory = join(root, "bin");
+  const destination = join(root, "ffmpeg.tar.xz");
+  const attemptsFile = join(root, "attempts");
+  const sleepFile = join(root, "sleep-delays");
+
+  try {
+    await mkdir(binDirectory, { recursive: true });
+    await writeFile(attemptsFile, "0");
+    await writeFile(
+      join(binDirectory, "curl"),
+      `#!/usr/bin/env bash
+set -euo pipefail
+attempts="$(cat \"$CURL_FAKE_ATTEMPTS\")"
+attempts=$((attempts + 1))
+printf "%s" "$attempts" > "$CURL_FAKE_ATTEMPTS"
+output=""
+while [[ $# -gt 0 ]]; do
+  if [[ "$1" == "--output" ]]; then output="$2"; shift 2; continue; fi
+  shift
+done
+if [[ "$attempts" -lt 3 ]]; then exit 35; fi
+printf "complete" > "$output"
+`,
+    );
+    await writeFile(
+      join(binDirectory, "sleep"),
+      `#!/usr/bin/env bash
+printf "%s\\n" "$1" >> "$SLEEP_FAKE_DELAYS"
+`,
+    );
+    await chmod(join(binDirectory, "curl"), 0o755);
+    await chmod(join(binDirectory, "sleep"), 0o755);
+
+    const result = spawnSync(
+      "bash",
+      [
+        "-c",
+        'source "$1"; download_with_retry "$2" "$3"',
+        "bash",
+        script,
+        destination,
+        "https://example.test/ffmpeg.tar.xz.asc",
+      ],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          PATH: `${binDirectory}:${process.env.PATH}`,
+          CURL_FAKE_ATTEMPTS: attemptsFile,
+          SLEEP_FAKE_DELAYS: sleepFile,
+          DOWNLOAD_RETRY_ATTEMPTS: "3",
+          DOWNLOAD_RETRY_DELAY_SECONDS: "2",
+          DOWNLOAD_RETRY_MAX_DELAY_SECONDS: "60",
+        },
+      },
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(await readFile(destination, "utf8"), "complete");
+    assert.equal(await readFile(attemptsFile, "utf8"), "3");
+    assert.equal(await readFile(sleepFile, "utf8"), "2\n4\n");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

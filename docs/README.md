@@ -40,6 +40,8 @@
   сетевого сбоя.
 - [SPS-696_AGENT_PUBLICATION_POLICY.md](SPS-696_AGENT_PUBLICATION_POLICY.md) —
   правило, когда агент может довести разрешённую задачу до PR и merge.
+- [SPS-697_FFMPEG_SIGNATURE_DOWNLOAD_RECOVERY.md](SPS-697_FFMPEG_SIGNATURE_DOWNLOAD_RECOVERY.md) —
+  recovery загрузки официальной подписи FFmpeg после installer-run Windows.
 
 ## Быстрый порядок чтения
 

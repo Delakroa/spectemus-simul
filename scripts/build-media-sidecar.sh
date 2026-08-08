@@ -10,28 +10,35 @@ readonly FFMPEG_KEY_URL="https://ffmpeg.org/ffmpeg-devel.asc"
 # подменённый архив, отдал бы и подходящий к нему ключ. Проверяем, что импортирован
 # именно ожидаемый ключ (last-16 отпечатка — общеизвестный key id B4322F04D67658D8).
 readonly FFMPEG_SIGNING_KEY_FINGERPRINT="FCF986EA15E6E293A5644F10B4322F04D67658D8"
-readonly DOWNLOAD_RETRY_ATTEMPTS="${DOWNLOAD_RETRY_ATTEMPTS:-5}"
-readonly DOWNLOAD_RETRY_DELAY_SECONDS="${DOWNLOAD_RETRY_DELAY_SECONDS:-2}"
+readonly DOWNLOAD_RETRY_ATTEMPTS="${DOWNLOAD_RETRY_ATTEMPTS:-7}"
+readonly DOWNLOAD_RETRY_DELAY_SECONDS="${DOWNLOAD_RETRY_DELAY_SECONDS:-5}"
+readonly DOWNLOAD_RETRY_MAX_DELAY_SECONDS="${DOWNLOAD_RETRY_MAX_DELAY_SECONDS:-60}"
+readonly DOWNLOAD_CONNECT_TIMEOUT_SECONDS="${DOWNLOAD_CONNECT_TIMEOUT_SECONDS:-60}"
 
 download_with_retry() {
   local destination="$1"
   local url="$2"
   local partial="${destination}.partial"
   local attempt
+  local delay_seconds="$DOWNLOAD_RETRY_DELAY_SECONDS"
 
   for ((attempt = 1; attempt <= DOWNLOAD_RETRY_ATTEMPTS; attempt += 1)); do
     rm -f "$partial"
     # --max-time нужен вдобавок к --connect-timeout: соединение может установиться и
     # затем встать, и без общего лимита job висит до своего таймаута.
-    if curl --fail --location --show-error --connect-timeout 20 --max-time 900 --output "$partial" "$url"; then
+    if curl --fail --location --show-error --connect-timeout "$DOWNLOAD_CONNECT_TIMEOUT_SECONDS" --max-time 900 --output "$partial" "$url"; then
       mv "$partial" "$destination"
       return 0
     fi
 
     rm -f "$partial"
     if ((attempt < DOWNLOAD_RETRY_ATTEMPTS)); then
-      echo "Не удалось скачать ${url} (попытка ${attempt}/${DOWNLOAD_RETRY_ATTEMPTS}); повторяем." >&2
-      sleep "$DOWNLOAD_RETRY_DELAY_SECONDS"
+      echo "Не удалось скачать ${url} (попытка ${attempt}/${DOWNLOAD_RETRY_ATTEMPTS}); повторяем через ${delay_seconds} с." >&2
+      sleep "$delay_seconds"
+      delay_seconds=$((delay_seconds * 2))
+      if ((delay_seconds > DOWNLOAD_RETRY_MAX_DELAY_SECONDS)); then
+        delay_seconds="$DOWNLOAD_RETRY_MAX_DELAY_SECONDS"
+      fi
     fi
   done
 
@@ -84,10 +91,9 @@ main() {
   [[ -n "$output" && -n "$source_output" ]] || usage
 
   work_directory="$(mktemp -d)"
-  cleanup() {
-    rm -rf "$work_directory"
-  }
-  trap cleanup EXIT
+  # Адрес каталога разворачивается при установке trap. EXIT запускается уже после
+  # возврата из main(), когда её local-переменные недоступны при set -u.
+  trap "rm -rf -- $(printf '%q' "$work_directory")" EXIT
 
   archive="$work_directory/$FFMPEG_ARCHIVE"
   signature="$archive.asc"
