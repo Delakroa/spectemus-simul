@@ -23,4 +23,7 @@ regexes = [
   '''devsecret''',
   '''devkey''',
   '''test-secret''',
+  # Публичный fingerprint ключа подписи официальных release FFmpeg. Это trust anchor
+  # для build-time проверки архива, а не credential.
+  '''FCF986EA15E6E293A5644F10B4322F04D67658D8''',
 ]
