@@ -13,7 +13,49 @@ import { join } from "node:path";
 import test from "node:test";
 
 const script = join(process.cwd(), "scripts", "build-media-sidecar.sh");
+const signingKey = join(
+  process.cwd(),
+  "scripts",
+  "ffmpeg-release-signing-key.asc",
+);
 const PINNED_FINGERPRINT = "FCF986EA15E6E293A5644F10B4322F04D67658D8";
+
+function openPgpCrc24(bytes) {
+  let checksum = 0xb704ce;
+
+  for (const byte of bytes) {
+    checksum ^= byte << 16;
+    for (let bit = 0; bit < 8; bit += 1) {
+      checksum <<= 1;
+      if (checksum & 0x1000000) {
+        checksum ^= 0x1864cfb;
+      }
+    }
+  }
+
+  return checksum & 0xffffff;
+}
+
+test("закреплённый ключ FFmpeg имеет корректный OpenPGP ASCII-armour checksum", async () => {
+  const armor = await readFile(signingKey, "utf8");
+  const lines = armor.trim().split(/\r?\n/);
+  const checksumLine = lines.find((line) => line.startsWith("="));
+  const payload = lines
+    .filter((line) => /^[A-Za-z0-9+/]+$/.test(line))
+    .join("");
+
+  assert.ok(checksumLine, "ASCII-armour должен содержать checksum");
+  assert.ok(payload, "ASCII-armour должен содержать payload");
+
+  const checksum = openPgpCrc24(Buffer.from(payload, "base64"));
+  const actualChecksum = Buffer.from([
+    (checksum >>> 16) & 0xff,
+    (checksum >>> 8) & 0xff,
+    checksum & 0xff,
+  ]).toString("base64");
+
+  assert.equal(actualChecksum, checksumLine.slice(1));
+});
 
 /**
  * Готовит каталог с подставными curl и gpg и запускает скрипт с ним в начале PATH.

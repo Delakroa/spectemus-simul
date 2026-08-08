@@ -42,6 +42,13 @@
   правило, когда агент может довести разрешённую задачу до PR и merge.
 - [SPS-697_FFMPEG_SIGNATURE_DOWNLOAD_RECOVERY.md](SPS-697_FFMPEG_SIGNATURE_DOWNLOAD_RECOVERY.md) —
   recovery загрузки официальной подписи FFmpeg после installer-run Windows.
+- [SPS-698_MACOS_BUNDLE_SYMLINKS.md](SPS-698_MACOS_BUNDLE_SYMLINKS.md) —
+  packaging macOS sidecars без недопустимых ссылок за пределы `.app` bundle.
+- [SPS-699_BUNDLED_FFMPEG_SIGNING_KEY.md](SPS-699_BUNDLED_FFMPEG_SIGNING_KEY.md) —
+  известный открытый ключ FFmpeg хранится в проекте, поэтому installer не
+  зависит от его повторной сетевой загрузки.
+- [SPS-700_FFMPEG_KEY_ARMOUR_INTEGRITY.md](SPS-700_FFMPEG_KEY_ARMOUR_INTEGRITY.md) —
+  исправление повреждённого OpenPGP armour и проверка его CRC-24 до runner-а.
 
 ## Быстрый порядок чтения
 
