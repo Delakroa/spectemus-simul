@@ -531,6 +531,13 @@ export function HomePage() {
   }
 
   async function handleMediaPicker() {
+    // Кнопка уже скрыта за disabled, пока идёт показ, но выбор файла запускает
+    // main-процесс IPC напрямую — без этой проверки гонка (двойной клик, программный
+    // вызов) освободила бы уже опубликованную временную копию раньше, чем renderer
+    // успеет остановить публикацию, и гость потерял бы доступ к media gateway.
+    if (canStopFilePublication) {
+      return;
+    }
     const desktop = window.spectemusDesktop;
     if (desktop?.pickMediaFile) {
       const selection = await desktop.pickMediaFile();
@@ -1040,7 +1047,7 @@ export function HomePage() {
                     className="button file-picker__trigger"
                     type="button"
                     aria-describedby="file-picker-help"
-                    disabled={isFilePreparing || isFilePublishing}
+                    disabled={isFilePreparing || canStopFilePublication}
                     onClick={() => void handleMediaPicker()}
                   >
                     <FolderOpen size={18} aria-hidden="true" />
@@ -1050,6 +1057,12 @@ export function HomePage() {
                         ? "Подготовка…"
                         : "Выбрать файл"}
                   </button>
+
+                  {roomSession.filePublicationStatus === "live" && (
+                    <p className="file-picker__hint" role="status">
+                      Сначала остановите показ, чтобы выбрать другой файл.
+                    </p>
+                  )}
 
                   {isDesktopDropRejected && (
                     <p className="file-picker__hint" role="status">
