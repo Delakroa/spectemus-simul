@@ -964,6 +964,19 @@ export function HomePage() {
                 <div>
                   <strong>LiveKit не подключён</strong>
                   <span>{roomSession.liveKitError}</span>
+                  {/* Этот блок — единственный способ вернуть контроль над переподключением
+                      LiveKit после того, как оператор закрыл userError-баннер: сама LiveKit
+                      SDK не пересоздаёт событие для терминального disconnected. */}
+                  <div className="system-message__actions">
+                    <button
+                      className="button"
+                      type="button"
+                      onClick={() => handleUserErrorAction("retry-livekit")}
+                    >
+                      <RefreshCw size={16} aria-hidden="true" />
+                      Повторить LiveKit
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

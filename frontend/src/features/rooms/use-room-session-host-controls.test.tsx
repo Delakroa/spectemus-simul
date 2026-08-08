@@ -570,6 +570,33 @@ describe("useRoomSession host playback controls", () => {
     expect(screen.getByTestId("livekit-status")).toHaveTextContent("connected");
   });
 
+  it("ошибка websocket не затирает неисправленную ошибку LiveKit", async () => {
+    const user = userEvent.setup();
+    render(<HostControlsHarness />);
+    vi.stubGlobal("WebSocket", MockWebSocket);
+
+    await user.click(screen.getByRole("button", { name: "Создать" }));
+    await waitFor(() => expect(liveKitHandlers).toHaveLength(1));
+    MockWebSocket.instances[0]?.onopen?.(new Event("open"));
+
+    act(() => {
+      liveKitHandlers[0]?.onStatusChange("disconnected");
+    });
+    expect(screen.getByTestId("user-error-action")).toHaveTextContent("retry-livekit");
+
+    // Битое событие комнаты поднимает websocket-ошибку поверх неисправленной LiveKit.
+    // Раньше она вытесняла её, и вместе с ней исчезал единственный способ вернуть видео:
+    // «Переподключить» снимал websocket-ошибку по совпадению area, а LiveKit оставался
+    // отключённым уже без всякой кнопки.
+    act(() => {
+      MockWebSocket.instances[0]?.onmessage?.({
+        data: "не json",
+      } as MessageEvent<string>);
+    });
+
+    expect(screen.getByTestId("user-error-action")).toHaveTextContent("retry-livekit");
+  });
+
   it("перезапускает поток host-а с текущей позиции и состоянием паузы", async () => {
     const user = userEvent.setup();
     await setupLivePublication(user);

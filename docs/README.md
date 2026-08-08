@@ -54,6 +54,9 @@
 - [SPS-702_PINNED_FFMPEG_ARCHIVE_SIGNATURE.md](SPS-702_PINNED_FFMPEG_ARCHIVE_SIGNATURE.md) —
   закреплённая detached-подпись исходного архива: сборщик больше не загружает её
   из сети.
+- [SPS-703_LIVEKIT_RECONNECT_CONTROL.md](SPS-703_LIVEKIT_RECONNECT_CONTROL.md) —
+  ручное переподключение LiveKit больше не теряется: кнопка есть и в запасном
+  блоке, а свежая ошибка не вытесняет неисправленную ошибку другой области.
 
 ## Быстрый порядок чтения
 
