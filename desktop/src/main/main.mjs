@@ -180,6 +180,7 @@ async function startDesktopHost(preferredLanAddress) {
         ? new DesktopMediaNormalizer({
             ffmpegPath: paths.ffmpeg,
             ffprobePath: paths.ffprobe,
+            logDirectory: sidecarLogDirectory,
             outputDirectory: normalizedMediaDirectory,
           })
         : null;

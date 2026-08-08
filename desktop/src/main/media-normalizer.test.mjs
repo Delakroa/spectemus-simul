@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { mkdtemp, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -11,6 +11,7 @@ import {
   assertSufficientDiskSpace,
   buildNormalizationArguments,
   buildProbeArguments,
+  classifyTranscodeStderr,
   clearNormalizedMediaDirectory,
   estimateOutputBytes,
   parseMediaInventory,
@@ -232,6 +233,89 @@ test("normalizer останавливается до запуска ffmpeg, ес
       error.code === "INSUFFICIENT_DISK_SPACE",
   );
   assert.equal(ffmpegSpawned, false);
+});
+
+test("classifyTranscodeStderr отличает отказ аудиокодека от отказа видеокодека", () => {
+  const audioFailure = classifyTranscodeStderr(
+    "[aac @ 0x0] Error while opening encoder for output stream #0:1 - maybe incorrect parameters",
+    "h264_videotoolbox",
+  );
+  assert.equal(audioFailure.code, "AUDIO_ENCODER_FAILED");
+
+  const videoFailure = classifyTranscodeStderr(
+    "[h264_videotoolbox @ 0x0] Error while opening encoder for output stream #0:0 - maybe incorrect parameters",
+    "h264_videotoolbox",
+  );
+  assert.equal(videoFailure.code, "VIDEO_ENCODER_FAILED");
+
+  const macCompressionFailure = classifyTranscodeStderr(
+    "Cannot create compression session: -12902",
+    "h264_videotoolbox",
+  );
+  assert.equal(macCompressionFailure.code, "VIDEO_ENCODER_FAILED");
+
+  const unrelatedFailure = classifyTranscodeStderr(
+    "moov atom not found",
+    "h264_videotoolbox",
+  );
+  assert.equal(unrelatedFailure.code, "TRANSCODE_FAILED");
+});
+
+test("normalizer сохраняет stderr ffmpeg в лог-каталог и называет его в ошибке", async () => {
+  const directory = await mkdtemp(
+    join(tmpdir(), "spectemus-normalized-media-"),
+  );
+  const logDirectory = await mkdtemp(join(tmpdir(), "spectemus-logs-"));
+  const normalizer = new DesktopMediaNormalizer({
+    ffmpegPath: "ffmpeg",
+    ffprobePath: "ffprobe",
+    logDirectory,
+    outputDirectory: directory,
+    platform: "darwin",
+    spawnProcess: (command) => {
+      if (command === "ffprobe") {
+        const child = createChild();
+        queueMicrotask(() => {
+          child.stdout.emit(
+            "data",
+            JSON.stringify({
+              format: { duration: "120", size: "1" },
+              streams: [{ codec_type: "video", codec_name: "h264" }],
+            }),
+          );
+          child.emit("close", 0);
+        });
+        return child;
+      }
+      const child = createChild();
+      queueMicrotask(() => {
+        child.stderr.emit(
+          "data",
+          "[aac @ 0x0] Error while opening encoder for output stream #0:1",
+        );
+        child.emit("close", 1);
+      });
+      return child;
+    },
+    statDiskSpace: async () => ({ bavail: 1_000_000, bsize: 1_000 }),
+  });
+
+  let error;
+  try {
+    await normalizer.normalize({ inputPath: "/private/movie.mkv" });
+    assert.fail("normalize() должен был отклонить промис");
+  } catch (thrown) {
+    error = thrown;
+  }
+  assert.ok(error instanceof MediaNormalizationFailure);
+  assert.equal(error.code, "AUDIO_ENCODER_FAILED");
+  assert.match(error.message, /Диагностика: /);
+
+  await new Promise((resolvePromise) => setImmediate(resolvePromise));
+  const logFiles = await readdir(logDirectory);
+  assert.equal(logFiles.length, 1);
+  const logContent = await readFile(join(logDirectory, logFiles[0]), "utf8");
+  assert.match(logContent, /output stream #0:1/);
 });
 
 function createChild({ closeOnSignal } = {}) {

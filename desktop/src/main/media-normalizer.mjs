@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
-import { mkdir, rm, stat, statfs } from "node:fs/promises";
+import { mkdir, rm, stat, statfs, writeFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 
 const OUTPUT_VIDEO_CODEC = "h264";
@@ -25,6 +25,7 @@ export class DesktopMediaNormalizer {
   constructor({
     ffmpegPath,
     ffprobePath,
+    logDirectory = null,
     outputDirectory,
     platform = process.platform,
     spawnProcess = spawn,
@@ -32,6 +33,7 @@ export class DesktopMediaNormalizer {
   }) {
     this.ffmpegPath = ffmpegPath;
     this.ffprobePath = ffprobePath;
+    this.logDirectory = logDirectory;
     this.outputDirectory = resolve(outputDirectory);
     this.platform = platform;
     this.spawnProcess = spawnProcess;
@@ -71,9 +73,11 @@ export class DesktopMediaNormalizer {
           platform: this.platform,
         }),
         durationSeconds: source.durationSeconds,
+        logDirectory: this.logDirectory,
         onProgress,
         signal,
         spawnProcess: this.spawnProcess,
+        videoEncoder: resolveVideoEncoder(this.platform),
       });
       const output = await probeMedia({
         command: this.ffprobePath,
@@ -272,9 +276,11 @@ function runTranscode({
   command,
   args,
   durationSeconds,
+  logDirectory,
   onProgress,
   signal,
   spawnProcess,
+  videoEncoder,
 }) {
   return new Promise((resolvePromise, rejectPromise) => {
     let stderr = "";
@@ -365,10 +371,7 @@ function runTranscode({
       }
       finish(() =>
         rejectPromise(
-          new MediaNormalizationFailure(
-            "TRANSCODE_FAILED",
-            describeTranscodeFailure(stderr),
-          ),
+          buildTranscodeFailure({ logDirectory, stderr, videoEncoder }),
         ),
       );
     });
@@ -539,15 +542,67 @@ function normalizeFailure(error) {
   );
 }
 
-function describeTranscodeFailure(stderr) {
-  if (
+// ffmpeg маппит -map 0:v:0 на output stream #0:0, а -map 0:a:0? — на #0:1, поэтому
+// индекс output stream в сообщении об ошибке достаточен, чтобы отличить, какая из
+// двух дорожек не encode-ится: раньше обе ошибки схлопывались в один и тот же общий
+// текст про видеокодек, и дефект нельзя было завести на верную подсистему.
+export function classifyTranscodeStderr(stderr, videoEncoder) {
+  const isEncoderFailure =
     stderr.includes("Unknown encoder") ||
     stderr.includes("Cannot create compression session") ||
-    stderr.includes("Error while opening encoder")
-  ) {
-    return "На этом компьютере сейчас недоступен встроенный H.264 видеокодер. Закройте приложения, использующие камеру или видео, и попробуйте снова.";
+    stderr.includes("Error while opening encoder");
+  if (!isEncoderFailure) {
+    return {
+      code: "TRANSCODE_FAILED",
+      reason:
+        "Не удалось подготовить совместимую копию видео. Оригинальный файл не изменён.",
+    };
   }
-  return "Не удалось подготовить совместимую копию видео. Оригинальный файл не изменён.";
+  const mentionsAudioEncoder =
+    stderr.includes("output stream #0:1") ||
+    stderr.includes(`'${OUTPUT_AUDIO_CODEC}'`);
+  const mentionsVideoEncoder =
+    stderr.includes("output stream #0:0") ||
+    stderr.includes("Cannot create compression session") ||
+    (videoEncoder && stderr.includes(`'${videoEncoder}'`));
+  if (mentionsAudioEncoder && !mentionsVideoEncoder) {
+    return {
+      code: "AUDIO_ENCODER_FAILED",
+      reason:
+        "На этом компьютере сейчас недоступен встроенный аудиокодек AAC. Закройте приложения, использующие звук, и попробуйте снова.",
+    };
+  }
+  return {
+    code: "VIDEO_ENCODER_FAILED",
+    reason:
+      "На этом компьютере сейчас недоступен встроенный H.264 видеокодер. Закройте приложения, использующие камеру или видео, и попробуйте снова.",
+  };
+}
+
+function buildTranscodeFailure({ logDirectory, stderr, videoEncoder }) {
+  const { code, reason } = classifyTranscodeStderr(stderr, videoEncoder);
+  const logPath = persistTranscodeDiagnostics({ logDirectory, stderr });
+  const message = logPath ? `${reason} Диагностика: ${logPath}` : reason;
+  return new MediaNormalizationFailure(code, message);
+}
+
+// Раньше stderr ffmpeg нигде не сохранялся: сообщение об ошибке — единственное, что
+// доходило до оператора, и по нему нельзя было завести содержательный тикет. Запись
+// не блокирует основную ошибку — оператор получает понятный текст, даже если сам
+// каталог логов недоступен на запись.
+function persistTranscodeDiagnostics({ logDirectory, stderr }) {
+  if (!logDirectory) {
+    return null;
+  }
+  const logPath = join(logDirectory, `ffmpeg-normalize-${randomUUID()}.log`);
+  mkdir(logDirectory, { recursive: true, mode: 0o700 })
+    .then(() => writeFile(logPath, stderr || "(ffmpeg не вывел stderr)"))
+    .catch((error) => {
+      console.error(
+        `[media] не удалось сохранить диагностику ffmpeg ${logPath}: ${error?.message ?? error}`,
+      );
+    });
+  return logPath;
 }
 
 function numberOrNull(value) {
