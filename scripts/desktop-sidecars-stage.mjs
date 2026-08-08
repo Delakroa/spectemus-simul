@@ -1,4 +1,12 @@
-import { access, chmod, constants, cp, mkdir, rm } from "node:fs/promises";
+import {
+  access,
+  chmod,
+  constants,
+  cp,
+  mkdir,
+  readdir,
+  rm,
+} from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 
@@ -11,6 +19,7 @@ await mkdir(sidecars, { recursive: true, mode: 0o700 });
 await stageRuntime(options.runtime, resolve(sidecars, "runtime"));
 await stageLiveKit(options.livekit, resolve(sidecars, "livekit"));
 await stageMediaTools(options.media, resolve(sidecars, "media"));
+await assertNoSymbolicLinks(sidecars);
 
 console.log("[ok] Desktop sidecars подготовлены для packaging.");
 
@@ -23,7 +32,11 @@ async function stageRuntime(source, destination) {
   );
   await assertExecutable(executable, "Java runtime");
   assertJavaVersion(executable);
-  await cp(source, destination, { recursive: true, force: true });
+  await cp(source, destination, {
+    recursive: true,
+    force: true,
+    dereference: true,
+  });
 }
 
 async function stageLiveKit(source, destination) {
@@ -32,7 +45,7 @@ async function stageLiveKit(source, destination) {
   const target =
     process.platform === "win32" ? "livekit-server.exe" : "livekit-server";
   const targetPath = resolve(destination, target);
-  await cp(source, targetPath, { force: true });
+  await cp(source, targetPath, { force: true, dereference: true });
   if (process.platform !== "win32") {
     await chmod(targetPath, 0o755);
   }
@@ -46,7 +59,11 @@ async function stageMediaTools(source, destination) {
     "FFmpeg normalizer",
   );
   await assertExecutable(resolve(source, "bin", probe), "FFprobe normalizer");
-  await cp(source, destination, { recursive: true, force: true });
+  await cp(source, destination, {
+    recursive: true,
+    force: true,
+    dereference: true,
+  });
 }
 
 function parseOptions(args) {
@@ -110,5 +127,20 @@ function assertJavaVersion(javaCommand) {
     throw new Error(
       "Для desktop installer нужен Java runtime версии 25 или новее.",
     );
+  }
+}
+
+async function assertNoSymbolicLinks(directory) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  for (const entry of entries) {
+    const entryPath = resolve(directory, entry.name);
+    if (entry.isSymbolicLink()) {
+      throw new Error(
+        `Desktop sidecar не может содержать symbolic link: ${entryPath}`,
+      );
+    }
+    if (entry.isDirectory()) {
+      await assertNoSymbolicLinks(entryPath);
+    }
   }
 }
