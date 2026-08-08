@@ -57,6 +57,9 @@
 - [SPS-703_LIVEKIT_RECONNECT_CONTROL.md](SPS-703_LIVEKIT_RECONNECT_CONTROL.md) —
   ручное переподключение LiveKit больше не теряется: кнопка есть и в запасном
   блоке, а свежая ошибка не вытесняет неисправленную ошибку другой области.
+- [SPS-704_DESKTOP_FEEDBACK_PERSISTENCE.md](SPS-704_DESKTOP_FEEDBACK_PERSISTENCE.md) —
+  отзывы desktop host переживают выход из приложения, а operator-эндпоинты
+  получают токен установки: канал сбора дефектов перестал быть write-only.
 
 ## Быстрый порядок чтения
 

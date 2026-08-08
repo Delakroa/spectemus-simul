@@ -39,6 +39,9 @@ spectemus-simul:
     admin-token: ${FEEDBACK_ADMIN_TOKEN:}
     retention: ${FEEDBACK_RETENTION:30d}
     export-limit: ${FEEDBACK_EXPORT_LIMIT:200}
+    # Desktop host передаёт сюда файл в своём userData: без него отзывы живут только в
+    # памяти процесса и исчезают при выходе из приложения.
+    storage-path: ${FEEDBACK_STORAGE_PATH:}
   rate-limit:
     # Redis-backed per-client-IP limits on the public mutating endpoints (WT-606).
     # Defaults are generous for real use but cap abuse/runaway LiveKit cost in the beta.
