@@ -273,6 +273,85 @@ test("загрузка FFmpeg требует хотя бы один URL", () => 
   assert.match(result.stderr, /Не указан URL для загрузки/);
 });
 
+test("Windows media sidecar содержит MinGW runtime и его лицензии", async () => {
+  const root = await mkdtemp(join(tmpdir(), "spectemus-mingw-runtime-"));
+  const prefix = join(root, "mingw64");
+  const output = join(root, "media");
+
+  try {
+    await mkdir(join(prefix, "bin"), { recursive: true });
+    await mkdir(join(prefix, "share/licenses/gcc-libs"), { recursive: true });
+    await mkdir(join(prefix, "share/licenses/libwinpthread"), {
+      recursive: true,
+    });
+    await mkdir(join(output, "bin"), { recursive: true });
+    await Promise.all([
+      writeFile(join(prefix, "bin/libgcc_s_seh-1.dll"), "gcc-runtime"),
+      writeFile(join(prefix, "bin/libstdc++-6.dll"), "cpp-runtime"),
+      writeFile(join(prefix, "bin/libwinpthread-1.dll"), "winpthread"),
+      writeFile(join(prefix, "share/licenses/gcc-libs/COPYING3"), "gpl"),
+      writeFile(
+        join(prefix, "share/licenses/gcc-libs/COPYING.RUNTIME"),
+        "runtime-exception",
+      ),
+      writeFile(
+        join(prefix, "share/licenses/libwinpthread/COPYING"),
+        "winpthread-license",
+      ),
+    ]);
+
+    const result = spawnSync(
+      "bash",
+      [
+        "-c",
+        'source "$1"; stage_windows_runtime_dependencies "$2" "$3"',
+        "bash",
+        script,
+        output,
+        prefix,
+      ],
+      { encoding: "utf8" },
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(
+      await readFile(join(output, "bin/libgcc_s_seh-1.dll"), "utf8"),
+      "gcc-runtime",
+    );
+    assert.equal(
+      await readFile(join(output, "bin/libstdc++-6.dll"), "utf8"),
+      "cpp-runtime",
+    );
+    assert.equal(
+      await readFile(join(output, "bin/libwinpthread-1.dll"), "utf8"),
+      "winpthread",
+    );
+    assert.equal(
+      await readFile(join(output, "MINGW-GCC-RUNTIME-EXCEPTION.txt"), "utf8"),
+      "runtime-exception",
+    );
+    assert.equal(
+      await readFile(join(output, "MINGW-WINPTHREAD-LICENSE.txt"), "utf8"),
+      "winpthread-license",
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("FFmpeg sidecar не зависит от случайных библиотек build runner", async () => {
+  const source = await readFile(script, "utf8");
+
+  assert.match(source, /"--disable-autodetect"/);
+  assert.match(source, /"--enable-d3d11va"/);
+  assert.match(source, /"--enable-mediafoundation"/);
+  assert.ok(
+    source.indexOf('"--disable-autodetect"') <
+      source.indexOf('"--enable-shared"'),
+    "автоопределение внешних библиотек отключается до настройки shared build",
+  );
+});
+
 test("загрузка FFmpeg увеличивает паузу между временными сетевыми ошибками", async () => {
   const root = await mkdtemp(join(tmpdir(), "spectemus-media-backoff-"));
   const binDirectory = join(root, "bin");

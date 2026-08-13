@@ -74,6 +74,9 @@
   гостя к уже опубликованной копии.
 - [SPS-710_WEBSOCKET_IDLE_TIMEOUT.md](SPS-710_WEBSOCKET_IDLE_TIMEOUT.md) —
   gateway больше не закрывает установленный WebSocket между heartbeat-сообщениями.
+- [SPS-711_WINDOWS_FFMPEG_RUNTIME.md](SPS-711_WINDOWS_FFMPEG_RUNTIME.md) —
+  Windows installer содержит runtime-библиотеки FFmpeg, а smoke больше
+  не подменяет их копиями из MSYS2 runner-а.
 
 ## Быстрый порядок чтения
 

@@ -62,6 +62,47 @@ download_with_retry() {
   return 1
 }
 
+# FFmpeg собирается в MinGW64 как набор DLL. На runner-е команда
+# `ffmpeg -version` может незаметно найти runtime GCC/winpthreads через
+# /mingw64/bin в PATH. На обычном Windows этого каталога нет, и тот же
+# ffmpeg падает до запуска с 0xC0000135. Кладём runtime рядом с
+# ffmpeg.exe/ffprobe.exe, как того требует Windows DLL search order, и
+# вместе с ним сохраняем лицензионные тексты.
+stage_windows_runtime_dependencies() {
+  local output="$1"
+  local mingw_prefix="${2:-${MINGW_PREFIX:-}}"
+
+  [[ -n "$mingw_prefix" ]] || {
+    echo "MINGW_PREFIX не задан: нельзя подготовить Windows runtime FFmpeg." >&2
+    return 1
+  }
+
+  local output_bin="$output/bin"
+  local gcc_license_directory="$mingw_prefix/share/licenses/gcc-libs"
+  local winpthread_license_directory="$mingw_prefix/share/licenses/libwinpthread"
+  local -a required_files=(
+    "$mingw_prefix/bin/libgcc_s_seh-1.dll:$output_bin/libgcc_s_seh-1.dll"
+    "$mingw_prefix/bin/libstdc++-6.dll:$output_bin/libstdc++-6.dll"
+    "$mingw_prefix/bin/libwinpthread-1.dll:$output_bin/libwinpthread-1.dll"
+    "$gcc_license_directory/COPYING3:$output/MINGW-GCC-COPYING3.txt"
+    "$gcc_license_directory/COPYING.RUNTIME:$output/MINGW-GCC-RUNTIME-EXCEPTION.txt"
+    "$winpthread_license_directory/COPYING:$output/MINGW-WINPTHREAD-LICENSE.txt"
+  )
+  local entry
+  local source
+  local destination
+
+  for entry in "${required_files[@]}"; do
+    source="${entry%%:*}"
+    destination="${entry#*:}"
+    [[ -r "$source" ]] || {
+      echo "Не найден Windows runtime или его лицензия: $source" >&2
+      return 1
+    }
+    cp "$source" "$destination"
+  done
+}
+
 usage() {
   echo "Usage: scripts/build-media-sidecar.sh --output <directory> --source-output <directory>" >&2
   exit 2
@@ -156,6 +197,10 @@ main() {
     "--prefix=$output"
     "--disable-gpl"
     "--disable-nonfree"
+    # Не подхватываем библиотеки, случайно установленные на runner-е. Иначе
+    # Windows-сборка незаметно линкуется с zlib/iconv из MSYS2 и запускается
+    # только пока их DLL присутствуют в PATH сборочной машины.
+    "--disable-autodetect"
     "--enable-shared"
     "--disable-static"
     "--disable-debug"
@@ -177,6 +222,9 @@ main() {
       configure_options+=(
         "--arch=x86_64"
         "--target-os=mingw32"
+        # Media Foundation encoder использует D3D11-типы даже для software
+        # frames. После --disable-autodetect включаем эту системную часть явно.
+        "--enable-d3d11va"
         "--enable-mediafoundation"
       )
       ;;
@@ -192,6 +240,10 @@ main() {
     make -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.logicalcpu)"
     make install
   )
+
+  if [[ "$(uname -s)" == MINGW* || "$(uname -s)" == MSYS* ]]; then
+    stage_windows_runtime_dependencies "$output"
+  fi
 
   ffmpeg_binary="$output/bin/ffmpeg"
   ffprobe_binary="$output/bin/ffprobe"
@@ -212,6 +264,14 @@ Configure command:
 ./configure ${configure_options[*]}
 No FFmpeg source patches are applied by this build.
 EOF
+
+  if [[ "$(uname -s)" == MINGW* || "$(uname -s)" == MSYS* ]]; then
+    cat >"$output/MINGW-RUNTIME-NOTICE.txt" <<EOF
+Spectemus Simul bundles the MinGW-w64 GCC runtime and winpthreads DLLs required
+to run this FFmpeg build on a Windows computer without an MSYS2 installation.
+Their license and GCC Runtime Library Exception texts are included next to this notice.
+EOF
+  fi
 
   echo "[ok] FFmpeg ${FFMPEG_VERSION} media sidecar is ready in $output"
 }

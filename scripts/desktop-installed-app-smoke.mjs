@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { access, constants, stat } from "node:fs/promises";
 import { resolve } from "node:path";
+import { createIsolatedWindowsProbeEnvironment } from "./desktop-installed-app-environment.mjs";
 
 const { platform, appPath } = readArguments(process.argv.slice(2));
 const resources = platform === "mac" ? "Contents/Resources" : "resources";
@@ -22,6 +23,32 @@ const required = [
   [`${resources}/sidecars/media/bin/${ffmpeg}`, "FFmpeg normalizer"],
   [`${resources}/sidecars/media/bin/${ffprobe}`, "FFprobe normalizer"],
 ];
+if (platform === "win") {
+  required.push(
+    [`${resources}/sidecars/media/bin/libgcc_s_seh-1.dll`, "MinGW GCC runtime"],
+    [`${resources}/sidecars/media/bin/libstdc++-6.dll`, "MinGW C++ runtime"],
+    [
+      `${resources}/sidecars/media/bin/libwinpthread-1.dll`,
+      "MinGW winpthreads runtime",
+    ],
+    [
+      `${resources}/sidecars/media/MINGW-GCC-RUNTIME-EXCEPTION.txt`,
+      "GCC Runtime Library Exception",
+    ],
+    [
+      `${resources}/sidecars/media/MINGW-GCC-COPYING3.txt`,
+      "GCC runtime license",
+    ],
+    [
+      `${resources}/sidecars/media/MINGW-WINPTHREAD-LICENSE.txt`,
+      "winpthreads license",
+    ],
+    [
+      `${resources}/sidecars/media/MINGW-RUNTIME-NOTICE.txt`,
+      "MinGW runtime notice",
+    ],
+  );
+}
 
 // Наличие файла ничего не доказывает: неподписанный или карантинный бинарник
 // присутствует, но убивается системой при запуске — и приложение сообщает
@@ -49,7 +76,7 @@ for (const [relativePath, label] of required) {
 }
 
 for (const [relativePath, args, label] of executables) {
-  assertRuns(resolve(appPath, relativePath), args, label);
+  assertRuns(resolve(appPath, relativePath), args, label, platform);
 }
 
 console.log(
@@ -72,9 +99,13 @@ function readArguments(args) {
   return { platform: args[1], appPath: resolve(args[3]) };
 }
 
-function assertRuns(filePath, args, label) {
+function assertRuns(filePath, args, label, targetPlatform) {
   const probe = spawnSync(filePath, args, {
     encoding: "utf8",
+    env:
+      targetPlatform === "win"
+        ? createIsolatedWindowsProbeEnvironment(filePath)
+        : process.env,
     windowsHide: true,
   });
   if (probe.error) {
