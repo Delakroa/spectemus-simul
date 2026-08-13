@@ -79,6 +79,34 @@ test("проксирует WebSocket upgrade только в локальный 
   assert.equal(receivedCookie, "spectemus-simul-session=secret");
 });
 
+test("не закрывает установленный WebSocket после handshake timeout", async (t) => {
+  const backend = createServer();
+  backend.on("upgrade", (_request, socket) => {
+    socket.write(
+      "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n",
+    );
+    setTimeout(() => socket.end("still-open"), 75);
+  });
+  const backendPort = await listen(backend);
+  t.after(() => close(backend));
+
+  const frontendDirectory = await mkdtemp(join(tmpdir(), "spectemus-gateway-"));
+  await writeFile(join(frontendDirectory, "index.html"), "ok");
+  const gateway = await startGateway({
+    backend: { host: "127.0.0.1", port: backendPort },
+    frontendDirectory,
+    host: "127.0.0.1",
+    port: 0,
+    websocketHandshakeTimeoutMs: 20,
+  });
+  t.after(() => gateway.close());
+
+  const response = await websocketUpgradeUntilData(gateway.port, "still-open");
+
+  assert.match(response, /101 Switching Protocols/);
+  assert.match(response, /still-open/);
+});
+
 test("не дописывает HTTP-ошибку в уже открытый WebSocket", async (t) => {
   const backend = createServer();
   backend.on("upgrade", (_request, socket) => {
@@ -341,6 +369,34 @@ function websocketUpgradeUntilClose(port) {
         ),
       );
     }, 1_000).unref();
+  });
+}
+
+function websocketUpgradeUntilData(port, expectedData) {
+  return new Promise((resolve, reject) => {
+    const socket = connect(port, "127.0.0.1");
+    let response = "";
+    const timeout = setTimeout(() => {
+      socket.destroy();
+      reject(new Error(`WebSocket gateway не передал ${expectedData}.`));
+    }, 1_000);
+    socket.once("connect", () => {
+      socket.write(
+        "GET /api/v1/rooms/AbCdEfGhIjKlMnOpQrStUv/events HTTP/1.1\r\nHost: 192.168.1.42:8088\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nCookie: spectemus-simul-session=secret\r\n\r\n",
+      );
+    });
+    socket.on("data", (chunk) => {
+      response += chunk.toString("utf8");
+      if (response.includes(expectedData)) {
+        clearTimeout(timeout);
+        socket.destroy();
+        resolve(response);
+      }
+    });
+    socket.once("error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
   });
 }
 

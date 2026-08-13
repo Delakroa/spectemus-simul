@@ -42,12 +42,14 @@ export async function startGateway({
   createMediaReadStream,
   mediaResolver,
   port = 8088,
+  websocketHandshakeTimeoutMs = UPSTREAM_TIMEOUT_MS,
 }) {
   const server = createGatewayServer({
     createMediaReadStream,
     backend,
     frontendDirectory,
     mediaResolver,
+    websocketHandshakeTimeoutMs,
   });
   await new Promise((resolveListen, rejectListen) => {
     server.once("error", rejectListen);
@@ -75,6 +77,7 @@ export function createGatewayServer({
   createMediaReadStream = createReadStream,
   frontendDirectory,
   mediaResolver,
+  websocketHandshakeTimeoutMs = UPSTREAM_TIMEOUT_MS,
 }) {
   const root = resolve(frontendDirectory);
   const sockets = new Set();
@@ -99,7 +102,13 @@ export function createGatewayServer({
       socket.end("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
       return;
     }
-    proxyUpgrade({ backend, request, socket, head });
+    proxyUpgrade({
+      backend,
+      request,
+      socket,
+      head,
+      websocketHandshakeTimeoutMs,
+    });
   });
   server.on("connection", (socket) => {
     sockets.add(socket);
@@ -340,7 +349,13 @@ function proxyHttp({ backend, request, response }) {
   request.pipe(upstream);
 }
 
-function proxyUpgrade({ backend, request, socket, head }) {
+function proxyUpgrade({
+  backend,
+  request,
+  socket,
+  head,
+  websocketHandshakeTimeoutMs,
+}) {
   const upstream = connect(backend.port, backend.host);
   let responseStarted = false;
   let failureHandled = false;
@@ -355,7 +370,11 @@ function proxyUpgrade({ backend, request, socket, head }) {
     }
     socket.end("HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n");
   };
-  upstream.setTimeout(UPSTREAM_TIMEOUT_MS, () => {
+  // Таймаут защищает только установку туннеля. После ответа backend первое чтение
+  // подтверждает WebSocket Upgrade, и дальнейшая живость определяется heartbeat
+  // комнаты. Если оставить socket timeout включённым, его 15 секунд совпадают с
+  // интервалом heartbeat клиента и gateway циклически рвёт здоровое соединение.
+  upstream.setTimeout(websocketHandshakeTimeoutMs, () => {
     upstream.destroy(new Error("Backend timeout"));
   });
   upstream.once("error", fail);
@@ -365,6 +384,7 @@ function proxyUpgrade({ backend, request, socket, head }) {
   upstream.once("connect", () => {
     upstream.once("data", () => {
       responseStarted = true;
+      upstream.setTimeout(0);
     });
     const headLines = [
       `${request.method} ${request.url} HTTP/${request.httpVersion}`,
