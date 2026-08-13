@@ -82,6 +82,7 @@ stage_windows_runtime_dependencies() {
   local winpthread_license_directory="$mingw_prefix/share/licenses/libwinpthread"
   local -a required_files=(
     "$mingw_prefix/bin/libgcc_s_seh-1.dll:$output_bin/libgcc_s_seh-1.dll"
+    "$mingw_prefix/bin/libstdc++-6.dll:$output_bin/libstdc++-6.dll"
     "$mingw_prefix/bin/libwinpthread-1.dll:$output_bin/libwinpthread-1.dll"
     "$gcc_license_directory/COPYING3:$output/MINGW-GCC-COPYING3.txt"
     "$gcc_license_directory/COPYING.RUNTIME:$output/MINGW-GCC-RUNTIME-EXCEPTION.txt"

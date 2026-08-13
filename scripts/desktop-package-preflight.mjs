@@ -48,6 +48,10 @@ if (platform === "win") {
       "MinGW GCC runtime",
     ],
     [
+      resolve(root, "desktop", ".sidecars", "media", "bin", "libstdc++-6.dll"),
+      "MinGW C++ runtime",
+    ],
+    [
       resolve(
         root,
         "desktop",

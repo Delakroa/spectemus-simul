@@ -26,6 +26,7 @@ const required = [
 if (platform === "win") {
   required.push(
     [`${resources}/sidecars/media/bin/libgcc_s_seh-1.dll`, "MinGW GCC runtime"],
+    [`${resources}/sidecars/media/bin/libstdc++-6.dll`, "MinGW C++ runtime"],
     [
       `${resources}/sidecars/media/bin/libwinpthread-1.dll`,
       "MinGW winpthreads runtime",

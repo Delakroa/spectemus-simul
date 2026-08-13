@@ -287,6 +287,7 @@ test("Windows media sidecar содержит MinGW runtime и его лицен�
     await mkdir(join(output, "bin"), { recursive: true });
     await Promise.all([
       writeFile(join(prefix, "bin/libgcc_s_seh-1.dll"), "gcc-runtime"),
+      writeFile(join(prefix, "bin/libstdc++-6.dll"), "cpp-runtime"),
       writeFile(join(prefix, "bin/libwinpthread-1.dll"), "winpthread"),
       writeFile(join(prefix, "share/licenses/gcc-libs/COPYING3"), "gpl"),
       writeFile(
@@ -316,6 +317,10 @@ test("Windows media sidecar содержит MinGW runtime и его лицен�
     assert.equal(
       await readFile(join(output, "bin/libgcc_s_seh-1.dll"), "utf8"),
       "gcc-runtime",
+    );
+    assert.equal(
+      await readFile(join(output, "bin/libstdc++-6.dll"), "utf8"),
+      "cpp-runtime",
     );
     assert.equal(
       await readFile(join(output, "bin/libwinpthread-1.dll"), "utf8"),
