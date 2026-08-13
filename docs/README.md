@@ -77,6 +77,9 @@
 - [SPS-711_WINDOWS_FFMPEG_RUNTIME.md](SPS-711_WINDOWS_FFMPEG_RUNTIME.md) —
   Windows installer содержит runtime-библиотеки FFmpeg, а smoke больше
   не подменяет их копиями из MSYS2 runner-а.
+- [SPS-712_PLAYBACK_ENDED_POSITION.md](SPS-712_PLAYBACK_ENDED_POSITION.md) —
+  при завершении фильма ползунок host-а и синхронизированная позиция guest-а
+  доходят ровно до известной длительности.
 
 ## Быстрый порядок чтения
 

@@ -271,7 +271,15 @@ function createPlaybackStateMessage(
   event: PlaybackEvent,
   publisherSessionId?: string,
 ): PlaybackStateMessage {
-  const duration = Number.isFinite(videoElement.duration) ? videoElement.duration : null;
+  const duration = Number.isFinite(videoElement.duration)
+    ? Math.max(0, videoElement.duration)
+    : null;
+  const currentTime =
+    event === "ended" && duration !== null
+      ? duration
+      : Number.isFinite(videoElement.currentTime)
+        ? Math.max(0, videoElement.currentTime)
+        : 0;
 
   return {
     schemaVersion: 1,
@@ -279,10 +287,8 @@ function createPlaybackStateMessage(
     revision,
     event,
     status: getPlaybackStatus(videoElement, event),
-    currentTime: Number.isFinite(videoElement.currentTime)
-      ? Math.max(0, videoElement.currentTime)
-      : 0,
-    duration: duration === null ? null : Math.max(0, duration),
+    currentTime,
+    duration,
     sentAt: new Date().toISOString(),
     fileName,
   };

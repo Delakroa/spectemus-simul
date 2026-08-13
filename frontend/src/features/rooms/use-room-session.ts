@@ -861,7 +861,21 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
         hostPlaybackStatus: videoElement.ended ? "ended" : "paused",
       }));
 
-    const handleEnded = () => setState((current) => ({ ...current, hostPlaybackStatus: "ended" }));
+    const handleEnded = () =>
+      setState((current) => {
+        const duration = Number.isFinite(videoElement.duration)
+          ? Math.max(0, videoElement.duration)
+          : current.hostPlaybackDuration;
+
+        return {
+          ...current,
+          hostPlaybackCurrentTime:
+            duration ??
+            (Number.isFinite(videoElement.currentTime) ? Math.max(0, videoElement.currentTime) : 0),
+          hostPlaybackDuration: duration,
+          hostPlaybackStatus: "ended",
+        };
+      });
 
     const handleTimeUpdate = () =>
       setState((current) => ({

@@ -73,6 +73,33 @@ describe("playback-state", () => {
     );
   });
 
+  it("host publisher передаёт точную длительность как позицию завершённого видео", () => {
+    vi.useFakeTimers();
+    const room = createRoom();
+    const videoElement = document.createElement("video");
+    setVideoState(videoElement, {
+      currentTime: 59.7,
+      duration: 60,
+      ended: true,
+      paused: true,
+      readyState: 4,
+    });
+
+    const publisher = createHostPlaybackStatePublisher(room as never, videoElement, "movie.mp4");
+    videoElement.dispatchEvent(new Event("ended"));
+
+    expect(getPublishedMessage(room, 1)).toEqual(
+      expect.objectContaining({
+        currentTime: 60,
+        duration: 60,
+        event: "ended",
+        status: "ended",
+      }),
+    );
+
+    publisher.disconnect();
+  });
+
   it("продолжает revision после повторной публикации, чтобы гость не отбросил новое состояние", () => {
     vi.useFakeTimers();
     const room = createRoom();
