@@ -72,6 +72,8 @@
 - [SPS-708_SAFE_MEDIA_REPLACEMENT.md](SPS-708_SAFE_MEDIA_REPLACEMENT.md) —
   выбор нового файла заблокирован во время live-показа, чтобы не рвать доступ
   гостя к уже опубликованной копии.
+- [SPS-710_WEBSOCKET_IDLE_TIMEOUT.md](SPS-710_WEBSOCKET_IDLE_TIMEOUT.md) —
+  gateway больше не закрывает установленный WebSocket между heartbeat-сообщениями.
 
 ## Быстрый порядок чтения
 
