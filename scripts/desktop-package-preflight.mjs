@@ -34,6 +34,66 @@ const required = [
     true,
   ],
 ];
+if (platform === "win") {
+  required.push(
+    [
+      resolve(
+        root,
+        "desktop",
+        ".sidecars",
+        "media",
+        "bin",
+        "libgcc_s_seh-1.dll",
+      ),
+      "MinGW GCC runtime",
+    ],
+    [
+      resolve(
+        root,
+        "desktop",
+        ".sidecars",
+        "media",
+        "bin",
+        "libwinpthread-1.dll",
+      ),
+      "MinGW winpthreads runtime",
+    ],
+    [
+      resolve(root, "desktop", ".sidecars", "media", "MINGW-GCC-COPYING3.txt"),
+      "GCC runtime license",
+    ],
+    [
+      resolve(
+        root,
+        "desktop",
+        ".sidecars",
+        "media",
+        "MINGW-GCC-RUNTIME-EXCEPTION.txt",
+      ),
+      "GCC Runtime Library Exception",
+    ],
+    [
+      resolve(
+        root,
+        "desktop",
+        ".sidecars",
+        "media",
+        "MINGW-WINPTHREAD-LICENSE.txt",
+      ),
+      "winpthreads license",
+    ],
+    [
+      resolve(
+        root,
+        "desktop",
+        ".sidecars",
+        "media",
+        "MINGW-RUNTIME-NOTICE.txt",
+      ),
+      "MinGW runtime notice",
+    ],
+  );
+}
 
 for (const [filePath, label, executableFile] of required) {
   await assertAvailable(filePath, label, executableFile);

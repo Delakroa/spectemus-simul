@@ -4,6 +4,7 @@ import { chmod, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
+import { createIsolatedWindowsProbeEnvironment } from "./desktop-installed-app-environment.mjs";
 
 const script = join(
   process.cwd(),
@@ -81,6 +82,26 @@ test("install smoke сообщает об отсутствующем Windows sid
   } finally {
     await rm(appPath, { recursive: true, force: true });
   }
+});
+
+test("Windows install smoke не видит DLL из сборочного MSYS2 PATH", () => {
+  const environment = createIsolatedWindowsProbeEnvironment(
+    "C:\\Spectemus\\resources\\sidecars\\media\\bin\\ffmpeg.exe",
+    {
+      Path: "C:\\msys64\\mingw64\\bin;C:\\tools\\node",
+      SYSTEMROOT: "C:\\Windows",
+      SPECTEMUS_TEST: "kept",
+    },
+  );
+
+  assert.equal(environment.SPECTEMUS_TEST, "kept");
+  assert.equal(environment.PATH, undefined);
+  assert.doesNotMatch(environment.Path, /msys64|tools\\node/i);
+  assert.match(
+    environment.Path,
+    /^C:\\Spectemus\\resources\\sidecars\\media\\bin;/i,
+  );
+  assert.match(environment.Path, /C:\\Windows\\System32/i);
 });
 
 async function createMacApp(appPath) {
