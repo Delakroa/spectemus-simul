@@ -18,6 +18,8 @@ Installer smoke на GitHub runner оставался зелёным, потом
 - Конфигурация FFmpeg использует `--disable-autodetect`: сборка не связывается
   со случайно установленными на runner-е `zlib`, `iconv` и другими DLL,
   которых нет на обычном компьютере пользователя.
+- Нужные Windows API включаются явно: Media Foundation вместе с D3D11VA, а не
+  как побочный эффект окружения сборочной машины.
 - В installer попадают тексты лицензий GCC Runtime Library Exception и
   winpthreads.
 - Package preflight и installed-app smoke требуют эти файлы.

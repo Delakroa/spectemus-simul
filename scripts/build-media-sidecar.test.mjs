@@ -338,6 +338,8 @@ test("FFmpeg sidecar не зависит от случайных библиот�
   const source = await readFile(script, "utf8");
 
   assert.match(source, /"--disable-autodetect"/);
+  assert.match(source, /"--enable-d3d11va"/);
+  assert.match(source, /"--enable-mediafoundation"/);
   assert.ok(
     source.indexOf('"--disable-autodetect"') <
       source.indexOf('"--enable-shared"'),

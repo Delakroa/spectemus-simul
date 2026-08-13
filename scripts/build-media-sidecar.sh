@@ -221,6 +221,9 @@ main() {
       configure_options+=(
         "--arch=x86_64"
         "--target-os=mingw32"
+        # Media Foundation encoder использует D3D11-типы даже для software
+        # frames. После --disable-autodetect включаем эту системную часть явно.
+        "--enable-d3d11va"
         "--enable-mediafoundation"
       )
       ;;
