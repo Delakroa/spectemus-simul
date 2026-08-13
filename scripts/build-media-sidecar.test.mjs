@@ -334,6 +334,17 @@ test("Windows media sidecar содержит MinGW runtime и его лицен�
   }
 });
 
+test("FFmpeg sidecar не зависит от случайных библиотек build runner", async () => {
+  const source = await readFile(script, "utf8");
+
+  assert.match(source, /"--disable-autodetect"/);
+  assert.ok(
+    source.indexOf('"--disable-autodetect"') <
+      source.indexOf('"--enable-shared"'),
+    "автоопределение внешних библиотек отключается до настройки shared build",
+  );
+});
+
 test("загрузка FFmpeg увеличивает паузу между временными сетевыми ошибками", async () => {
   const root = await mkdtemp(join(tmpdir(), "spectemus-media-backoff-"));
   const binDirectory = join(root, "bin");

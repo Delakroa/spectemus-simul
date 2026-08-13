@@ -15,6 +15,9 @@ Installer smoke на GitHub runner оставался зелёным, потом
 
 - Windows media sidecar явно включает `libgcc_s_seh-1.dll` и
   `libwinpthread-1.dll` рядом с `ffmpeg.exe` и `ffprobe.exe`.
+- Конфигурация FFmpeg использует `--disable-autodetect`: сборка не связывается
+  со случайно установленными на runner-е `zlib`, `iconv` и другими DLL,
+  которых нет на обычном компьютере пользователя.
 - В installer попадают тексты лицензий GCC Runtime Library Exception и
   winpthreads.
 - Package preflight и installed-app smoke требуют эти файлы.

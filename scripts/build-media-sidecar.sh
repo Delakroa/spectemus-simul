@@ -196,6 +196,10 @@ main() {
     "--prefix=$output"
     "--disable-gpl"
     "--disable-nonfree"
+    # Не подхватываем библиотеки, случайно установленные на runner-е. Иначе
+    # Windows-сборка незаметно линкуется с zlib/iconv из MSYS2 и запускается
+    # только пока их DLL присутствуют в PATH сборочной машины.
+    "--disable-autodetect"
     "--enable-shared"
     "--disable-static"
     "--disable-debug"
