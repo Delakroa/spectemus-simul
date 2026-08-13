@@ -437,7 +437,7 @@ describe("useRoomSession host playback controls", () => {
     timeoutSpy.mockRestore();
   });
 
-  it("DOM события play и pause обновляют hostPlaybackStatus", async () => {
+  it("DOM события play, pause и ended обновляют состояние playback", async () => {
     const user = userEvent.setup();
     await setupLivePublication(user);
 
@@ -454,9 +454,13 @@ describe("useRoomSession host playback controls", () => {
     expect(screen.getByTestId("pb-status")).toHaveTextContent("paused");
 
     act(() => {
+      mockVideoElement.currentTime = 119.7;
+      mockVideoElement.duration = 120;
       mockVideoElement.emit("ended");
     });
     expect(screen.getByTestId("pb-status")).toHaveTextContent("ended");
+    expect(screen.getByTestId("pb-time")).toHaveTextContent("120");
+    expect(screen.getByTestId("pb-duration")).toHaveTextContent("120");
   });
 
   it("timeupdate и durationchange обновляют currentTime и duration", async () => {
