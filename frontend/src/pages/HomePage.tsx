@@ -206,7 +206,7 @@ export function HomePage() {
     isMobileInviteHandoff ? undefined : routeRoomId,
     desktopPublicInviteOrigin,
   );
-  const { setHostPreviewElement, setRemotePlaybackElements } = roomSession;
+  const { setHostPlaybackAudio, setHostPreviewElement, setRemotePlaybackElements } = roomSession;
   const [hostDisplayName, setHostDisplayName] = useState("Host");
   const [guestDisplayName, setGuestDisplayName] = useState("Guest");
   const [joinRoomIdDraft, setJoinRoomIdDraft] = useState("");
@@ -356,7 +356,12 @@ export function HomePage() {
   }, [isHost, room?.roomId, roomClosed, roomSession.filePublicationStatus, setHostPreviewElement]);
 
   useEffect(() => {
-    const mediaElement = isHost ? hostPreviewVideoRef.current : remoteAudioRef.current;
+    if (isHost) {
+      setHostPlaybackAudio(isPlaybackSoundMuted, playbackVolume / 100);
+      return;
+    }
+
+    const mediaElement = remoteAudioRef.current;
     if (!mediaElement) {
       return;
     }
@@ -368,7 +373,9 @@ export function HomePage() {
     isPlaybackSoundMuted,
     playbackVolume,
     room?.roomId,
+    roomSession.filePublicationStatus,
     roomSession.remotePlaybackAudioTrackName,
+    setHostPlaybackAudio,
     showWatchSurface,
   ]);
 
@@ -407,7 +414,12 @@ export function HomePage() {
   }, [shouldAutoHideStageControls]);
 
   const applyPlaybackAudioSettings = (muted: boolean, volume: number) => {
-    const mediaElement = isHost ? hostPreviewVideoRef.current : remoteAudioRef.current;
+    if (isHost) {
+      setHostPlaybackAudio(muted, volume / 100);
+      return;
+    }
+
+    const mediaElement = remoteAudioRef.current;
     if (!mediaElement) {
       return;
     }

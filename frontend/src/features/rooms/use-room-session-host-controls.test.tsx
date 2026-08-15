@@ -45,6 +45,8 @@ const {
     duration: 120,
     ended: false,
     paused: true,
+    muted: true,
+    volume: 1,
     play: vi.fn().mockResolvedValue(undefined),
     pause: vi.fn(),
     addEventListener: vi.fn((type: string, listener: EventListener) => {
@@ -64,6 +66,8 @@ const {
       this.duration = 120;
       this.ended = false;
       this.paused = true;
+      this.muted = true;
+      this.volume = 1;
       this.play.mockResolvedValue(undefined);
     },
   };
@@ -305,6 +309,9 @@ function HostControlsHarness() {
       <button type="button" onClick={() => session.setHostPreviewElement(hostPreviewElement)}>
         Привязать preview
       </button>
+      <button type="button" onClick={() => session.setHostPlaybackAudio(false, 0.65)}>
+        Громкость host 65
+      </button>
 
       <span data-testid="pub-status">{session.filePublicationStatus}</span>
       <span data-testid="pub-error">{session.filePublicationError ?? ""}</span>
@@ -355,16 +362,18 @@ afterEach(() => {
 });
 
 describe("useRoomSession host playback controls", () => {
-  it("привязка host preview не включает звук, выключенный пользователем", async () => {
+  it("host слушает исходный файл, а preview остаётся беззвучным", async () => {
     const user = userEvent.setup();
     await setupLivePublication(user);
 
-    // Пользователь выключил звук локального preview.
-    hostPreviewElement.muted = true;
+    hostPreviewElement.muted = false;
 
-    // Повторная привязка происходит при republish и восстановлении показа.
     await user.click(screen.getByRole("button", { name: "Привязать preview" }));
+    expect(hostPreviewElement.muted).toBe(true);
 
+    await user.click(screen.getByRole("button", { name: "Громкость host 65" }));
+    expect(mockVideoElement.muted).toBe(false);
+    expect(mockVideoElement.volume).toBe(0.65);
     expect(hostPreviewElement.muted).toBe(true);
   });
 

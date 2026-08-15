@@ -560,9 +560,9 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
     }
 
     videoElement.autoplay = true;
-    // `muted` stays owned by the playback sound control. React writes that prop only when
-    // its value changes, so forcing it here would silently unmute the host on every
-    // re-attach (republish, recovery) while the UI still shows the sound as muted.
+    // Host слушает исходный media element. Повторное воспроизведение захваченного
+    // MediaStream здесь нужно только для изображения и на Windows может заикаться.
+    videoElement.muted = true;
     videoElement.playsInline = true;
     videoElement.srcObject = publication.stream;
     void videoElement.play().catch((error: unknown) => {
@@ -951,6 +951,17 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
 
   const hostSeek = useCallback((seconds: number, onComplete?: () => void) => {
     hostSeekControllerRef.current?.seek(seconds, onComplete);
+  }, []);
+
+  const setHostPlaybackAudio = useCallback((muted: boolean, volume: number) => {
+    const videoElement = filePublicationRef.current?.videoElement;
+    if (!videoElement) {
+      return;
+    }
+
+    const normalizedVolume = Math.min(1, Math.max(0, volume));
+    videoElement.muted = muted || normalizedVolume === 0;
+    videoElement.volume = normalizedVolume;
   }, []);
 
   const publishFile = useCallback(
@@ -2309,6 +2320,7 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
     selectFile,
     selectDesktopMedia,
     sendChatMessage,
+    setHostPlaybackAudio,
     setHostPreviewElement,
     setRemotePlaybackElements,
     stopFilePublication,
