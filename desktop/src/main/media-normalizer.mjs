@@ -7,6 +7,7 @@ const OUTPUT_VIDEO_CODEC = "h264";
 const OUTPUT_AUDIO_CODEC = "aac";
 const OUTPUT_AUDIO_BITRATE = "160k";
 const OUTPUT_VIDEO_BITRATE = "6000k";
+const DIRECT_H264_PIXEL_FORMATS = new Set(["yuv420p", "yuvj420p"]);
 const FORCE_KILL_WAIT_MS = 1_000;
 const PROBE_TIMEOUT_MS = 15_000;
 // Оценка по битрейту выхода игнорирует контейнерные накладные расходы и
@@ -57,12 +58,16 @@ export class DesktopMediaNormalizer {
           "В выбранном файле не найдена видеодорожка.",
         );
       }
+      const plan = createNormalizationPlan(source, this.platform);
 
       await mkdir(this.outputDirectory, { recursive: true, mode: 0o700 });
       outputPath = join(this.outputDirectory, `${randomUUID()}.mp4`);
       await assertSufficientDiskSpace({
         outputDirectory: this.outputDirectory,
-        requiredBytes: estimateOutputBytes(source.durationSeconds),
+        requiredBytes: estimateOutputBytes(source.durationSeconds, {
+          copyVideo: plan.copyVideo,
+          sourceSizeBytes: source.sizeBytes,
+        }),
         statDiskSpace: this.statDiskSpace,
       });
       await runTranscode({
@@ -70,14 +75,14 @@ export class DesktopMediaNormalizer {
         args: buildNormalizationArguments({
           inputPath: sourcePath,
           outputPath,
-          platform: this.platform,
+          plan,
         }),
         durationSeconds: source.durationSeconds,
         logDirectory: this.logDirectory,
         onProgress,
         signal,
         spawnProcess: this.spawnProcess,
-        videoEncoder: resolveVideoEncoder(this.platform),
+        videoEncoder: plan.videoEncoder,
       });
       const output = await probeMedia({
         command: this.ffprobePath,
@@ -106,7 +111,13 @@ export async function clearNormalizedMediaDirectory(outputDirectory) {
   await rm(resolve(outputDirectory), { force: true, recursive: true });
 }
 
-export function estimateOutputBytes(durationSeconds) {
+export function estimateOutputBytes(
+  durationSeconds,
+  { copyVideo = false, sourceSizeBytes = null } = {},
+) {
+  if (copyVideo && Number.isFinite(sourceSizeBytes) && sourceSizeBytes > 0) {
+    return Math.ceil(sourceSizeBytes * DISK_SPACE_SAFETY_MARGIN);
+  }
   if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
     return null;
   }
@@ -153,12 +164,29 @@ function formatGigabytes(bytes) {
   return (bytes / 1024 ** 3).toFixed(1);
 }
 
-export function buildNormalizationArguments({
-  inputPath,
-  outputPath,
-  platform,
-}) {
-  return [
+export function createNormalizationPlan(source, platform) {
+  const copyVideo =
+    source.video === OUTPUT_VIDEO_CODEC &&
+    DIRECT_H264_PIXEL_FORMATS.has(source.videoPixelFormat);
+  const copyAudio =
+    source.audio === null || source.audio === OUTPUT_AUDIO_CODEC;
+  const videoEncoder = copyVideo ? null : resolveVideoEncoder(platform);
+
+  return {
+    copyAudio,
+    copyVideo,
+    mode:
+      copyVideo && copyAudio
+        ? "remux"
+        : copyVideo || copyAudio
+          ? "partial"
+          : "transcode",
+    videoEncoder,
+  };
+}
+
+export function buildNormalizationArguments({ inputPath, outputPath, plan }) {
+  const args = [
     "-hide_banner",
     "-nostdin",
     "-v",
@@ -173,19 +201,21 @@ export function buildNormalizationArguments({
     "-map",
     "0:a:0?",
     "-c:v",
-    resolveVideoEncoder(platform),
-    "-b:v",
-    OUTPUT_VIDEO_BITRATE,
-    "-pix_fmt",
-    "yuv420p",
-    "-c:a",
-    OUTPUT_AUDIO_CODEC,
-    "-b:a",
-    OUTPUT_AUDIO_BITRATE,
-    "-movflags",
-    "+faststart",
-    outputPath,
+    plan.copyVideo ? "copy" : plan.videoEncoder,
   ];
+
+  if (!plan.copyVideo) {
+    args.push("-b:v", OUTPUT_VIDEO_BITRATE, "-pix_fmt", "yuv420p");
+  }
+
+  args.push("-c:a", plan.copyAudio ? "copy" : OUTPUT_AUDIO_CODEC);
+
+  if (!plan.copyAudio) {
+    args.push("-b:a", OUTPUT_AUDIO_BITRATE);
+  }
+
+  args.push("-movflags", "+faststart", outputPath);
+  return args;
 }
 
 export function resolveVideoEncoder(platform) {
@@ -206,7 +236,7 @@ export function buildProbeArguments(inputPath) {
     "-v",
     "error",
     "-show_entries",
-    "format=duration,size:stream=codec_type,codec_name",
+    "format=duration,size:stream=codec_type,codec_name,pix_fmt",
     "-of",
     "json",
     inputPath,
@@ -230,15 +260,18 @@ export function parseMediaInventory(rawOutput) {
     );
   }
 
+  const videoStream = parsed.streams.find(
+    (stream) => stream.codec_type === "video",
+  );
+
   return {
     audio:
       parsed.streams.find((stream) => stream.codec_type === "audio")
         ?.codec_name ?? null,
     durationSeconds: numberOrNull(parsed.format.duration),
     sizeBytes: numberOrNull(parsed.format.size),
-    video:
-      parsed.streams.find((stream) => stream.codec_type === "video")
-        ?.codec_name ?? null,
+    video: videoStream?.codec_name ?? null,
+    videoPixelFormat: videoStream?.pix_fmt ?? null,
   };
 }
 

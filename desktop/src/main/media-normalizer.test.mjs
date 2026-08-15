@@ -13,6 +13,7 @@ import {
   buildProbeArguments,
   classifyTranscodeStderr,
   clearNormalizedMediaDirectory,
+  createNormalizationPlan,
   estimateOutputBytes,
   parseMediaInventory,
   parseProgressLine,
@@ -21,10 +22,14 @@ import {
 } from "./media-normalizer.mjs";
 
 test("normalizer создаёт H.264/AAC MP4 profile для macOS", () => {
+  const plan = createNormalizationPlan(
+    { audio: "flac", video: "hevc", videoPixelFormat: "yuv420p10le" },
+    "darwin",
+  );
   const argumentsList = buildNormalizationArguments({
     inputPath: "/private/input.mkv",
     outputPath: "/private/output.mp4",
-    platform: "darwin",
+    plan,
   });
 
   assert.deepEqual(argumentsList.slice(0, 10), [
@@ -42,6 +47,56 @@ test("normalizer создаёт H.264/AAC MP4 profile для macOS", () => {
   assert.ok(argumentsList.includes("h264_videotoolbox"));
   assert.ok(argumentsList.includes("aac"));
   assert.equal(argumentsList.at(-1), "/private/output.mp4");
+});
+
+test("normalizer быстро remux-ит совместимые H.264/AAC дорожки без потери качества", () => {
+  const plan = createNormalizationPlan(
+    { audio: "aac", video: "h264", videoPixelFormat: "yuv420p" },
+    "win32",
+  );
+  const argumentsList = buildNormalizationArguments({
+    inputPath: "C:\\private\\input.mkv",
+    outputPath: "C:\\private\\output.mp4",
+    plan,
+  });
+
+  assert.deepEqual(plan, {
+    copyAudio: true,
+    copyVideo: true,
+    mode: "remux",
+    videoEncoder: null,
+  });
+  assert.equal(argumentsList[argumentsList.indexOf("-c:v") + 1], "copy");
+  assert.equal(argumentsList[argumentsList.indexOf("-c:a") + 1], "copy");
+  assert.ok(!argumentsList.includes("6000k"));
+  assert.ok(!argumentsList.includes("160k"));
+});
+
+test("normalizer перекодирует только несовместимую аудиодорожку", () => {
+  const plan = createNormalizationPlan(
+    { audio: "dts", video: "h264", videoPixelFormat: "yuv420p" },
+    "win32",
+  );
+  const argumentsList = buildNormalizationArguments({
+    inputPath: "C:\\private\\input.mkv",
+    outputPath: "C:\\private\\output.mp4",
+    plan,
+  });
+
+  assert.equal(plan.mode, "partial");
+  assert.equal(argumentsList[argumentsList.indexOf("-c:v") + 1], "copy");
+  assert.equal(argumentsList[argumentsList.indexOf("-c:a") + 1], "aac");
+  assert.ok(argumentsList.includes("160k"));
+});
+
+test("normalizer не копирует H.264 10-bit, который Chromium декодирует ненадёжно", () => {
+  const plan = createNormalizationPlan(
+    { audio: "aac", video: "h264", videoPixelFormat: "yuv420p10le" },
+    "win32",
+  );
+
+  assert.equal(plan.copyVideo, false);
+  assert.equal(plan.videoEncoder, "h264_mf");
 });
 
 test("normalizer выбирает Windows Media Foundation encoder", () => {
@@ -63,12 +118,18 @@ test("normalizer читает только codecs и безопасные media 
       JSON.stringify({
         format: { duration: "95.4", size: "123456" },
         streams: [
-          { codec_type: "video", codec_name: "hevc" },
+          { codec_type: "video", codec_name: "hevc", pix_fmt: "yuv420p10le" },
           { codec_type: "audio", codec_name: "dts" },
         ],
       }),
     ),
-    { audio: "dts", durationSeconds: 95.4, sizeBytes: 123456, video: "hevc" },
+    {
+      audio: "dts",
+      durationSeconds: 95.4,
+      sizeBytes: 123456,
+      video: "hevc",
+      videoPixelFormat: "yuv420p10le",
+    },
   );
 });
 
@@ -77,7 +138,7 @@ test("normalizer строит валидный ffprobe inventory query", () => {
     "-v",
     "error",
     "-show_entries",
-    "format=duration,size:stream=codec_type,codec_name",
+    "format=duration,size:stream=codec_type,codec_name,pix_fmt",
     "-of",
     "json",
     "/private/movie.mkv",
@@ -158,6 +219,10 @@ test("estimateOutputBytes растёт с длительностью и не с�
   // 2 часа при 6000k видео + 160k аудио — около 5,5 ГБ с учётом запаса.
   assert.ok(twoHourFilm > 5 * 1024 ** 3);
   assert.ok(twoHourFilm < 6.5 * 1024 ** 3);
+  assert.equal(
+    estimateOutputBytes(null, { copyVideo: true, sourceSizeBytes: 1_000_000 }),
+    1_150_000,
+  );
 });
 
 test("assertSufficientDiskSpace пропускает подготовку, когда места достаточно", async () => {
