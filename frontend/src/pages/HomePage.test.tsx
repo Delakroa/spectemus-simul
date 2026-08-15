@@ -1463,10 +1463,8 @@ describe("HomePage", () => {
     const audioTrack = createTrack("audio");
     const publishStream = createStream([videoTrack], [audioTrack]);
     const realCreateElement = document.createElement.bind(document);
-    const videoStubs = [
-      createVideoStub(undefined, realCreateElement),
-      createVideoStub(publishStream, realCreateElement),
-    ];
+    const publicationVideo = createVideoStub(publishStream, realCreateElement);
+    const videoStubs = [createVideoStub(undefined, realCreateElement), publicationVideo];
     vi.spyOn(document, "createElement").mockImplementation((tagName: string) =>
       tagName === "video"
         ? (videoStubs.shift() ?? createVideoStub(publishStream, realCreateElement))
@@ -1516,6 +1514,17 @@ describe("HomePage", () => {
       audioTrack,
       expect.objectContaining({ name: "movie-audio", source: "screen_share_audio" }),
     );
+
+    const seekBar = screen.getByRole("slider", { name: "Перемотка" });
+    fireEvent.change(seekBar, { target: { value: "4200" } });
+    expect(seekBar).toHaveValue("4200");
+    Object.defineProperties(publicationVideo, {
+      currentTime: { configurable: true, value: 5399.7 },
+      ended: { configurable: true, value: true },
+    });
+    act(() => publicationVideo.dispatchEvent(new Event("ended")));
+
+    await waitFor(() => expect(seekBar).toHaveValue("5400"));
 
     await user.click(screen.getByRole("button", { name: "Остановить" }));
 

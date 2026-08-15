@@ -286,6 +286,10 @@ export function HomePage() {
     roomSession.filePublicationStatus === "publishing" ||
     roomSession.filePublicationStatus === "restarting" ||
     roomSession.filePublicationStatus === "live";
+  const displayedHostPlaybackTime =
+    roomSession.hostPlaybackStatus === "ended"
+      ? roomSession.hostPlaybackCurrentTime
+      : (seekBarValue ?? roomSession.hostPlaybackCurrentTime);
   const canUseVoice = roomSession.liveKitStatus === "connected" && !roomClosed;
   const voiceRequiresSecureContext = globalThis.isSecureContext === false;
   const visibleVoiceError = voiceRequiresSecureContext
@@ -1107,7 +1111,10 @@ export function HomePage() {
                         className="button button--primary"
                         type="button"
                         disabled={!canPublishFile}
-                        onClick={() => void roomSession.publishFile()}
+                        onClick={() => {
+                          setSeekBarValue(null);
+                          void roomSession.publishFile();
+                        }}
                       >
                         <Radio size={18} aria-hidden="true" />
                         {isFilePublishing ? "Публикуется…" : "Опубликовать"}
@@ -1116,7 +1123,10 @@ export function HomePage() {
                         className="button"
                         type="button"
                         disabled={!canStopFilePublication}
-                        onClick={() => roomSession.stopFilePublication()}
+                        onClick={() => {
+                          setSeekBarValue(null);
+                          roomSession.stopFilePublication();
+                        }}
                       >
                         <Square size={16} aria-hidden="true" />
                         Остановить
@@ -1132,7 +1142,10 @@ export function HomePage() {
                           className="button"
                           type="button"
                           disabled={!canPublishFile}
-                          onClick={() => void roomSession.publishFile()}
+                          onClick={() => {
+                            setSeekBarValue(null);
+                            void roomSession.publishFile();
+                          }}
                         >
                           <RefreshCw size={16} aria-hidden="true" />
                           Повторить
@@ -1205,9 +1218,7 @@ export function HomePage() {
                         </button>
                       )}
                       <span className="host-controls__time">
-                        {formatDurationMs(
-                          (seekBarValue ?? roomSession.hostPlaybackCurrentTime) * 1000,
-                        )}
+                        {formatDurationMs(displayedHostPlaybackTime * 1000)}
                         {roomSession.hostPlaybackDuration
                           ? ` / ${formatDurationMs(roomSession.hostPlaybackDuration * 1000)}`
                           : ""}
@@ -1220,7 +1231,7 @@ export function HomePage() {
                       min={0}
                       max={roomSession.hostPlaybackDuration ?? 0}
                       step={0.5}
-                      value={seekBarValue ?? roomSession.hostPlaybackCurrentTime}
+                      value={displayedHostPlaybackTime}
                       aria-label="Перемотка"
                       onChange={(e) => setSeekBarValue(Number(e.target.value))}
                       onPointerUp={(e) => {
