@@ -1498,14 +1498,15 @@ describe("HomePage", () => {
     ).not.toBeInTheDocument();
     const hostPreview = document.querySelector(".remote-player__video") as HTMLVideoElement;
     expect(hostPreview.srcObject).toBe(publishStream);
-    expect(hostPreview.muted).toBe(false);
-    await user.click(screen.getByRole("button", { name: "Выключить звук" }));
     expect(hostPreview.muted).toBe(true);
+    await waitFor(() => expect(publicationVideo.muted).toBe(false));
+    await user.click(screen.getByRole("button", { name: "Выключить звук" }));
+    expect(publicationVideo.muted).toBe(true);
     fireEvent.change(screen.getByRole("slider", { name: "Громкость просмотра" }), {
       target: { value: "65" },
     });
-    expect(hostPreview.muted).toBe(false);
-    expect(hostPreview.volume).toBeCloseTo(0.65);
+    expect(publicationVideo.muted).toBe(false);
+    expect(publicationVideo.volume).toBeCloseTo(0.65);
     expect(liveKitMock.rooms[0]?.localParticipant.publishTrack).toHaveBeenCalledWith(
       videoTrack,
       expect.objectContaining({ name: "movie-video", source: "camera" }),
