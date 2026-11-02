@@ -24,6 +24,26 @@ describe("App", () => {
     expect(screen.getByRole("link", { name: "На главную" })).toHaveAttribute("href", "/");
   });
 
+  it("открывает приглашение Internet-комнаты без формы host-а", () => {
+    const inviteToken = "c".repeat(43);
+
+    render(
+      <QueryClientProvider client={createAppQueryClient()}>
+        <MemoryRouter initialEntries={[`/join#invite=${inviteToken}`]}>
+          <App />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Просмотр из другого города пока закрыт" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Такой страницы нет" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Имя host")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Создать" })).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain(inviteToken);
+  });
+
   it("открывает operator dashboard route", () => {
     render(
       <QueryClientProvider client={createAppQueryClient()}>

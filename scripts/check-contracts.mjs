@@ -44,6 +44,11 @@ assert.equal(
   "planned",
   "Public LiveKit access must remain planned before its runtime ticket",
 );
+assert.deepEqual(
+  Object.keys(openApi.components.schemas.CreateRoomRequest.properties),
+  ["hostDisplayName"],
+  "LAN create must stay free of an Internet mode field",
+);
 assert.equal(
   publicInviteSchema.properties.invitePath.pattern,
   "^/join#invite=[A-Za-z0-9_-]{43}$",

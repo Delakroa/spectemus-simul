@@ -71,6 +71,7 @@ import {
   LOCAL_MEDIA_FILE_ACCEPT,
   LOCAL_MEDIA_FORMATS_HINT,
 } from "../features/rooms/file-diagnostics";
+import { isInternetRoomChoiceEnabled, type RoomProductMode } from "../features/rooms/room-mode";
 import {
   INVITE_SHARE_TEXT,
   INVITE_SHARE_TITLE,
@@ -208,6 +209,8 @@ export function HomePage() {
   );
   const { setHostPlaybackAudio, setHostPreviewElement, setRemotePlaybackElements } = roomSession;
   const [hostDisplayName, setHostDisplayName] = useState("Host");
+  const [roomMode, setRoomMode] = useState<RoomProductMode>("lan");
+  const internetRoomChoiceEnabled = isInternetRoomChoiceEnabled();
   const [guestDisplayName, setGuestDisplayName] = useState("Guest");
   const [joinRoomIdDraft, setJoinRoomIdDraft] = useState("");
   const [isFileDropActive, setIsFileDropActive] = useState(false);
@@ -585,7 +588,8 @@ export function HomePage() {
 
   function handleCreateRoom(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void roomSession.create(hostDisplayName);
+    const mode = internetRoomChoiceEnabled ? roomMode : "lan";
+    void roomSession.create(hostDisplayName, mode);
   }
 
   function handleJoinRoom(event: FormEvent<HTMLFormElement>) {
@@ -900,6 +904,31 @@ export function HomePage() {
           <div className={`room-actions${isInviteEntry ? " room-actions--invite" : ""}`}>
             {!isInviteEntry && (
               <form className="room-form" onSubmit={handleCreateRoom}>
+                {internetRoomChoiceEnabled && (
+                  <fieldset className="room-mode">
+                    <legend>Где смотрите</legend>
+                    <label className="room-mode__option">
+                      <input
+                        checked={roomMode === "lan"}
+                        name="roomMode"
+                        onChange={() => setRoomMode("lan")}
+                        type="radio"
+                        value="lan"
+                      />
+                      В одной сети
+                    </label>
+                    <label className="room-mode__option">
+                      <input
+                        checked={roomMode === "internet"}
+                        name="roomMode"
+                        onChange={() => setRoomMode("internet")}
+                        type="radio"
+                        value="internet"
+                      />
+                      Из разных городов
+                    </label>
+                  </fieldset>
+                )}
                 <label htmlFor="host-display-name">Создать комнату</label>
                 <div className="room-form__row">
                   <input

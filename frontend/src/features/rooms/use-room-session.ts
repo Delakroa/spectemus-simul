@@ -14,6 +14,11 @@ import {
   type RoomSnapshot,
 } from "./room-api";
 import {
+  CLOSED_INTERNET_ROOM_MESSAGE,
+  CLOSED_INTERNET_ROOM_TITLE,
+  type RoomProductMode,
+} from "./room-mode";
+import {
   connectLiveKitRoom,
   type LiveKitConnection,
   type LiveKitConnectionStatus,
@@ -1812,7 +1817,23 @@ export function useRoomSession(routeRoomId?: string, inviteOrigin?: string) {
   }, [disconnectSocket, scheduleRoomReconnect]);
 
   const create = useCallback(
-    async (hostDisplayName: string) => {
+    async (hostDisplayName: string, requestedMode: RoomProductMode = "lan") => {
+      if (requestedMode === "internet") {
+        setState((current) => ({
+          ...current,
+          error: CLOSED_INTERNET_ROOM_MESSAGE,
+          pendingAction: null,
+          userError: {
+            action: null,
+            area: "room",
+            message: CLOSED_INTERNET_ROOM_MESSAGE,
+            retryable: false,
+            title: CLOSED_INTERNET_ROOM_TITLE,
+          },
+        }));
+        return;
+      }
+
       const displayName = hostDisplayName.trim();
       if (!displayName) {
         setState((current) => ({
