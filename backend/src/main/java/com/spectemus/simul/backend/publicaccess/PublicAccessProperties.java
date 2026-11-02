@@ -32,7 +32,8 @@ public record PublicAccessProperties(
         if (sessionTtl.isZero() || sessionTtl.isNegative()) {
             throw new IllegalArgumentException("spectemus-simul.public-access.session-ttl must be positive");
         }
-        if (isEnabled()) {
+        // The record field is assigned after this body, so isEnabled() would still see the default.
+        if (Boolean.TRUE.equals(enabled)) {
             requireText(jdbcUrl, "jdbc-url");
             requireText(jdbcUsername, "jdbc-username");
             requireText(jdbcPassword, "jdbc-password");
