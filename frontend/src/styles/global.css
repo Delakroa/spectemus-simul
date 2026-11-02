@@ -238,6 +238,7 @@ a {
 
 .hero h1,
 .not-found h1,
+.internet-invite h1,
 .fatal-error h1 {
   margin: 0;
   color: var(--ink);
@@ -564,6 +565,38 @@ a {
 .room-form input:focus {
   border-color: #f08a72;
   outline: 3px solid rgb(255 107 74 / 18%);
+}
+
+.room-mode {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.room-mode legend {
+  margin-bottom: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.room-mode__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 650;
+  text-transform: none;
+}
+
+.room-form .room-mode input {
+  width: 16px;
+  height: 16px;
+  padding: 0;
 }
 
 .room-dashboard {
@@ -2110,6 +2143,7 @@ a {
 }
 
 .not-found,
+.internet-invite,
 .fatal-error {
   display: flex;
   min-height: calc(100vh - 140px);
@@ -2123,11 +2157,13 @@ a {
 }
 
 .not-found h1,
+.internet-invite h1,
 .fatal-error h1 {
   font-size: 40px;
 }
 
 .not-found > p:not(.eyebrow),
+.internet-invite > p:not(.eyebrow),
 .fatal-error > p:not(.eyebrow) {
   margin: 18px 0 28px;
   color: var(--muted);
@@ -2432,6 +2468,10 @@ html:has(.operator-page) {
 
 .home--entry .room-form label {
   color: #bdb2cc;
+}
+
+.home--entry .room-form .room-mode__option {
+  color: #f6f1ff;
 }
 
 .home--entry .room-form input {
@@ -3703,6 +3743,7 @@ html:has(.operator-page) {
   }
 
   .not-found h1,
+  .internet-invite h1,
   .fatal-error h1 {
     font-size: 34px;
   }

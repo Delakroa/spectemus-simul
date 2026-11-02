@@ -22,6 +22,9 @@
 - [WT-654_PASSWORDLESS_ACCOUNTS_AND_INVITES.md](WT-654_PASSWORDLESS_ACCOUNTS_AND_INVITES.md) —
   passwordless account/invite foundation, fail-closed конфигурация и граница
   перед будущей Internet room runtime.
+- [SPS-716_INTERNET_ROOM_RUNTIME_FOUNDATION.md](SPS-716_INTERNET_ROOM_RUNTIME_FOUNDATION.md) —
+  явный выбор LAN и Internet за закрытым feature flag; Internet-приглашение не
+  показывает управление host-а и не создаёт локальную комнату.
 - [WT-690_PRODUCT_ROADMAP_STATE.md](WT-690_PRODUCT_ROADMAP_STATE.md) —
   фактический статус LAN hardening, public access foundation и внешний gate
   перед Internet mode.
@@ -222,6 +225,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [SPS-713_CLEAR_ENDED_SEEK_DRAFT.md](SPS-713_CLEAR_ENDED_SEEK_DRAFT.md) — завершение видео очищает локальный черновик перемотки, поэтому бегунок доходит до конца шкалы.
 - [SPS-714_DIRECT_HOST_AUDIO.md](SPS-714_DIRECT_HOST_AUDIO.md) — host слушает исходный файл без повторного аудио-loopback через захваченный preview.
 - [SPS-715_ADAPTIVE_MEDIA_NORMALIZATION.md](SPS-715_ADAPTIVE_MEDIA_NORMALIZATION.md) — MKV и другие контейнеры проходят быстрый remux или частичное перекодирование вместо безусловной полной конвертации.
+- [SPS-716_INTERNET_ROOM_RUNTIME_FOUNDATION.md](SPS-716_INTERNET_ROOM_RUNTIME_FOUNDATION.md) — закрытая граница LAN и Internet room: feature flag, отказ без отката в LAN и страница приглашения без управления host-а.
 - [WT-652_INTERNET_MODE_ARCHITECTURE.md](WT-652_INTERNET_MODE_ARCHITECTURE.md) — отдельный public Internet mode: account/invite, TLS/TURN, privacy, cost gates и последовательность запуска.
 - [WT-653_PUBLIC_ACCESS_CONTRACTS.md](WT-653_PUBLIC_ACCESS_CONTRACTS.md) — контракт изолированного `/api/v2` для account, membership и hash-only invite; LAN API не меняется.
 - [WT-657_DESKTOP_INSTALL_SMOKE.md](WT-657_DESKTOP_INSTALL_SMOKE.md) — CI монтирует DMG и устанавливает NSIS, затем проверяет runtime-компоненты готового приложения.

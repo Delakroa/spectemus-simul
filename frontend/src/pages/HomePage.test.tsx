@@ -125,6 +125,7 @@ describe("HomePage", () => {
     liveKitMock.rooms.length = 0;
     MockWebSocket.instances = [];
     window.sessionStorage.clear();
+    vi.unstubAllEnvs();
     vi.unstubAllGlobals();
   });
 
@@ -165,6 +166,7 @@ describe("HomePage", () => {
     expect(await screen.findByText("Сервис готов")).toBeInTheDocument();
     expect(screen.getByText("v1")).toBeInTheDocument();
     expect(screen.getByText("0.1.0")).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "Из разных городов" })).not.toBeInTheDocument();
   });
 
   it("показывает понятную ошибку соединения", async () => {
@@ -1778,6 +1780,59 @@ describe("HomePage", () => {
         ),
       ).toBeInTheDocument();
     });
+  });
+
+  it("не создаёт LAN-комнату, когда выбран закрытый Internet mode", async () => {
+    vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
+    const user = userEvent.setup();
+    const roomPosts: unknown[] = [];
+
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const url = String(input);
+
+      if (url.endsWith("/health")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ status: "UP", checkedAt: "2026-07-10T10:00:00Z" }), {
+            status: 200,
+          }),
+        );
+      }
+
+      if (url.endsWith("/version")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              name: "spectemus-simul-backend",
+              version: "0.1.0",
+              buildTime: "2026-07-10T10:00:00Z",
+              apiVersion: "v1",
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      if (url.includes("/api/v1/rooms") || url.includes("/api/v2/")) {
+        roomPosts.push({ url, method: init?.method, body: init?.body });
+      }
+
+      return Promise.resolve(new Response(null, { status: 404 }));
+    });
+
+    renderPage();
+
+    await screen.findByText("Сервис готов");
+    expect(screen.getByRole("radio", { name: "В одной сети" })).toBeChecked();
+    await user.click(screen.getByRole("radio", { name: "Из разных городов" }));
+    await user.click(screen.getByRole("button", { name: "Создать" }));
+
+    await screen.findByText(
+      "Просмотр из другого города сейчас закрыт. Локальная комната вместо него не создаётся.",
+    );
+    expect(roomPosts).toEqual([]);
+    expect(screen.queryByText("Видеофайл")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Повторить" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("location-path")).toHaveTextContent("/");
   });
 });
 

@@ -54,6 +54,7 @@ describe("room api", () => {
       "/api/v1/rooms",
       expect.objectContaining({
         method: "POST",
+        body: JSON.stringify({ hostDisplayName: "Host" }),
         headers: expect.objectContaining({
           "Content-Type": "application/json",
           "Idempotency-Key": expect.stringMatching(/^create-room-/),
