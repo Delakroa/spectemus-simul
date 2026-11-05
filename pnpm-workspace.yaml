@@ -16,21 +16,22 @@ onlyBuiltDependencies:
   - esbuild
 
 # SPS-719: narrow transitive security pins when parents have no safe release yet.
-# Remove when electron-builder / eslint / vite 6 / ajv parents absorb these versions.
+# Scoped to vulnerable major ranges so a future parent bump is not forced onto
+# these pins. Remove when electron-builder / eslint / vite 6 / ajv absorb them.
 overrides:
-  "@xmldom/xmldom": 0.8.15
-  baseline-browser-mapping: 2.11.35
+  "@xmldom/xmldom@^0.8.0": 0.8.15
+  "baseline-browser-mapping@^2.0.0": 2.11.35
   "brace-expansion@^1.0.0": 1.1.21
   "brace-expansion@^2.0.0": 2.1.7
   "brace-expansion@^5.0.0": 5.0.12
-  browserslist: 4.29.5
-  fast-uri: 3.1.9
-  js-yaml: 4.3.2
+  "browserslist@^4.0.0": 4.29.5
+  "fast-uri@^3.0.0": 3.1.9
+  "js-yaml@^4.0.0": 4.3.2
   "minimatch@^9.0.0": 11.0.4
   "minimatch@^10.0.0": 11.0.4
-  nanoid: 3.3.18
-  postcss: 8.5.23
-  source-map-js: 1.2.2
-  tar: 7.5.22
+  "nanoid@^3.0.0": 3.3.18
+  "postcss@^8.0.0": 8.5.23
+  "source-map-js@^1.0.0": 1.2.2
+  "tar@^7.0.0": 7.5.22
   "undici@^6.0.0": 6.29.1
   "undici@^7.0.0": 7.30.2
