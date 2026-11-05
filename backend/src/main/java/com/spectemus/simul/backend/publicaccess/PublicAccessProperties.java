@@ -32,14 +32,15 @@ public record PublicAccessProperties(
         if (sessionTtl.isZero() || sessionTtl.isNegative()) {
             throw new IllegalArgumentException("spectemus-simul.public-access.session-ttl must be positive");
         }
-        if (isEnabled()) {
+        // Record fields are assigned after this body. isEnabled() would still see the default.
+        if (Boolean.TRUE.equals(enabled)) {
             requireText(jdbcUrl, "jdbc-url");
             requireText(jdbcUsername, "jdbc-username");
             requireText(jdbcPassword, "jdbc-password");
             requireText(identityPepper, "identity-pepper");
             if (!Boolean.TRUE.equals(cookieSecure)) {
                 throw new IllegalArgumentException(
-                        "public access requires a Secure wt_account cookie");
+                        "spectemus-simul.public-access.cookie-secure must be true when public access is enabled");
             }
             email.requireConfigured();
         }
