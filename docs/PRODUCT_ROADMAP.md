@@ -42,7 +42,8 @@ Internet mode остаётся выключенным. WT-654 держит accou
 LAN и Internet, но не открывает публичный просмотр и не подменяет отказ
 Internet-комнаты локальной комнатой. SPS-717 восстанавливает fail-fast:
 неполная public-access конфигурация останавливает запуск и не включает
-Internet mode.
+Internet mode. SPS-718 делает OSV Security Scan устойчивым на PR и оставляет
+full scan fail-closed; закрытие найденных уязвимостей — SPS-719.
 
 ## Порядок задач
 
