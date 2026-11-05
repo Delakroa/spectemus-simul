@@ -33,26 +33,35 @@ Reusable OSV workflows убраны. В `.github/workflows/security-scan.yml` т
 загружаются как artifacts и в Code Scanning.
 
 Actions закреплены на commit SHA (`checkout`, `dependency-review-action`,
-`osv-scanner-action` / `osv-reporter-action` v2.5.1, `upload-artifact`,
+`osv-scanner-action` / `osv-reporter-action` **v2.5.1**, `upload-artifact`,
 `codeql-action/upload-sarif`). Top-level `permissions: contents: read`;
 `security-events: write` только у OSV jobs с SARIF.
 
-Fail-closed smoke качает binary `osv-scanner` **v2.5.1** — ту же линию, что
-образ `ghcr.io/google/osv-scanner-action:v2.5.1` у pinned scanner/reporter
-actions. `OSV_SCANNER_VERSION` в workflow держит это совпадение явным.
+### Версии scanner vs action tag
+
+Tag action **v2.5.1** указывает на образ
+`ghcr.io/google/osv-scanner-action:v2.5.1`, но release notes этого тега явно
+пишут: «This updates OSV-Scanner to **v2.3.8**». Поэтому fail-closed smoke
+качает binary `osv-scanner` **v2.3.8** (`OSV_SCANNER_VERSION`), а не номер
+тега action. Так smoke проверяет тот же scanner, что внутри pinned actions.
 
 `continue-on-error` стоит только на шаге **scanner** (как у upstream): бинарь
 выходит с кодом 1 при findings, а решение о fail принимает **reporter** без
 `continue-on-error` и без `fail-on-vuln: false`.
 
+После каждого scanner-шага добавлена проверка по образцу upstream **v2.6+**:
+если outcome = `failure` и JSON отсутствует или пуст (`[ ! -s file ]`), job
+падает. Findings с exit 1 и непустым JSON обрабатывает reporter.
+
 ## PR scan vs full scan
 
 - **PR scan** сравнивает результаты base и head. Уже известные уязвимости на
   `main` не валят PR. Новые — валят.
-- Base/head SHA берутся из payload события, а не из `GITHUB_BASE_REF`:
-  - `pull_request` → `pull_request.base.sha` / `pull_request.head.sha`
-  - `merge_group` → `merge_group.base_sha` / `merge_group.head_sha`
-    (`GITHUB_BASE_REF` на merge queue пустой и для checkout непригоден)
+- Base/head SHA:
+  - `pull_request` → base `pull_request.base.sha`, head **`github.sha`**
+    (merge commit PR)
+  - `merge_group` → base `merge_group.base_sha`, head `merge_group.head_sha`
+  - `GITHUB_BASE_REF` на merge queue пустой и не используется
 - **Full scan** смотрит только текущее дерево и падает, пока findings есть.
   Это намеренно: Security Scan на `main` остаётся красным до SPS-719.
 
@@ -62,7 +71,7 @@ actions. `OSV_SCANNER_VERSION` в workflow держит это совпаден�
 `lodash@4.17.20`. Имя `.fixture` нужно, чтобы Dependency review и recursive
 OSV scan не приняли его за product lockfile.
 
-Smoke job на OSV **v2.5.1** копирует fixture во временный `package-lock.json`
+Smoke job на OSV **v2.3.8** копирует fixture во временный `package-lock.json`
 и требует exit code `1`.
 
 ## Почему findings не подавлены
@@ -76,10 +85,10 @@ react-router, source-map-js, tar, undici, Vite, Vitest, Zod и ряде backend
 
 ```bash
 curl -fsSL -o /tmp/osv-scanner \
-  https://github.com/google/osv-scanner/releases/download/v2.5.1/osv-scanner_darwin_arm64
+  https://github.com/google/osv-scanner/releases/download/v2.3.8/osv-scanner_darwin_arm64
 chmod +x /tmp/osv-scanner
 /tmp/osv-scanner --version
-# osv-scanner version: 2.5.1
+# osv-scanner version: 2.3.8
 
 # Fixture must fail closed
 mkdir -p /tmp/vuln-lock
@@ -96,15 +105,14 @@ cp ci/osv-fixtures/known-vulnerable/package-lock.json.fixture /tmp/vuln-lock/pac
 # exit 1; product findings остаются, fixture lodash отсутствует
 ```
 
+Доказательство версии scanner в action v2.5.1: release notes
+https://github.com/google/osv-scanner-action/releases/tag/v2.5.1
+(`This updates OSV-Scanner to v2.3.8`).
+
 `git diff --check` — без замечаний.
 
-`pnpm check` завершился успешно.
-
-- frontend: 155 тестов в 31 файле
-- desktop: 58 тестов
-- backend build/test: BUILD SUCCESSFUL
-- media poc: 13 тестов
-- LAN scripts: 36, media poc scripts: 4, staging preflight: 8
+`pnpm check` завершился успешно на исходном коммите тикета (workflow/docs only
+в follow-up).
 
 ## Откат
 

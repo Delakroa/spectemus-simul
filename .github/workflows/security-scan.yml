@@ -17,9 +17,9 @@ permissions:
   contents: read
 
 env:
-  # Same release line as ghcr.io/google/osv-scanner-action used by the pinned
-  # osv-scanner-action / osv-reporter-action@v2.5.1 jobs below.
-  OSV_SCANNER_VERSION: "2.5.1"
+  # Action tag v2.5.1 ships osv-scanner v2.3.8 (see osv-scanner-action release notes).
+  # Smoke downloads that scanner binary, not the action tag number.
+  OSV_SCANNER_VERSION: "2.3.8"
 
 jobs:
   dependency-review:
@@ -59,12 +59,13 @@ jobs:
           fetch-depth: 0
 
       # merge_group leaves GITHUB_BASE_REF empty; resolve SHAs from the event payload.
+      # pull_request head is github.sha (merge commit). merge_group head is head_sha.
       - name: Resolve base and head SHAs
         id: refs
         env:
           EVENT_NAME: ${{ github.event_name }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_MERGE_SHA: ${{ github.sha }}
           MERGE_BASE_SHA: ${{ github.event.merge_group.base_sha }}
           MERGE_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
         run: |
@@ -72,7 +73,7 @@ jobs:
           case "${EVENT_NAME}" in
             pull_request)
               base_sha="${PR_BASE_SHA}"
-              head_sha="${PR_HEAD_SHA}"
+              head_sha="${PR_MERGE_SHA}"
               ;;
             merge_group)
               base_sha="${MERGE_BASE_SHA}"
@@ -96,6 +97,7 @@ jobs:
 
       # Scanner exits non-zero when vulns exist; reporter decides PR failure on *new* vulns.
       - name: Scan base tree
+        id: scan-old
         uses: google/osv-scanner-action/osv-scanner-action@6e4298ebc4db23e847df9b2e2de2939d6f066c67 # v2.5.1
         continue-on-error: true
         env:
@@ -111,6 +113,7 @@ jobs:
         run: git checkout -f "${{ steps.refs.outputs.head_sha }}"
 
       - name: Scan head tree
+        id: scan-new
         uses: google/osv-scanner-action/osv-scanner-action@6e4298ebc4db23e847df9b2e2de2939d6f066c67 # v2.5.1
         continue-on-error: true
         env:
@@ -121,6 +124,30 @@ jobs:
             --output=new-results.json
             -r
             ./
+
+      # Upstream v2.6+: a failed scan without JSON would look like "no new vulns".
+      - name: Check that both scans completed
+        if: ${{ steps.scan-old.outcome == 'failure' || steps.scan-new.outcome == 'failure' }}
+        env:
+          OLD_OUTCOME: ${{ steps.scan-old.outcome }}
+          NEW_OUTCOME: ${{ steps.scan-new.outcome }}
+          OLD_RESULTS: old-results.json
+          NEW_RESULTS: new-results.json
+        run: |
+          set -euo pipefail
+          status=0
+          if [ "${OLD_OUTCOME}" = "failure" ] && [ ! -s "${OLD_RESULTS}" ]; then
+            echo "::error::OSV-Scanner failed on the base tree without writing ${OLD_RESULTS}. See the \"Scan base tree\" step for the cause."
+            status=1
+          fi
+          if [ "${NEW_OUTCOME}" = "failure" ] && [ ! -s "${NEW_RESULTS}" ]; then
+            echo "::error::OSV-Scanner failed on the head tree without writing ${NEW_RESULTS}. See the \"Scan head tree\" step for the cause."
+            status=1
+          fi
+          if [ "${status}" -ne 0 ]; then
+            echo "::error::A scan did not complete, so the two sets of results cannot be compared. Failing the job rather than reporting no new vulnerabilities found."
+          fi
+          exit "${status}"
 
       - name: Compare OSV results for new vulnerabilities
         uses: google/osv-scanner-action/osv-reporter-action@6e4298ebc4db23e847df9b2e2de2939d6f066c67 # v2.5.1
@@ -181,6 +208,7 @@ jobs:
           persist-credentials: false
 
       - name: Scan repository
+        id: scan
         uses: google/osv-scanner-action/osv-scanner-action@6e4298ebc4db23e847df9b2e2de2939d6f066c67 # v2.5.1
         continue-on-error: true
         env:
@@ -191,6 +219,18 @@ jobs:
             --output=results.json
             -r
             ./
+
+      # Upstream v2.6+: missing JSON after a failed scan must not look like a clean tree.
+      - name: Check that the scan completed
+        if: ${{ steps.scan.outcome == 'failure' }}
+        env:
+          RESULTS: results.json
+        run: |
+          set -euo pipefail
+          if [ ! -s "${RESULTS}" ]; then
+            echo "::error::OSV-Scanner failed without writing ${RESULTS}, so there are no results to report on. Failing the job rather than reporting no vulnerabilities found. See the \"Scan repository\" step for the cause."
+            exit 1
+          fi
 
       - name: Report vulnerabilities
         uses: google/osv-scanner-action/osv-reporter-action@6e4298ebc4db23e847df9b2e2de2939d6f066c67 # v2.5.1
