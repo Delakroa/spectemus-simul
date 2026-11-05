@@ -40,7 +40,9 @@ H.264/AAC MP4. SPS-711–SPS-715 уже в коде: Windows runtime FFmpeg, к�
 Internet mode остаётся выключенным. WT-654 держит account, membership и
 отзывное приглашение за `PUBLIC_ACCESS_ENABLED=false`. SPS-716 отделяет выбор
 LAN и Internet, но не открывает публичный просмотр и не подменяет отказ
-Internet-комнаты локальной комнатой.
+Internet-комнаты локальной комнатой. SPS-717 восстанавливает fail-fast:
+неполная public-access конфигурация останавливает запуск и не включает
+Internet mode.
 
 ## Порядок задач
 
