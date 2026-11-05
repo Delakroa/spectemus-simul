@@ -43,7 +43,8 @@ LAN и Internet, но не открывает публичный просмот�
 Internet-комнаты локальной комнатой. SPS-717 восстанавливает fail-fast:
 неполная public-access конфигурация останавливает запуск и не включает
 Internet mode. SPS-718 делает OSV Security Scan устойчивым на PR и оставляет
-full scan fail-closed; закрытие найденных уязвимостей — SPS-719.
+full scan fail-closed. SPS-719 закрывает найденные уязвимости зависимостей
+без suppressions, чтобы полный OSV scan снова был зелёным.
 
 ## Порядок задач
 
