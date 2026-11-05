@@ -28,6 +28,9 @@
 - [SPS-717_PUBLIC_ACCESS_CONFIG_FAIL_FAST.md](SPS-717_PUBLIC_ACCESS_CONFIG_FAIL_FAST.md) —
   неполная public-access конфигурация снова останавливает запуск: проверка
   читает параметр конструктора, а не ещё не присвоенное поле записи.
+- [SPS-718_OSV_SECURITY_WORKFLOW_RELIABILITY.md](SPS-718_OSV_SECURITY_WORKFLOW_RELIABILITY.md) —
+  OSV Security Scan без job outputs: PR сравнивает новые vulns, full scan
+  остаётся fail-closed, реальные findings уходят в SPS-719.
 - [WT-690_PRODUCT_ROADMAP_STATE.md](WT-690_PRODUCT_ROADMAP_STATE.md) —
   фактический статус LAN hardening, public access foundation и внешний gate
   перед Internet mode.
@@ -230,6 +233,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [SPS-715_ADAPTIVE_MEDIA_NORMALIZATION.md](SPS-715_ADAPTIVE_MEDIA_NORMALIZATION.md) — MKV и другие контейнеры проходят быстрый remux или частичное перекодирование вместо безусловной полной конвертации.
 - [SPS-716_INTERNET_ROOM_RUNTIME_FOUNDATION.md](SPS-716_INTERNET_ROOM_RUNTIME_FOUNDATION.md) — закрытая граница LAN и Internet room: feature flag, отказ без отката в LAN и страница приглашения без управления host-а.
 - [SPS-717_PUBLIC_ACCESS_CONFIG_FAIL_FAST.md](SPS-717_PUBLIC_ACCESS_CONFIG_FAIL_FAST.md) — включённый public access с пустой конфигурацией больше не проходит конструктор.
+- [SPS-718_OSV_SECURITY_WORKFLOW_RELIABILITY.md](SPS-718_OSV_SECURITY_WORKFLOW_RELIABILITY.md) — OSV PR scan больше не падает на Maximum object size exceeded; full scan честно красный до SPS-719.
 - [WT-652_INTERNET_MODE_ARCHITECTURE.md](WT-652_INTERNET_MODE_ARCHITECTURE.md) — отдельный public Internet mode: account/invite, TLS/TURN, privacy, cost gates и последовательность запуска.
 - [WT-653_PUBLIC_ACCESS_CONTRACTS.md](WT-653_PUBLIC_ACCESS_CONTRACTS.md) — контракт изолированного `/api/v2` для account, membership и hash-only invite; LAN API не меняется.
 - [WT-657_DESKTOP_INSTALL_SMOKE.md](WT-657_DESKTOP_INSTALL_SMOKE.md) — CI монтирует DMG и устанавливает NSIS, затем проверяет runtime-компоненты готового приложения.

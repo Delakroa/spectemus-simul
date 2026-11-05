@@ -12,10 +12,14 @@ on:
     - cron: "30 4 * * 1"
   workflow_dispatch:
 
+# Top-level stay minimal; jobs request only what they need.
 permissions:
-  actions: read
   contents: read
-  security-events: write
+
+env:
+  # Action tag v2.5.1 ships osv-scanner v2.3.8 (see osv-scanner-action release notes).
+  # Smoke downloads that scanner binary, not the action tag number.
+  OSV_SCANNER_VERSION: "2.3.8"
 
 jobs:
   dependency-review:
@@ -23,13 +27,16 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
 
     steps:
       - name: Получить исходный код
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Проверить новые зависимости
-        uses: actions/dependency-review-action@v5
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
           fail-on-scopes: runtime, development
@@ -38,21 +45,294 @@ jobs:
   osv-pr:
     name: OSV PR scan
     if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.3.8
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Получить исходный код
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      # merge_group leaves GITHUB_BASE_REF empty; resolve SHAs from the event payload.
+      # pull_request head is github.sha (merge commit). merge_group head is head_sha.
+      - name: Resolve base and head SHAs
+        id: refs
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_MERGE_SHA: ${{ github.sha }}
+          MERGE_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          MERGE_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          case "${EVENT_NAME}" in
+            pull_request)
+              base_sha="${PR_BASE_SHA}"
+              head_sha="${PR_MERGE_SHA}"
+              ;;
+            merge_group)
+              base_sha="${MERGE_BASE_SHA}"
+              head_sha="${MERGE_HEAD_SHA}"
+              ;;
+            *)
+              echo "::error::OSV PR scan does not support event ${EVENT_NAME}"
+              exit 1
+              ;;
+          esac
+          if [ -z "${base_sha}" ] || [ -z "${head_sha}" ]; then
+            echo "::error::Missing base/head SHA for ${EVENT_NAME}"
+            exit 1
+          fi
+          echo "base_sha=${base_sha}" >> "${GITHUB_OUTPUT}"
+          echo "head_sha=${head_sha}" >> "${GITHUB_OUTPUT}"
+          echo "Resolved ${EVENT_NAME} base=${base_sha} head=${head_sha}"
+
+      - name: Checkout base tree
+        run: git checkout "${{ steps.refs.outputs.base_sha }}"
+
+      # Scanner exits non-zero when vulns exist; reporter decides PR failure on *new* vulns.
+      - name: Scan base tree
+        id: scan-old
+        uses: google/osv-scanner-action/osv-scanner-action@6e4298ebc4db23e847df9b2e2de2939d6f066c67 # v2.5.1
+        continue-on-error: true
+        env:
+          GOTOOLCHAIN: auto
+        with:
+          scan-args: |-
+            --format=json
+            --output=old-results.json
+            -r
+            ./
+
+      - name: Checkout head tree
+        run: git checkout -f "${{ steps.refs.outputs.head_sha }}"
+
+      - name: Scan head tree
+        id: scan-new
+        uses: google/osv-scanner-action/osv-scanner-action@6e4298ebc4db23e847df9b2e2de2939d6f066c67 # v2.5.1
+        continue-on-error: true
+        env:
+          GOTOOLCHAIN: auto
+        with:
+          scan-args: |-
+            --format=json
+            --output=new-results.json
+            -r
+            ./
+
+      # Upstream v2.6+: a failed scan without JSON would look like "no new vulns".
+      - name: Check that both scans completed
+        if: ${{ steps.scan-old.outcome == 'failure' || steps.scan-new.outcome == 'failure' }}
+        env:
+          OLD_OUTCOME: ${{ steps.scan-old.outcome }}
+          NEW_OUTCOME: ${{ steps.scan-new.outcome }}
+          OLD_RESULTS: old-results.json
+          NEW_RESULTS: new-results.json
+        run: |
+          set -euo pipefail
+          status=0
+          if [ "${OLD_OUTCOME}" = "failure" ] && [ ! -s "${OLD_RESULTS}" ]; then
+            echo "::error::OSV-Scanner failed on the base tree without writing ${OLD_RESULTS}. See the \"Scan base tree\" step for the cause."
+            status=1
+          fi
+          if [ "${NEW_OUTCOME}" = "failure" ] && [ ! -s "${NEW_RESULTS}" ]; then
+            echo "::error::OSV-Scanner failed on the head tree without writing ${NEW_RESULTS}. See the \"Scan head tree\" step for the cause."
+            status=1
+          fi
+          if [ "${status}" -ne 0 ]; then
+            echo "::error::A scan did not complete, so the two sets of results cannot be compared. Failing the job rather than reporting no new vulnerabilities found."
+          fi
+          exit "${status}"
+
+      - name: Compare OSV results for new vulnerabilities
+        uses: google/osv-scanner-action/osv-reporter-action@6e4298ebc4db23e847df9b2e2de2939d6f066c67 # v2.5.1
+        with:
+          scan-args: |-
+            --output=results.sarif
+            --old=old-results.json
+            --new=new-results.json
+            --gh-annotations=true
+            --fail-on-vuln=true
+
+      - name: Upload OSV SARIF artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: osv-pr-sarif
+          path: results.sarif
+          retention-days: 5
+          if-no-files-found: warn
+
+      - name: Upload OSV JSON artifacts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: osv-pr-json
+          path: |
+            old-results.json
+            new-results.json
+          retention-days: 5
+          if-no-files-found: warn
+
+      - name: Upload SARIF to code scanning
+        if: ${{ !cancelled() }}
+        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
+        with:
+          sarif_file: results.sarif
+
+      - name: Print code scanning PR link
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: |
+          echo "View the OSV-Scanner results for this PR in the Security tab:"
+          echo "${{ github.server_url }}/${{ github.repository }}/security/code-scanning?query=pr%3A${{ github.event.pull_request.number }}"
 
   osv-full:
     name: OSV full scan
     if: github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.3.8
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Получить исходный код
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Scan repository
+        id: scan
+        uses: google/osv-scanner-action/osv-scanner-action@6e4298ebc4db23e847df9b2e2de2939d6f066c67 # v2.5.1
+        continue-on-error: true
+        env:
+          GOTOOLCHAIN: auto
+        with:
+          scan-args: |-
+            --format=json
+            --output=results.json
+            -r
+            ./
+
+      # Upstream v2.6+: missing JSON after a failed scan must not look like a clean tree.
+      - name: Check that the scan completed
+        if: ${{ steps.scan.outcome == 'failure' }}
+        env:
+          RESULTS: results.json
+        run: |
+          set -euo pipefail
+          if [ ! -s "${RESULTS}" ]; then
+            echo "::error::OSV-Scanner failed without writing ${RESULTS}, so there are no results to report on. Failing the job rather than reporting no vulnerabilities found. See the \"Scan repository\" step for the cause."
+            exit 1
+          fi
+
+      - name: Report vulnerabilities
+        uses: google/osv-scanner-action/osv-reporter-action@6e4298ebc4db23e847df9b2e2de2939d6f066c67 # v2.5.1
+        with:
+          scan-args: |-
+            --output=results.sarif
+            --new=results.json
+            --gh-annotations=false
+            --fail-on-vuln=true
+
+      - name: Upload OSV SARIF artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: osv-full-sarif
+          path: results.sarif
+          retention-days: 5
+          if-no-files-found: warn
+
+      - name: Upload OSV JSON artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: osv-full-json
+          path: results.json
+          retention-days: 5
+          if-no-files-found: warn
+
+      - name: Upload SARIF to code scanning
+        if: ${{ !cancelled() }}
+        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
+        with:
+          sarif_file: results.sarif
+
+      - name: Print code scanning link
+        if: ${{ !cancelled() }}
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          echo "View the OSV-Scanner results in the Security tab:"
+          echo "${{ github.server_url }}/${{ github.repository }}/security/code-scanning?query=is%3Aopen+branch%3A${GITHUB_REF_NAME}+tool%3Aosv-scanner"
+
+  osv-fail-closed-smoke:
+    name: OSV fail-closed smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Получить исходный код
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Download pinned osv-scanner binary
+        env:
+          OSV_SCANNER_VERSION: ${{ env.OSV_SCANNER_VERSION }}
+        run: |
+          set -euo pipefail
+          asset="osv-scanner_linux_amd64"
+          base="https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}"
+          curl -fsSL -o "${asset}" "${base}/${asset}"
+          curl -fsSL -o osv-scanner_SHA256SUMS "${base}/osv-scanner_SHA256SUMS"
+          grep " ${asset}\$" osv-scanner_SHA256SUMS | sha256sum -c -
+          install -m 0755 "${asset}" ./osv-scanner
+          ./osv-scanner --version
+
+      - name: Confirm OSV still fails on known-vulnerable fixture
+        run: |
+          set -euo pipefail
+          fixture_dir="${RUNNER_TEMP}/sps-718-known-vulnerable"
+          mkdir -p "${fixture_dir}"
+          cp ci/osv-fixtures/known-vulnerable/package-lock.json.fixture \
+            "${fixture_dir}/package-lock.json"
+          set +e
+          ./osv-scanner scan --format=table \
+            --lockfile="${fixture_dir}/package-lock.json"
+          status=$?
+          set -e
+          if [ "${status}" -eq 0 ]; then
+            echo "::error::osv-scanner exited 0 on known-vulnerable fixture; fail-closed behaviour is broken"
+            exit 1
+          fi
+          if [ "${status}" -ne 1 ]; then
+            echo "::error::osv-scanner exited ${status} on known-vulnerable fixture; expected exit code 1"
+            exit 1
+          fi
+          echo "osv-scanner correctly exited ${status} on known-vulnerable fixture"
 
   secret-scan:
     name: Secret scan
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
 
     steps:
       - name: Получить исходный код
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Сканировать секреты (gitleaks)
         run: >
