@@ -37,6 +37,10 @@ Actions закреплены на commit SHA (`checkout`, `dependency-review-act
 `codeql-action/upload-sarif`). Top-level `permissions: contents: read`;
 `security-events: write` только у OSV jobs с SARIF.
 
+Fail-closed smoke качает binary `osv-scanner` **v2.5.1** — ту же линию, что
+образ `ghcr.io/google/osv-scanner-action:v2.5.1` у pinned scanner/reporter
+actions. `OSV_SCANNER_VERSION` в workflow держит это совпадение явным.
+
 `continue-on-error` стоит только на шаге **scanner** (как у upstream): бинарь
 выходит с кодом 1 при findings, а решение о fail принимает **reporter** без
 `continue-on-error` и без `fail-on-vuln: false`.
@@ -45,6 +49,10 @@ Actions закреплены на commit SHA (`checkout`, `dependency-review-act
 
 - **PR scan** сравнивает результаты base и head. Уже известные уязвимости на
   `main` не валят PR. Новые — валят.
+- Base/head SHA берутся из payload события, а не из `GITHUB_BASE_REF`:
+  - `pull_request` → `pull_request.base.sha` / `pull_request.head.sha`
+  - `merge_group` → `merge_group.base_sha` / `merge_group.head_sha`
+    (`GITHUB_BASE_REF` на merge queue пустой и для checkout непригоден)
 - **Full scan** смотрит только текущее дерево и падает, пока findings есть.
   Это намеренно: Security Scan на `main` остаётся красным до SPS-719.
 
@@ -54,8 +62,8 @@ Actions закреплены на commit SHA (`checkout`, `dependency-review-act
 `lodash@4.17.20`. Имя `.fixture` нужно, чтобы Dependency review и recursive
 OSV scan не приняли его за product lockfile.
 
-Smoke job копирует fixture во временный `package-lock.json` и требует
-exit code `1`.
+Smoke job на OSV **v2.5.1** копирует fixture во временный `package-lock.json`
+и требует exit code `1`.
 
 ## Почему findings не подавлены
 
@@ -68,8 +76,10 @@ react-router, source-map-js, tar, undici, Vite, Vitest, Zod и ряде backend
 
 ```bash
 curl -fsSL -o /tmp/osv-scanner \
-  https://github.com/google/osv-scanner/releases/download/v2.3.8/osv-scanner_darwin_arm64
+  https://github.com/google/osv-scanner/releases/download/v2.5.1/osv-scanner_darwin_arm64
 chmod +x /tmp/osv-scanner
+/tmp/osv-scanner --version
+# osv-scanner version: 2.5.1
 
 # Fixture must fail closed
 mkdir -p /tmp/vuln-lock
