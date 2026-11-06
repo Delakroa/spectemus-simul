@@ -12,9 +12,12 @@ LiveKit-комнаты через `RoomService.RemoveParticipant`. LAN `/api/v1`
 1. Проверка account session и полномочий OWNER.
 2. Persist revoke membership (главный результат; не откатывается).
 3. Opaque `room` / `identity` через `PublicAccessSecrets`.
-4. `RemoveParticipant` при `PUBLIC_LIVEKIT_ENABLED=true`.
+4. `RemoveParticipant` при `PUBLIC_LIVEKIT_ENABLED=true` — **до** audit, чтобы сбой
+   записи audit не оставлял гостя подключённым.
 5. Audit `PUBLIC_MEMBER_REVOKED`.
-6. `204` при успехе или отсутствии participant в LiveKit.
+6. `204` при успехе или валидном Twirp `not_found` (HTTP 404 + JSON
+   `code == "not_found"`). HTML/пустой/битый 404 и `not_found` под другим статусом
+   → fail-closed `503`.
 
 При недоступности Admin API / timeout / неожиданном ответе:
 
@@ -60,9 +63,8 @@ Bearer JWT: `roomAdmin=true`, `room=<opaque room name>`, без `roomJoin`.
 ## Проверки
 
 - `git diff --check` — без замечаний
-- `./gradlew :backend:test --no-daemon` — BUILD SUCCESSFUL, 171 тест
+- `./gradlew :backend:test --no-daemon` — BUILD SUCCESSFUL, 175 тестов
 - `pnpm contracts:check` — ok
-- `pnpm check` — успешно
 
 ## Откат
 

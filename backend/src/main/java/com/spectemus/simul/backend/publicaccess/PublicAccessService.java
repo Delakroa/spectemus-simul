@@ -247,12 +247,7 @@ final class PublicAccessService {
         if (!store.revokeMember(publicRoomId, memberAccountId, account.accountId(), Instant.now(clock))) {
             throw membershipRequired();
         }
-        store.recordAudit(
-                publicRoomId,
-                account.accountId(),
-                "PUBLIC_MEMBER_REVOKED",
-                correlationId,
-                Instant.now(clock));
+        // Disconnect before audit: an audit DB failure must not leave the guest connected.
         if (roomAdminClient != null) {
             try {
                 roomAdminClient.removeParticipant(
@@ -262,6 +257,12 @@ final class PublicAccessService {
                 throw publicLiveKitDisconnectFailed();
             }
         }
+        store.recordAudit(
+                publicRoomId,
+                account.accountId(),
+                "PUBLIC_MEMBER_REVOKED",
+                correlationId,
+                Instant.now(clock));
     }
 
     private PublicAccessStore.StoredAccount requireAccount(String sessionCredential) {

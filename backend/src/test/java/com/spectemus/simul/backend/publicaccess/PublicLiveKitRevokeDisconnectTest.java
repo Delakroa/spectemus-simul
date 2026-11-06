@@ -106,6 +106,55 @@ class PublicLiveKitRevokeDisconnectTest {
     }
 
     @Test
+    void htmlOrEmpty404IsFailClosed() {
+        assertDisconnectFailed(
+                new RecordingPoster(404, "<html>not found</html>"),
+                "proxy HTML 404 must not look like Twirp not_found");
+        assertDisconnectFailed(new RecordingPoster(404, ""), "empty 404 body must not succeed");
+        assertDisconnectFailed(new RecordingPoster(404, "   "), "blank 404 body must not succeed");
+    }
+
+    @Test
+    void notFoundUnderNon404StatusIsFailClosed() {
+        assertDisconnectFailed(
+                new RecordingPoster(500, "{\"code\":\"not_found\",\"msg\":\"participant not found\"}"),
+                "not_found under HTTP 500 must not succeed");
+    }
+
+    @Test
+    void malformedJson404IsFailClosed() {
+        assertDisconnectFailed(
+                new RecordingPoster(404, "{code:not_found}"),
+                "malformed JSON 404 must not succeed");
+        assertDisconnectFailed(
+                new RecordingPoster(404, "{\"code\":[\"not_found\"]}"),
+                "non-textual Twirp code must not succeed");
+    }
+
+    @Test
+    void auditFailureStillDisconnectsParticipant() {
+        RecordingPoster poster = new RecordingPoster(200, "{}");
+        Fixture fixture = Fixture.withPoster(poster);
+        PublicAccessService.AccountSessionResult owner = fixture.login("owner@example.test", "Host");
+        PublicRoomAccessResponse room = fixture.createRoom(owner);
+        PublicAccessService.AccountSessionResult guest = fixture.login("guest@example.test", "Guest");
+        fixture.admitGuest(room.room().publicRoomId(), owner, guest);
+        fixture.store.failNextAudit = true;
+
+        assertThatThrownBy(() -> fixture.service.revokeMember(
+                        room.room().publicRoomId(),
+                        guest.profile().accountId(),
+                        owner.sessionCredential(),
+                        CORRELATION_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("audit unavailable");
+
+        assertThat(poster.calls).hasSize(1);
+        assertThat(fixture.store.rooms.get(room.room().publicRoomId()).revokedMembers)
+                .contains(guest.profile().accountId());
+    }
+
+    @Test
     void liveKitFailureKeepsMembershipRevokedAndReturnsStableProblem() {
         RecordingPoster poster = new RecordingPoster(503, "upstream unavailable");
         Fixture fixture = Fixture.withPoster(poster);
@@ -235,6 +284,27 @@ class PublicLiveKitRevokeDisconnectTest {
                 owner.sessionCredential(),
                 CORRELATION_ID);
 
+        assertThat(fixture.store.rooms.get(room.room().publicRoomId()).revokedMembers)
+                .contains(guest.profile().accountId());
+    }
+
+    private static void assertDisconnectFailed(RecordingPoster poster, String reason) {
+        Fixture fixture = Fixture.withPoster(poster);
+        PublicAccessService.AccountSessionResult owner = fixture.login("owner@example.test", "Host");
+        PublicRoomAccessResponse room = fixture.createRoom(owner);
+        PublicAccessService.AccountSessionResult guest = fixture.login("guest@example.test", "Guest");
+        fixture.admitGuest(room.room().publicRoomId(), owner, guest);
+
+        assertThatThrownBy(() -> fixture.service.revokeMember(
+                        room.room().publicRoomId(),
+                        guest.profile().accountId(),
+                        owner.sessionCredential(),
+                        CORRELATION_ID))
+                .as(reason)
+                .isInstanceOf(ApiException.class)
+                .extracting(exception -> ((ApiException) exception).code())
+                .isEqualTo("PUBLIC_LIVEKIT_DISCONNECT_FAILED");
+        assertThat(poster.calls).as(reason).hasSize(1);
         assertThat(fixture.store.rooms.get(room.room().publicRoomId()).revokedMembers)
                 .contains(guest.profile().accountId());
     }
@@ -381,6 +451,7 @@ class PublicLiveKitRevokeDisconnectTest {
         private final Map<String, StoredAccountSession> sessions = new HashMap<>();
         private final Map<UUID, RoomRecord> rooms = new HashMap<>();
         private final Map<UUID, InviteRecord> invites = new HashMap<>();
+        private boolean failNextAudit;
 
         @Override
         public void saveChallenge(StoredChallenge challenge) {
@@ -513,7 +584,12 @@ class PublicLiveKitRevokeDisconnectTest {
 
         @Override
         public void recordAudit(
-                UUID publicRoomId, UUID actorAccountId, String action, UUID correlationId, Instant occurredAt) {}
+                UUID publicRoomId, UUID actorAccountId, String action, UUID correlationId, Instant occurredAt) {
+            if (failNextAudit) {
+                failNextAudit = false;
+                throw new IllegalStateException("audit unavailable");
+            }
+        }
 
         private static final class RoomRecord {
             private final PublicRoom room;
