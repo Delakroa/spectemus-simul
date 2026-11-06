@@ -14,9 +14,17 @@ Internet mode для пользователей по-прежнему выклю
 - Нет membership, revoke, closed/expired/unknown room → одинаковый
   `404 MEMBERSHIP_REQUIRED` без oracle о существовании комнаты или owner.
 - Permission checks выполняются до подписи JWT.
+- `expiresAt` = минимум из `issuedAt + tokenTtl` и `room.expiresAt`. Если комната
+  истекла между membership check и подписью, token не выпускается
+  (`404 MEMBERSHIP_REQUIRED`).
 - Token, API secret, account cookie и invite token не логируются.
 - Ответ: `Cache-Control: no-store`.
 - Rate-limit bucket `livekit-token` покрывает и LAN, и public path.
+- После завершённого revoke новый mint получает `MEMBERSHIP_REQUIRED`. Запрос,
+  который уже прошёл membership check и ещё подписывает JWT, считается
+  допустимым in-flight исключением; абсолютная гонка revoke↔mint без
+  транзакционной синхронизации в этот тикет не входит. Disconnect уже
+  подключённого participant — отдельный тикет.
 
 ## Конфигурация
 
@@ -24,13 +32,13 @@ Internet mode для пользователей по-прежнему выклю
 выключен). Не использует LAN `spectemus-simul.livekit` и не собирает URL из
 `Host`.
 
-| Параметр / env              | Назначение                                    |
-| --------------------------- | --------------------------------------------- |
-| `PUBLIC_LIVEKIT_ENABLED`    | Явный switch endpoint-а                       |
-| `PUBLIC_LIVEKIT_RTC_URL`    | Browser URL; обязателен `wss://`, не loopback |
-| `PUBLIC_LIVEKIT_API_KEY`    | Не `devkey`                                   |
-| `PUBLIC_LIVEKIT_API_SECRET` | Не LAN/default secret                         |
-| `PUBLIC_LIVEKIT_TOKEN_TTL`  | Положительный TTL, максимум 15m (default 5m)  |
+| Параметр / env              | Назначение                                                                                   |
+| --------------------------- | -------------------------------------------------------------------------------------------- |
+| `PUBLIC_LIVEKIT_ENABLED`    | Явный switch endpoint-а                                                                      |
+| `PUBLIC_LIVEKIT_RTC_URL`    | Browser URL; обязателен `wss://`, не loopback                                                |
+| `PUBLIC_LIVEKIT_API_KEY`    | Не `devkey`                                                                                  |
+| `PUBLIC_LIVEKIT_API_SECRET` | Не LAN/default secret                                                                        |
+| `PUBLIC_LIVEKIT_TOKEN_TTL`  | Верхняя граница TTL (max 15m, default 5m); фактический `exp` ещё обрезается `room.expiresAt` |
 
 `PUBLIC_LIVEKIT_URL` во frontend build остаётся отдельной переменной и не
 подписывает JWT. Неполная включённая конфигурация останавливает binding.
@@ -74,12 +82,18 @@ LAN `LiveKitTokenResponse.roomName` остаётся `RoomId` (22 символа
 | Нет / битая / истёкшая session                    |  401 | `ACCOUNT_REQUIRED`    |
 | Non-member / revoked / closed / expired / unknown |  404 | `MEMBERSHIP_REQUIRED` |
 
+## TTL
+
+Фактический срок JWT не превышает оставшееся время жизни Internet-комнаты.
+Пример: до `room.expiresAt` осталось 30 секунд при TTL 5m → `exp` через 30
+секунд.
+
 ## Проверки
 
 - `git diff --check` — без замечаний
-- `./gradlew :backend:test --no-daemon` — BUILD SUCCESSFUL, 161 тест
+- `./gradlew :backend:test --no-daemon` — BUILD SUCCESSFUL, 162 теста
 - `pnpm contracts:check` — ok
-- `pnpm check` — успешно
+- `git diff --check` — чисто
 
 ## Откат
 
@@ -98,6 +112,7 @@ LAN `LiveKitTokenResponse.roomName` остаётся `RoomId` (22 символа
 
 ## Следующий gate
 
-Запрет token после revoke уже покрыт membership check. Дальше: disconnect
-active participant через LiveKit Server API, публичные WSS/TURN и диагностика
-сети. Internet mode остаётся выключенным до staging gate.
+Новые mint после завершённого revoke уже получают `MEMBERSHIP_REQUIRED`.
+Дальше: disconnect active participant через LiveKit Server API (включая
+закрытие окна для in-flight mint), публичные WSS/TURN и диагностика сети.
+Internet mode остаётся выключенным до staging gate.

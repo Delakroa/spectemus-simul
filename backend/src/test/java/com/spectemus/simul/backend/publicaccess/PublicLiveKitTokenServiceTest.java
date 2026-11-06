@@ -123,6 +123,28 @@ class PublicLiveKitTokenServiceTest {
     }
 
     @Test
+    void capsTokenExpiryToRemainingRoomLifetime() throws Exception {
+        Fixture fixture = new Fixture();
+        PublicAccessService.AccountSessionResult owner = fixture.login("owner@example.test", "Host");
+        PublicRoomAccessResponse room = fixture.createRoom(owner);
+        Instant roomExpiresAt = NOW.plusSeconds(30);
+        fixture.store.rooms.get(room.room().publicRoomId()).room = new PublicRoom(
+                room.room().publicRoomId(),
+                PublicRoomStatus.OPEN,
+                room.room().memberLimit(),
+                room.room().createdAt(),
+                roomExpiresAt);
+
+        PublicLiveKitTokenResponse response =
+                fixture.tokenService.mint(room.room().publicRoomId(), owner.sessionCredential());
+        String payload = payload(response.token());
+
+        assertThat(response.expiresAt()).isEqualTo(roomExpiresAt);
+        assertThat(payload).contains("\"exp\":" + roomExpiresAt.getEpochSecond());
+        assertValidSignature(response.token());
+    }
+
+    @Test
     void rejectsMissingInvalidExpiredSessionAsAccountRequired() {
         Fixture fixture = new Fixture();
         PublicAccessService.AccountSessionResult owner = fixture.login("owner@example.test", "Host");

@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import com.spectemus.simul.backend.api.ApiException;
 import com.spectemus.simul.backend.room.LiveKitTokenSigner;
 import com.spectemus.simul.backend.room.ParticipantRole;
 
@@ -48,7 +49,14 @@ final class PublicLiveKitTokenService {
         String participantIdentity = secrets.livekitParticipantIdentity(publicRoomId, accountId);
         UUID participantId = secrets.livekitParticipantId(publicRoomId, accountId);
         Instant issuedAt = Instant.now(clock);
-        Instant expiresAt = issuedAt.plus(properties.tokenTtl());
+        Instant roomExpiresAt = membership.access().room().expiresAt();
+        // Cap JWT life to the remaining room window. If the room expired between the membership
+        // read and this instant, refuse instead of minting a token that outlives the room.
+        if (!roomExpiresAt.isAfter(issuedAt)) {
+            throw membershipRequired();
+        }
+        Instant ttlExpiry = issuedAt.plus(properties.tokenTtl());
+        Instant expiresAt = ttlExpiry.isBefore(roomExpiresAt) ? ttlExpiry : roomExpiresAt;
 
         String token = signer.sign(
                 properties.apiKey(),
@@ -72,5 +80,12 @@ final class PublicLiveKitTokenService {
                 canPublish,
                 canPublishData,
                 expiresAt);
+    }
+
+    private static ApiException membershipRequired() {
+        return ApiException.notFound(
+                "MEMBERSHIP_REQUIRED",
+                "Комната недоступна",
+                "Эта комната недоступна для текущего account.");
     }
 }

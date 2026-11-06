@@ -637,8 +637,10 @@ paths:
         HOST, GUEST — media-роль GUEST с публикацией только microphone.
         `roomName` — opaque runtime LiveKit name, derived from `publicRoomId`, а не
         LAN `RoomId` и не сырой UUID. Ответ использует отдельную схему, чтобы не
-        ослаблять LAN `LiveKitTokenResponse.roomName`. Revoke по-прежнему запрещает
-        новые tokens; отключение уже подключённого participant — отдельный тикет.
+        ослаблять LAN `LiveKitTokenResponse.roomName`. `expiresAt` не превышает
+        `room.expiresAt`. После завершённого revoke новый mint получает
+        `MEMBERSHIP_REQUIRED`; in-flight mint, уже прошедший membership check,
+        остаётся допустимым исключением до disconnect runtime.
       x-implementation-status: implemented
       security:
         - accountSessionCookie: []
