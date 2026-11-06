@@ -32,9 +32,11 @@
 
 ## Planned Internet mode (`/api/v2`)
 
-`/api/v2` описывает будущий public Internet mode и **не реализован** до следующих
-тикетов. Он не меняет текущие LAN endpoints `/api/v1` и не включает регистрацию
-или публичный доступ сам по себе.
+`/api/v2` описывает public Internet mode. Account/invite foundation и
+`livekit-token` реализованы в коде, но по умолчанию выключены
+(`PUBLIC_ACCESS_ENABLED=false`, `PUBLIC_LIVEKIT_ENABLED=false`). Поверхность не
+меняет LAN endpoints `/api/v1` и не включает регистрацию или публичный доступ
+сама по себе.
 
 - Account session хранится отдельно в opaque cookie `wt_account`; она не заменяет
   текущую room cookie `wt_session`.
@@ -42,9 +44,10 @@
   Raw одноразовый code не возвращается и не попадает в browser storage.
 - Invite URL имеет вид `/join#invite=<token>`: fragment не уходит HTTP server-у.
   Frontend передаёт raw token только write-only полем `POST /api/v2/invite-redemptions`.
-- До `LiveKitTokenResponse` обязательна active account membership. Revoke invite
-  или member-а запрещает выпуск новых tokens и должен отключать active participant
-  в runtime-тикете.
+- До `PublicLiveKitTokenResponse` обязательна active account membership. Revoke
+  invite или member-а запрещает выпуск новых tokens; отключение уже
+  подключённого participant остаётся отдельным runtime-тикетом.
+- Public `roomName` — opaque HMAC-derived name, не LAN `RoomId` и не сырой UUID.
 - Public room не принимает и не возвращает movie bytes, local path, movie title,
   email или LiveKit API secret.
 

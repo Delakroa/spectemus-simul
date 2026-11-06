@@ -15,14 +15,39 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.springframework.stereotype.Component;
 
+/** Shared LiveKit JWT signer for LAN and Internet tokens. */
 @Component
-class LiveKitTokenSigner {
+public class LiveKitTokenSigner {
 
     private static final Base64.Encoder BASE64_URL = Base64.getUrlEncoder().withoutPadding();
     private static final String HMAC_SHA256 = "HmacSHA256";
 
-    String sign(
+    public String sign(
             LiveKitProperties properties,
+            String roomName,
+            String participantIdentity,
+            String displayName,
+            boolean canPublish,
+            boolean canPublishData,
+            List<String> canPublishSources,
+            Instant issuedAt,
+            Instant expiresAt) {
+        return sign(
+                properties.apiKey(),
+                properties.apiSecret(),
+                roomName,
+                participantIdentity,
+                displayName,
+                canPublish,
+                canPublishData,
+                canPublishSources,
+                issuedAt,
+                expiresAt);
+    }
+
+    public String sign(
+            String apiKey,
+            String apiSecret,
             String roomName,
             String participantIdentity,
             String displayName,
@@ -46,7 +71,7 @@ class LiveKitTokenSigner {
         }
 
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("iss", properties.apiKey());
+        payload.put("iss", apiKey);
         payload.put("sub", participantIdentity);
         payload.put("name", displayName);
         payload.put("nbf", issuedAt.getEpochSecond());
@@ -55,7 +80,7 @@ class LiveKitTokenSigner {
         payload.put("video", videoGrant);
 
         String signingInput = base64Json(header) + "." + base64Json(payload);
-        return signingInput + "." + signHmac(signingInput, properties.apiSecret());
+        return signingInput + "." + signHmac(signingInput, apiSecret);
     }
 
     private String base64Json(Map<String, Object> value) {

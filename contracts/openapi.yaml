@@ -633,10 +633,13 @@ paths:
       operationId: mintPublicRoomLiveKitToken
       summary: Выдать краткоживущий LiveKit token только public room member-у
       description: |
-        Planned endpoint. Account membership проверяется до выпуска token; revoke
-        запрещает новые tokens и будущая runtime-реализация удаляет participant
-        через LiveKit Server API.
-      x-implementation-status: planned
+        Account membership проверяется до выпуска token. OWNER получает media-роль
+        HOST, GUEST — media-роль GUEST с публикацией только microphone.
+        `roomName` — opaque runtime LiveKit name, derived from `publicRoomId`, а не
+        LAN `RoomId` и не сырой UUID. Ответ использует отдельную схему, чтобы не
+        ослаблять LAN `LiveKitTokenResponse.roomName`. Revoke по-прежнему запрещает
+        новые tokens; отключение уже подключённого participant — отдельный тикет.
+      x-implementation-status: implemented
       security:
         - accountSessionCookie: []
       responses:
@@ -648,7 +651,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LiveKitTokenResponse"
+                $ref: "#/components/schemas/PublicLiveKitTokenResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -1352,6 +1355,60 @@ components:
         role:
           type: string
           enum: [HOST, GUEST]
+        canPublish:
+          type: boolean
+        canPublishData:
+          type: boolean
+        expiresAt:
+          type: string
+          format: date-time
+
+    PublicLiveKitTokenResponse:
+      type: object
+      additionalProperties: false
+      description: |
+        Internet LiveKit token. Отдельная схема: `roomName` — opaque runtime name
+        (HMAC от publicRoomId), а не 22-символьный LAN RoomId и не сырой UUID.
+      required:
+        - token
+        - liveKitUrl
+        - roomName
+        - participantId
+        - participantIdentity
+        - role
+        - canPublish
+        - canPublishData
+        - expiresAt
+      properties:
+        token:
+          type: string
+          minLength: 20
+          description: Signed LiveKit JWT. Нельзя логировать или кэшировать.
+        liveKitUrl:
+          type: string
+          pattern: ^wss://
+          description: Явно заданный browser-facing public LiveKit URL.
+        roomName:
+          type: string
+          pattern: ^[A-Za-z0-9_-]{43}$
+          description: |
+            Opaque LiveKit room name, derived from publicRoomId через
+            domain-separated HMAC. Не равен publicRoomId и не LAN RoomId.
+        participantId:
+          type: string
+          format: uuid
+          description: |
+            Room-scoped deterministic UUID participant id. Не сырой account UUID.
+        participantIdentity:
+          type: string
+          pattern: ^[A-Za-z0-9_-]{43}$
+          description: |
+            Room-scoped opaque LiveKit identity. Один account в разных комнатах
+            получает разные identity.
+        role:
+          type: string
+          enum: [HOST, GUEST]
+          description: Media-роль LiveKit (OWNER→HOST, GUEST→GUEST).
         canPublish:
           type: boolean
         canPublishData:
