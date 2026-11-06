@@ -117,10 +117,19 @@ final class PublicAccessService {
 
     PublicRoomAccessResponse roomAccess(
             UUID publicRoomId, String sessionCredential) {
+        return access(requireActiveMembership(publicRoomId, sessionCredential).access());
+    }
+
+    /**
+     * Resolves the account session and an active, non-revoked membership in an open Internet room.
+     * Closed, expired, unknown and non-member rooms all collapse to {@code MEMBERSHIP_REQUIRED}.
+     */
+    ActiveMembership requireActiveMembership(UUID publicRoomId, String sessionCredential) {
         PublicAccessStore.StoredAccount account = requireAccount(sessionCredential);
-        return store.findRoomAccess(publicRoomId, account.accountId(), Instant.now(clock))
-                .map(this::access)
+        PublicAccessStore.PublicRoomAccess access = store
+                .findRoomAccess(publicRoomId, account.accountId(), Instant.now(clock))
                 .orElseThrow(PublicAccessService::membershipRequired);
+        return new ActiveMembership(account, access);
     }
 
     PublicInviteCreatedResponse createInvite(
@@ -352,4 +361,7 @@ final class PublicAccessService {
 
     record AccountSessionResult(
             AccountProfileResponse profile, String sessionCredential, Duration sessionTtl) {}
+
+    record ActiveMembership(
+            PublicAccessStore.StoredAccount account, PublicAccessStore.PublicRoomAccess access) {}
 }

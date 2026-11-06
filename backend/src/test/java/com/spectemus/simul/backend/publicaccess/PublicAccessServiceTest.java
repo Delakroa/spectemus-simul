@@ -263,7 +263,10 @@ class PublicAccessServiceTest {
         @Override
         public Optional<PublicRoomAccess> findRoomAccess(UUID publicRoomId, UUID accountId, Instant now) {
             RoomRecord record = rooms.get(publicRoomId);
-            if (record == null || !record.room.expiresAt().isAfter(now) || record.revokedMembers.contains(accountId)) {
+            if (record == null
+                    || record.room.status() != PublicRoomStatus.OPEN
+                    || !record.room.expiresAt().isAfter(now)
+                    || record.revokedMembers.contains(accountId)) {
                 return Optional.empty();
             }
             PublicRoomMembership membership = record.members.get(accountId);
@@ -413,7 +416,7 @@ class PublicAccessServiceTest {
 
         private static final class RoomRecord {
 
-            private final PublicRoom room;
+            private PublicRoom room;
             private final Map<UUID, PublicRoomMembership> members = new HashMap<>();
             private final java.util.Set<UUID> revokedMembers = new java.util.HashSet<>();
 

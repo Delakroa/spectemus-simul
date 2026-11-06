@@ -89,6 +89,10 @@ public class SecurityConfig {
                                         HttpMethod.POST,
                                         "/api/v2/public-rooms/*/members/*/revoke")
                                 .permitAll()
+                                .requestMatchers(
+                                        HttpMethod.POST,
+                                        "/api/v2/public-rooms/*/livekit-token")
+                                .permitAll()
                                 .requestMatchers(HttpMethod.POST, "/api/v2/invite-redemptions")
                                 .permitAll();
                     }

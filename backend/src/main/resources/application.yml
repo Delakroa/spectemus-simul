@@ -93,6 +93,14 @@ spectemus-simul:
       password: ${PUBLIC_ACCESS_EMAIL_PASSWORD:}
       from: ${PUBLIC_ACCESS_EMAIL_FROM:}
       starttls: ${PUBLIC_ACCESS_EMAIL_STARTTLS:true}
+  public-livekit:
+    # Separate from LAN spectemus-simul.livekit. Disabled by default; never falls
+    # back to devkey/loopback. Frontend VITE build still uses PUBLIC_LIVEKIT_URL.
+    enabled: ${PUBLIC_LIVEKIT_ENABLED:false}
+    url: ${PUBLIC_LIVEKIT_RTC_URL:}
+    api-key: ${PUBLIC_LIVEKIT_API_KEY:}
+    api-secret: ${PUBLIC_LIVEKIT_API_SECRET:}
+    token-ttl: ${PUBLIC_LIVEKIT_TOKEN_TTL:5m}
 
 management:
   endpoints:

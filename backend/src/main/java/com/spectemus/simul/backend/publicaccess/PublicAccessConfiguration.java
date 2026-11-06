@@ -4,6 +4,8 @@ import java.util.Properties;
 
 import javax.sql.DataSource;
 
+import com.spectemus.simul.backend.room.LiveKitTokenSigner;
+
 import org.flywaydb.core.Flyway;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -80,6 +82,25 @@ class PublicAccessConfiguration {
                 emailChallengeDelivery,
                 publicAccessSecrets,
                 properties,
+                clock);
+    }
+
+    @Bean
+    @ConditionalOnProperty(
+            prefix = "spectemus-simul.public-livekit",
+            name = "enabled",
+            havingValue = "true")
+    PublicLiveKitTokenService publicLiveKitTokenService(
+            PublicAccessService publicAccessService,
+            PublicAccessSecrets publicAccessSecrets,
+            PublicLiveKitProperties publicLiveKitProperties,
+            LiveKitTokenSigner liveKitTokenSigner,
+            java.time.Clock clock) {
+        return new PublicLiveKitTokenService(
+                publicAccessService,
+                publicAccessSecrets,
+                publicLiveKitProperties,
+                liveKitTokenSigner,
                 clock);
     }
 }

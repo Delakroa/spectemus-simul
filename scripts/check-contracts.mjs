@@ -37,17 +37,49 @@ assert.equal(
   "wt_account",
   "Planned Internet mode must keep account and LAN room cookies separate",
 );
+const publicLiveKitToken =
+  openApi.paths["/api/v2/public-rooms/{publicRoomId}/livekit-token"].post;
 assert.equal(
-  openApi.paths["/api/v2/public-rooms/{publicRoomId}/livekit-token"].post[
-    "x-implementation-status"
-  ],
-  "planned",
-  "Public LiveKit access must remain planned before its runtime ticket",
+  publicLiveKitToken["x-implementation-status"],
+  "implemented",
+  "Public LiveKit token must be marked implemented after SPS-720",
+);
+assert.deepEqual(
+  publicLiveKitToken.security,
+  [{ accountSessionCookie: [] }],
+  "Public LiveKit token must require the account session cookie",
+);
+const publicTokenSchema =
+  publicLiveKitToken.responses["200"].content["application/json"].schema;
+assert.equal(
+  publicTokenSchema.properties.roomName.pattern,
+  "^[A-Za-z0-9_-]{43}$",
+  "Public LiveKit token must use opaque roomName, not LAN RoomId",
+);
+assert.equal(
+  publicTokenSchema.properties.liveKitUrl.pattern,
+  "^wss://",
+  "Public LiveKit token must require an explicit wss:// browser URL",
+);
+assert.equal(
+  openApi.components.schemas.LiveKitTokenResponse.properties.roomName.pattern,
+  "^[A-Za-z0-9_-]{22}$",
+  "LAN LiveKitTokenResponse.roomName must stay bound to RoomId",
+);
+assert.notEqual(
+  openApi.components.schemas.LiveKitTokenResponse.properties.roomName.pattern,
+  publicTokenSchema.properties.roomName.pattern,
+  "Public response must not weaken or reuse the LAN RoomId contract",
 );
 assert.deepEqual(
   Object.keys(openApi.components.schemas.CreateRoomRequest.properties),
   ["hostDisplayName"],
   "LAN create must stay free of an Internet mode field",
+);
+assert.equal(
+  JSON.stringify(publicLiveKitToken).includes("inviteToken"),
+  false,
+  "Public LiveKit token contract must not expose inviteToken",
 );
 assert.equal(
   publicInviteSchema.properties.invitePath.pattern,
@@ -76,7 +108,7 @@ for (const pathItem of Object.values(openApi.paths)) {
     "Invite token must never appear in an API path or query parameter",
   );
 }
-console.log("[ok] Planned Internet access contract privacy invariants");
+console.log("[ok] Internet access contract privacy invariants");
 
 const [commonSchema, problemSchema, clientEventSchema, serverEventSchema] =
   await Promise.all([

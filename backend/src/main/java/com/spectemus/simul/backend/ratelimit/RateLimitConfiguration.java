@@ -88,6 +88,14 @@ class RateLimitConfiguration implements WebMvcConfigurer {
                     "public-invite",
                     config.publicInvite(),
                     "/api/v2/public-rooms/*/invites");
+            // Same abuse budget as LAN media tokens; Internet mode must not mint unlimited JWTs.
+            register(
+                    registry,
+                    limiter,
+                    meters,
+                    "livekit-token",
+                    config.livekitToken(),
+                    "/api/v2/public-rooms/*/livekit-token");
             register(
                     registry,
                     limiter,
