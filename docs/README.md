@@ -37,6 +37,9 @@
 - [SPS-720_PUBLIC_LIVEKIT_TOKEN.md](SPS-720_PUBLIC_LIVEKIT_TOKEN.md) —
   короткоживущий LiveKit token для Internet-комнаты за fail-closed public
   LiveKit конфигурацией; Internet mode по-прежнему выключен.
+- [SPS-721_PUBLIC_LIVEKIT_REVOKE_DISCONNECT.md](SPS-721_PUBLIC_LIVEKIT_REVOKE_DISCONNECT.md) —
+  revoke member вызывает LiveKit RemoveParticipant; БД-revoke не откатывается
+  при сбое Admin API.
 - [WT-690_PRODUCT_ROADMAP_STATE.md](WT-690_PRODUCT_ROADMAP_STATE.md) —
   фактический статус LAN hardening, public access foundation и внешний gate
   перед Internet mode.
@@ -242,6 +245,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [SPS-718_OSV_SECURITY_WORKFLOW_RELIABILITY.md](SPS-718_OSV_SECURITY_WORKFLOW_RELIABILITY.md) — OSV PR scan больше не падает на Maximum object size exceeded; full scan честно красный до SPS-719.
 - [SPS-719_DEPENDENCY_SECURITY_REMEDIATION.md](SPS-719_DEPENDENCY_SECURITY_REMEDIATION.md) — Spring Boot 4.1.2, Electron/Vite/Vitest/Zod и узкие overrides закрывают OSV findings без suppressions.
 - [SPS-720_PUBLIC_LIVEKIT_TOKEN.md](SPS-720_PUBLIC_LIVEKIT_TOKEN.md) — `/api/v2/.../livekit-token` с opaque room identity и отдельной wss-конфигурацией; LAN token не изменён.
+- [SPS-721_PUBLIC_LIVEKIT_REVOKE_DISCONNECT.md](SPS-721_PUBLIC_LIVEKIT_REVOKE_DISCONNECT.md) — revoke member → RemoveParticipant; 503 при сбое disconnect без отката membership.
 - [WT-652_INTERNET_MODE_ARCHITECTURE.md](WT-652_INTERNET_MODE_ARCHITECTURE.md) — отдельный public Internet mode: account/invite, TLS/TURN, privacy, cost gates и последовательность запуска.
 - [WT-653_PUBLIC_ACCESS_CONTRACTS.md](WT-653_PUBLIC_ACCESS_CONTRACTS.md) — контракт изолированного `/api/v2` для account, membership и hash-only invite; LAN API не меняется.
 - [WT-657_DESKTOP_INSTALL_SMOKE.md](WT-657_DESKTOP_INSTALL_SMOKE.md) — CI монтирует DMG и устанавливает NSIS, затем проверяет runtime-компоненты готового приложения.

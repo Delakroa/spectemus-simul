@@ -89,22 +89,23 @@ Endpoint: `/api/v1/rooms/{roomId}/events`. Upgrade использует same-ori
 
 Стартовый каталог:
 
-| HTTP | Code                      | Retryable | Назначение                                          |
-| ---: | ------------------------- | :-------: | --------------------------------------------------- |
-|  400 | `MALFORMED_REQUEST`       |    нет    | Некорректный JSON или структура запроса             |
-|  401 | `AUTHENTICATION_REQUIRED` |    нет    | Нет действующей session                             |
-|  401 | `AUTH_CHALLENGE_REJECTED` |    нет    | Code/challenge недействителен без раскрытия причины |
-|  403 | `ACCESS_DENIED`           |    нет    | Недостаточно прав                                   |
-|  404 | `ROOM_UNAVAILABLE`        |    нет    | Комната недоступна без раскрытия её существования   |
-|  404 | `INVITE_UNAVAILABLE`      |    нет    | Invite неверен, истёк, отозван или исчерпан         |
-|  404 | `MEMBERSHIP_REQUIRED`     |    нет    | Нет active membership без oracle public room        |
-|  409 | `IDEMPOTENCY_CONFLICT`    |    нет    | Key повторен с другим payload                       |
-|  409 | `ROOM_FULL`               |    нет    | Достигнут participant limit                         |
-|  409 | `ACCOUNT_LIMIT_REACHED`   |    нет    | Достигнут безопасный лимит account/room             |
-|  409 | `ROOM_STATE_CONFLICT`     |    да     | Операция основана на устаревшей room version        |
-|  422 | `VALIDATION_FAILED`       |    нет    | Предметная валидация не прошла                      |
-|  429 | `RATE_LIMITED`            |    да     | Превышен rate limit                                 |
-|  500 | `INTERNAL_ERROR`          |    да     | Безопасная внутренняя ошибка                        |
+| HTTP | Code                               | Retryable | Назначение                                                         |
+| ---: | ---------------------------------- | :-------: | ------------------------------------------------------------------ |
+|  400 | `MALFORMED_REQUEST`                |    нет    | Некорректный JSON или структура запроса                            |
+|  401 | `AUTHENTICATION_REQUIRED`          |    нет    | Нет действующей session                                            |
+|  401 | `AUTH_CHALLENGE_REJECTED`          |    нет    | Code/challenge недействителен без раскрытия причины                |
+|  403 | `ACCESS_DENIED`                    |    нет    | Недостаточно прав                                                  |
+|  404 | `ROOM_UNAVAILABLE`                 |    нет    | Комната недоступна без раскрытия её существования                  |
+|  404 | `INVITE_UNAVAILABLE`               |    нет    | Invite неверен, истёк, отозван или исчерпан                        |
+|  404 | `MEMBERSHIP_REQUIRED`              |    нет    | Нет active membership без oracle public room                       |
+|  409 | `IDEMPOTENCY_CONFLICT`             |    нет    | Key повторен с другим payload                                      |
+|  409 | `ROOM_FULL`                        |    нет    | Достигнут participant limit                                        |
+|  409 | `ACCOUNT_LIMIT_REACHED`            |    нет    | Достигнут безопасный лимит account/room                            |
+|  409 | `ROOM_STATE_CONFLICT`              |    да     | Операция основана на устаревшей room version                       |
+|  422 | `VALIDATION_FAILED`                |    нет    | Предметная валидация не прошла                                     |
+|  429 | `RATE_LIMITED`                     |    да     | Превышен rate limit                                                |
+|  503 | `PUBLIC_LIVEKIT_DISCONNECT_FAILED` |    да     | Revoke сохранён, disconnect через LiveKit Admin API не подтверждён |
+|  500 | `INTERNAL_ERROR`                   |    да     | Безопасная внутренняя ошибка                                       |
 
 Frontend отображает локализованный текст по `code`. Неизвестный code обрабатывается как generic error с `correlationId`; raw `detail` не считается готовым пользовательским текстом.
 

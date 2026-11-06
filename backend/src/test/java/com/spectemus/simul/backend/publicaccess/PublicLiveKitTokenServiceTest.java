@@ -272,7 +272,14 @@ class PublicLiveKitTokenServiceTest {
                 service,
                 secrets,
                 new PublicLiveKitProperties(
-                        true, PUBLIC_URL, PUBLIC_API_KEY, PUBLIC_API_SECRET, Duration.ofMinutes(5)),
+                        true,
+                        PUBLIC_URL,
+                        "https://rtc-api.example.test",
+                        PUBLIC_API_KEY,
+                        PUBLIC_API_SECRET,
+                        Duration.ofMinutes(5),
+                        Duration.ofMinutes(1),
+                        Duration.ofSeconds(3)),
                 new LiveKitTokenSigner(),
                 Clock.fixed(NOW, ZoneOffset.UTC));
 

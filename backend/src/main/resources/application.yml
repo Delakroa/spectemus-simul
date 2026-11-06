@@ -98,9 +98,12 @@ spectemus-simul:
     # back to devkey/loopback. Frontend VITE build still uses PUBLIC_LIVEKIT_URL.
     enabled: ${PUBLIC_LIVEKIT_ENABLED:false}
     url: ${PUBLIC_LIVEKIT_RTC_URL:}
+    api-url: ${PUBLIC_LIVEKIT_API_URL:}
     api-key: ${PUBLIC_LIVEKIT_API_KEY:}
     api-secret: ${PUBLIC_LIVEKIT_API_SECRET:}
     token-ttl: ${PUBLIC_LIVEKIT_TOKEN_TTL:5m}
+    admin-token-ttl: ${PUBLIC_LIVEKIT_ADMIN_TOKEN_TTL:1m}
+    admin-timeout: ${PUBLIC_LIVEKIT_ADMIN_TIMEOUT:3s}
 
 management:
   endpoints:

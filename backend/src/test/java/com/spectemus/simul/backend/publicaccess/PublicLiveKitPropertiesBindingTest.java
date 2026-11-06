@@ -19,6 +19,7 @@ class PublicLiveKitPropertiesBindingTest {
         runner.withPropertyValues(
                         "spectemus-simul.public-livekit.enabled=true",
                         "spectemus-simul.public-livekit.url=",
+                        "spectemus-simul.public-livekit.api-url=https://rtc-api.example.test",
                         "spectemus-simul.public-livekit.api-key=public-key",
                         "spectemus-simul.public-livekit.api-secret=" + API_SECRET)
                 .run(context -> {
@@ -32,18 +33,40 @@ class PublicLiveKitPropertiesBindingTest {
     }
 
     @Test
+    void failsFastWhenEnabledWithoutApiUrl() {
+        runner.withPropertyValues(
+                        "spectemus-simul.public-livekit.enabled=true",
+                        "spectemus-simul.public-livekit.url=wss://rtc.example.test",
+                        "spectemus-simul.public-livekit.api-url=",
+                        "spectemus-simul.public-livekit.api-key=public-key",
+                        "spectemus-simul.public-livekit.api-secret=" + API_SECRET)
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    Throwable root = rootCause(context.getStartupFailure());
+                    assertThat(root).isInstanceOf(IllegalArgumentException.class);
+                    assertThat(root.getMessage())
+                            .contains("api-url")
+                            .doesNotContain(API_SECRET);
+                });
+    }
+
+    @Test
     void bindsCompletePublicConfiguration() {
         runner.withPropertyValues(
                         "spectemus-simul.public-livekit.enabled=true",
                         "spectemus-simul.public-livekit.url=wss://rtc.example.test",
+                        "spectemus-simul.public-livekit.api-url=https://rtc-api.example.test",
                         "spectemus-simul.public-livekit.api-key=public-key",
                         "spectemus-simul.public-livekit.api-secret=" + API_SECRET,
-                        "spectemus-simul.public-livekit.token-ttl=5m")
+                        "spectemus-simul.public-livekit.token-ttl=5m",
+                        "spectemus-simul.public-livekit.admin-token-ttl=1m",
+                        "spectemus-simul.public-livekit.admin-timeout=3s")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     PublicLiveKitProperties properties = context.getBean(PublicLiveKitProperties.class);
                     assertThat(properties.isEnabled()).isTrue();
                     assertThat(properties.url()).isEqualTo("wss://rtc.example.test");
+                    assertThat(properties.apiUrl()).isEqualTo("https://rtc-api.example.test");
                 });
     }
 

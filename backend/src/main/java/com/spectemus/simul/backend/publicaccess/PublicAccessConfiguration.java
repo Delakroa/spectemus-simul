@@ -76,12 +76,15 @@ class PublicAccessConfiguration {
             EmailChallengeDelivery emailChallengeDelivery,
             PublicAccessSecrets publicAccessSecrets,
             PublicAccessProperties properties,
+            org.springframework.beans.factory.ObjectProvider<PublicLiveKitRoomAdminClient>
+                    publicLiveKitRoomAdminClient,
             java.time.Clock clock) {
         return new PublicAccessService(
                 publicAccessStore,
                 emailChallengeDelivery,
                 publicAccessSecrets,
                 properties,
+                publicLiveKitRoomAdminClient.getIfAvailable(),
                 clock);
     }
 
@@ -102,5 +105,18 @@ class PublicAccessConfiguration {
                 publicLiveKitProperties,
                 liveKitTokenSigner,
                 clock);
+    }
+
+    @Bean
+    @ConditionalOnProperty(
+            prefix = "spectemus-simul.public-livekit",
+            name = "enabled",
+            havingValue = "true")
+    PublicLiveKitRoomAdminClient publicLiveKitRoomAdminClient(
+            PublicLiveKitProperties publicLiveKitProperties,
+            LiveKitTokenSigner liveKitTokenSigner,
+            java.time.Clock clock) {
+        return new PublicLiveKitRoomAdminClient(
+                publicLiveKitProperties, liveKitTokenSigner, clock);
     }
 }
