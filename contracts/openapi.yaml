@@ -735,16 +735,28 @@ paths:
       tags: [Internet access]
       operationId: revokePublicRoomMember
       summary: Удалить member-а из private Internet-mode room
+      description: |
+        OWNER отзывает GUEST membership. Revoke в PostgreSQL — главный результат.
+        При включённом public LiveKit backend затем вызывает RoomService.RemoveParticipant
+        по opaque room/identity. Если participant уже отсутствует, ответ остаётся 204.
+        Если Admin API недоступен после успешного revoke, возвращается 503
+        `PUBLIC_LIVEKIT_DISCONNECT_FAILED` (retryable); повторный revoke снова пытается
+        отключить participant. Self-hosted LiveKit не отзывает уже выданный JWT: новый
+        token backend не выдаёт, а старый может жить до своего expiresAt.
       x-implementation-status: implemented
       security:
         - accountSessionCookie: []
       responses:
         "204":
-          description: Membership удалена или уже неактивна. Отключение active participant появляется в WT-655 вместе с Internet media runtime.
+          description: |
+            Membership отозвана (или уже была неактивна) и, при включённом public LiveKit,
+            disconnect подтверждён либо participant уже отсутствовал.
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/MembershipRequired"
+        "503":
+          $ref: "#/components/responses/PublicLiveKitDisconnectFailed"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -1660,6 +1672,15 @@ components:
           schema:
             type: integer
             minimum: 1
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    PublicLiveKitDisconnectFailed:
+      description: |
+        Membership уже отозвана, но LiveKit RoomService.RemoveParticipant не подтвердил
+        отключение. Код `PUBLIC_LIVEKIT_DISCONNECT_FAILED`, retryable. Ответ не содержит
+        admin URL, token или raw upstream body.
       content:
         application/problem+json:
           schema:

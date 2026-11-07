@@ -127,9 +127,12 @@ class PublicLiveKitTokenControllerTest {
             return new PublicLiveKitProperties(
                     true,
                     "wss://rtc.example.test",
+                    "https://rtc-api.example.test",
                     "public-key",
                     "public-secret-value",
-                    Duration.ofMinutes(5));
+                    Duration.ofMinutes(5),
+                    Duration.ofMinutes(1),
+                    Duration.ofSeconds(3));
         }
     }
 }

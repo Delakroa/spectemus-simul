@@ -53,6 +53,10 @@ public final class ApiException extends RuntimeException {
                 List.of());
     }
 
+    public static ApiException serviceUnavailable(String code, String title, String detail) {
+        return new ApiException(HttpStatus.SERVICE_UNAVAILABLE, code, title, detail, true, List.of());
+    }
+
     public static ApiException validation(ApiFieldViolation violation) {
         return new ApiException(
                 HttpStatus.UNPROCESSABLE_CONTENT,

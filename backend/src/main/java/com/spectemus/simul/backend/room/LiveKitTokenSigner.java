@@ -83,6 +83,36 @@ public class LiveKitTokenSigner {
         return signingInput + "." + signHmac(signingInput, apiSecret);
     }
 
+    /**
+     * Short-lived RoomService admin JWT. Grants {@code roomAdmin} for one opaque room and never
+     * includes {@code roomJoin} or account/session material.
+     */
+    public String signRoomAdmin(
+            String apiKey,
+            String apiSecret,
+            String roomName,
+            Instant issuedAt,
+            Instant expiresAt) {
+        Map<String, Object> header = new LinkedHashMap<>();
+        header.put("alg", "HS256");
+        header.put("typ", "JWT");
+
+        Map<String, Object> videoGrant = new LinkedHashMap<>();
+        videoGrant.put("room", roomName);
+        videoGrant.put("roomAdmin", true);
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("iss", apiKey);
+        payload.put("sub", "public-room-admin");
+        payload.put("nbf", issuedAt.getEpochSecond());
+        payload.put("iat", issuedAt.getEpochSecond());
+        payload.put("exp", expiresAt.getEpochSecond());
+        payload.put("video", videoGrant);
+
+        String signingInput = base64Json(header) + "." + base64Json(payload);
+        return signingInput + "." + signHmac(signingInput, apiSecret);
+    }
+
     private String base64Json(Map<String, Object> value) {
         return BASE64_URL.encodeToString(toJson(value).getBytes(StandardCharsets.UTF_8));
     }

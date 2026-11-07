@@ -47,25 +47,27 @@ full scan fail-closed. SPS-719 закрывает найденные уязви�
 без suppressions, чтобы полный OSV scan снова был зелёным. SPS-720 добавляет
 `POST /api/v2/public-rooms/{id}/livekit-token` за отдельным
 `PUBLIC_LIVEKIT_ENABLED=false`: короткоживущий JWT только для active member,
-без fallback на LAN LiveKit credentials.
+без fallback на LAN LiveKit credentials. SPS-721 после revoke member вызывает
+LiveKit `RemoveParticipant` по opaque identity; membership revoke в БД остаётся
+источником истины. Self-hosted LiveKit не отзывает уже выданный JWT — только
+отключает participant и блокирует новый token.
 
 ## Порядок задач
 
-| Фаза | Состояние                                     | Результат                                                                                                                                                     | Незавершённый gate                                                                                             |
-| ---- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| 0    | Код готов: WT-682, WT-684–WT-689, SPS-711–715 | Локальная подготовка и исправления desktop/LAN. Физически форматы и платформы ещё не подтверждены                                                             | Mac ↔ Windows matrix перенесена в финальный release-candidate gate                                             |
-| 1    | Код готов, feature выключена: WT-654          | Изолированный `/api/v2`: account, email challenge, membership, отзыв invite и audit                                                                           | PostgreSQL, SMTP и sender domain; revoked invite не даёт access                                                |
-| 2    | Код готов, feature выключена: SPS-716/720     | Явный выбор LAN/Internet за feature flag. Короткий LiveKit token на `/api/v2` за `PUBLIC_LIVEKIT_ENABLED=false`. Закрытый Internet mode не открывает просмотр | Revoke/disconnect active participant, публичные WSS/TURN и диагностика. Публичный доступ выключен              |
-| 3    | Запланировано: private alpha                  | Ограниченная invite-only проверка «host дома → гость в другом городе»                                                                                         | Сессии из разных сетей, включая сложную сеть; измерены QoS, TURN usage, стоимость и support load               |
-| 4    | Запланировано: closed beta → release          | Понятная установка, операционный контур и честный UX для малых private rooms                                                                                  | Успешность сессий, privacy/deletion policy, incident/revoke runbook, физическая matrix и проверенная экономика |
+| Фаза | Состояние                                     | Результат                                                                                                                                          | Незавершённый gate                                                                                             |
+| ---- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 0    | Код готов: WT-682, WT-684–WT-689, SPS-711–715 | Локальная подготовка и исправления desktop/LAN. Физически форматы и платформы ещё не подтверждены                                                  | Mac ↔ Windows matrix перенесена в финальный release-candidate gate                                             |
+| 1    | Код готов, feature выключена: WT-654          | Изолированный `/api/v2`: account, email challenge, membership, отзыв invite и audit                                                                | PostgreSQL, SMTP и sender domain; revoked invite не даёт access                                                |
+| 2    | Код готов, feature выключена: SPS-716/720/721 | Явный выбор LAN/Internet. LiveKit token и revoke→RemoveParticipant за `PUBLIC_LIVEKIT_ENABLED=false`. Закрытый Internet mode не открывает просмотр | Публичные WSS/TURN и диагностика. Публичный доступ выключен. Уже выданный JWT живёт до TTL на self-hosted LK   |
+| 3    | Запланировано: private alpha                  | Ограниченная invite-only проверка «host дома → гость в другом городе»                                                                              | Сессии из разных сетей, включая сложную сеть; измерены QoS, TURN usage, стоимость и support load               |
+| 4    | Запланировано: closed beta → release          | Понятная установка, операционный контур и честный UX для малых private rooms                                                                       | Успешность сессий, privacy/deletion policy, incident/revoke runbook, физическая matrix и проверенная экономика |
 
 ## Что делаем следующим
 
 SPS-716 фиксирует границу режимов, SPS-720 выдаёт короткоживущий public LiveKit
-token только active member-у. Internet mode остаётся закрытым. Следующие
-отдельные тикеты: отключение участника после revoke, публичные WSS/TURN,
-диагностика сети и privacy-safe telemetry. Ни один из них не делает LAN-комнату
-публичной.
+token, SPS-721 отключает participant после revoke member. Internet mode
+остаётся закрытым. Следующие отдельные тикеты: публичные WSS/TURN, диагностика
+сети и privacy-safe telemetry. Ни один из них не делает LAN-комнату публичной.
 
 Публичный доступ и заявление о готовности Internet mode невозможны, пока не
 пройдена финальная проверка VM, DNS, HTTPS, WSS и TURN. До неё же остаётся

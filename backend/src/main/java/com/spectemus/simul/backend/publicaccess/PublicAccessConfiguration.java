@@ -13,6 +13,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 
+import tools.jackson.databind.ObjectMapper;
+
 /** Beans which exist only after the explicit Internet-mode switch has been validated. */
 @Configuration
 @ConditionalOnProperty(
@@ -76,12 +78,15 @@ class PublicAccessConfiguration {
             EmailChallengeDelivery emailChallengeDelivery,
             PublicAccessSecrets publicAccessSecrets,
             PublicAccessProperties properties,
+            org.springframework.beans.factory.ObjectProvider<PublicLiveKitRoomAdminClient>
+                    publicLiveKitRoomAdminClient,
             java.time.Clock clock) {
         return new PublicAccessService(
                 publicAccessStore,
                 emailChallengeDelivery,
                 publicAccessSecrets,
                 properties,
+                publicLiveKitRoomAdminClient.getIfAvailable(),
                 clock);
     }
 
@@ -102,5 +107,19 @@ class PublicAccessConfiguration {
                 publicLiveKitProperties,
                 liveKitTokenSigner,
                 clock);
+    }
+
+    @Bean
+    @ConditionalOnProperty(
+            prefix = "spectemus-simul.public-livekit",
+            name = "enabled",
+            havingValue = "true")
+    PublicLiveKitRoomAdminClient publicLiveKitRoomAdminClient(
+            PublicLiveKitProperties publicLiveKitProperties,
+            LiveKitTokenSigner liveKitTokenSigner,
+            java.time.Clock clock,
+            ObjectMapper objectMapper) {
+        return new PublicLiveKitRoomAdminClient(
+                publicLiveKitProperties, liveKitTokenSigner, clock, objectMapper);
     }
 }

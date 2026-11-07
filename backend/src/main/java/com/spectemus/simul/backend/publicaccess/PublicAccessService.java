@@ -22,6 +22,7 @@ final class PublicAccessService {
     private final EmailChallengeDelivery emailDelivery;
     private final PublicAccessSecrets secrets;
     private final PublicAccessProperties properties;
+    private final PublicLiveKitRoomAdminClient roomAdminClient;
     private final Clock clock;
 
     PublicAccessService(
@@ -30,10 +31,21 @@ final class PublicAccessService {
             PublicAccessSecrets secrets,
             PublicAccessProperties properties,
             Clock clock) {
+        this(store, emailDelivery, secrets, properties, null, clock);
+    }
+
+    PublicAccessService(
+            PublicAccessStore store,
+            EmailChallengeDelivery emailDelivery,
+            PublicAccessSecrets secrets,
+            PublicAccessProperties properties,
+            PublicLiveKitRoomAdminClient roomAdminClient,
+            Clock clock) {
         this.store = store;
         this.emailDelivery = emailDelivery;
         this.secrets = secrets;
         this.properties = properties;
+        this.roomAdminClient = roomAdminClient;
         this.clock = clock;
     }
 
@@ -235,6 +247,16 @@ final class PublicAccessService {
         if (!store.revokeMember(publicRoomId, memberAccountId, account.accountId(), Instant.now(clock))) {
             throw membershipRequired();
         }
+        // Disconnect before audit: an audit DB failure must not leave the guest connected.
+        if (roomAdminClient != null) {
+            try {
+                roomAdminClient.removeParticipant(
+                        secrets.livekitRoomName(publicRoomId),
+                        secrets.livekitParticipantIdentity(publicRoomId, memberAccountId));
+            } catch (PublicLiveKitDisconnectException exception) {
+                throw publicLiveKitDisconnectFailed();
+            }
+        }
         store.recordAudit(
                 publicRoomId,
                 account.accountId(),
@@ -357,6 +379,13 @@ final class PublicAccessService {
                 "IDEMPOTENCY_REPLAY_UNAVAILABLE",
                 "Повтор приглашения недоступен",
                 "Создайте новое приглашение: raw token безопасно возвращается только один раз.");
+    }
+
+    private static ApiException publicLiveKitDisconnectFailed() {
+        return ApiException.serviceUnavailable(
+                "PUBLIC_LIVEKIT_DISCONNECT_FAILED",
+                "Не удалось отключить участника",
+                "Доступ отозван, но отключение от медиакомнаты не подтверждено. Повторите отзыв позже.");
     }
 
     record AccountSessionResult(
