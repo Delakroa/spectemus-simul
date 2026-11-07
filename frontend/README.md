@@ -39,6 +39,11 @@ pnpm dev:frontend
 
 Другой адрес бэкенда для локальной разработки можно задать через `VITE_BACKEND_PROXY_TARGET`. Для отдельного production API используется `VITE_API_BASE_URL`. Пример находится в `.env.example`.
 
+`VITE_INTERNET_ROOM_RUNTIME_ENABLED` по умолчанию выключен. При `true` гость может
+пройти `/join#invite=<token>` → email challenge → redemption →
+`/internet/rooms/{publicRoomId}` без media/LiveKit. Host Internet flow этим
+флагом не открывается.
+
 ## Проверки
 
 Из корня репозитория:

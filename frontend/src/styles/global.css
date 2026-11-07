@@ -2170,6 +2170,64 @@ a {
   line-height: 1.6;
 }
 
+.internet-invite--guest {
+  align-items: stretch;
+  text-align: left;
+}
+
+.internet-invite--guest h1 {
+  text-align: left;
+}
+
+.internet-invite__form {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 420px);
+  margin: 8px 0 0;
+}
+
+.internet-invite__form label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.internet-invite__form input {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 92%, white);
+  color: var(--ink);
+}
+
+.internet-invite__form input:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 1px;
+}
+
+.internet-invite__form .button {
+  justify-self: start;
+  margin-top: 4px;
+}
+
+.internet-invite__error {
+  display: grid;
+  gap: 14px;
+  width: min(100%, 420px);
+  margin-top: 18px;
+}
+
+.internet-invite__error p {
+  margin: 0;
+  color: var(--danger);
+  line-height: 1.5;
+}
+
+.internet-invite__meta {
+  margin-top: 0;
+  color: var(--muted);
+}
+
 .fatal-error__icon {
   display: grid;
   width: 56px;
