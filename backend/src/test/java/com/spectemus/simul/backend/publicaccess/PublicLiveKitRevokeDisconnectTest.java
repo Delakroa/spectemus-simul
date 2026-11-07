@@ -34,6 +34,9 @@ import com.spectemus.simul.backend.room.LiveKitTokenSigner;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+
 class PublicLiveKitRevokeDisconnectTest {
 
     private static final Instant NOW = Instant.parse("2026-11-06T18:00:00Z");
@@ -41,6 +44,8 @@ class PublicLiveKitRevokeDisconnectTest {
     private static final String PEPPER = "test-identity-pepper-at-least-32-characters";
     private static final String PUBLIC_API_KEY = "public-test-key";
     private static final String PUBLIC_API_SECRET = "public-test-secret-public-test-secret";
+    private static final ObjectMapper OBJECT_MAPPER =
+            JsonMapper.builder().findAndAddModules().build();
 
     @Test
     void successfulRevokeCallsRemoveParticipantWithOpaqueRoomAndIdentity() {
@@ -129,6 +134,15 @@ class PublicLiveKitRevokeDisconnectTest {
         assertDisconnectFailed(
                 new RecordingPoster(404, "{\"code\":[\"not_found\"]}"),
                 "non-textual Twirp code must not succeed");
+        assertDisconnectFailed(
+                new RecordingPoster(404, "{\"code\":\"not_found\""),
+                "truncated Twirp JSON object must not succeed");
+        assertDisconnectFailed(
+                new RecordingPoster(404, "{\"code\":\"not_found\"}garbage"),
+                "trailing tokens after Twirp JSON must not succeed");
+        assertDisconnectFailed(
+                new RecordingPoster(404, "{\"x\":1 \"code\":\"not_found\"}"),
+                "JSON object missing commas must not succeed");
     }
 
     @Test
@@ -372,6 +386,7 @@ class PublicLiveKitRevokeDisconnectTest {
                         properties,
                         new LiveKitTokenSigner(),
                         Clock.fixed(NOW, ZoneOffset.UTC),
+                        OBJECT_MAPPER,
                         poster);
                 this.service = new PublicAccessService(
                         store,

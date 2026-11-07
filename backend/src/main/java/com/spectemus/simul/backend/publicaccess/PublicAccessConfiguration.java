@@ -13,6 +13,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 
+import tools.jackson.databind.ObjectMapper;
+
 /** Beans which exist only after the explicit Internet-mode switch has been validated. */
 @Configuration
 @ConditionalOnProperty(
@@ -115,8 +117,9 @@ class PublicAccessConfiguration {
     PublicLiveKitRoomAdminClient publicLiveKitRoomAdminClient(
             PublicLiveKitProperties publicLiveKitProperties,
             LiveKitTokenSigner liveKitTokenSigner,
-            java.time.Clock clock) {
+            java.time.Clock clock,
+            ObjectMapper objectMapper) {
         return new PublicLiveKitRoomAdminClient(
-                publicLiveKitProperties, liveKitTokenSigner, clock);
+                publicLiveKitProperties, liveKitTokenSigner, clock, objectMapper);
     }
 }

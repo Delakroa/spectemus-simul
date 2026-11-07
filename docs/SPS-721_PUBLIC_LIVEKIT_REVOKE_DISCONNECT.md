@@ -15,9 +15,10 @@ LiveKit-комнаты через `RoomService.RemoveParticipant`. LAN `/api/v1`
 4. `RemoveParticipant` при `PUBLIC_LIVEKIT_ENABLED=true` — **до** audit, чтобы сбой
    записи audit не оставлял гостя подключённым.
 5. Audit `PUBLIC_MEMBER_REVOKED`.
-6. `204` при успехе или валидном Twirp `not_found` (HTTP 404 + JSON
-   `code == "not_found"`). HTML/пустой/битый 404 и `not_found` под другим статусом
-   → fail-closed `503`.
+6. `204` при успехе или валидном Twirp `not_found` (HTTP 404 + ровно один
+   JSON-объект с `code == "not_found"` через `tools.jackson` ObjectMapper с
+   `FAIL_ON_TRAILING_TOKENS`). HTML/пустой/обрезанный/битый JSON, данные после
+   закрывающего объекта и `not_found` под другим статусом → fail-closed `503`.
 
 При недоступности Admin API / timeout / неожиданном ответе:
 
@@ -64,6 +65,8 @@ Bearer JWT: `roomAdmin=true`, `room=<opaque room name>`, без `roomJoin`.
 
 - `git diff --check` — без замечаний
 - `./gradlew :backend:test --no-daemon` — BUILD SUCCESSFUL, 175 тестов
+  (в т.ч. truncated/`garbage`/missing-comma 404 → 503; валидный Twirp
+  `not_found` → 204)
 - `pnpm contracts:check` — ok
 
 ## Откат
