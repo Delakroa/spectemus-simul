@@ -58,6 +58,18 @@ export type DesktopPublicInvite = {
   maxRedemptions: number;
 };
 
+export type DesktopPublicLiveKitToken = {
+  canPublish: boolean;
+  canPublishData: boolean;
+  expiresAt: string;
+  liveKitUrl: string;
+  participantId: string;
+  participantIdentity: string;
+  role: "HOST" | "GUEST";
+  roomName: string;
+  token: string;
+};
+
 export type SpectemusDesktopApi = {
   cancelDeviceBinding?: () => Promise<{ cancelled: boolean }>;
   cancelMediaNormalization?: (id: string) => Promise<void>;
@@ -75,6 +87,7 @@ export type SpectemusDesktopApi = {
   getDeviceBindingStatus?: () => Promise<DesktopDeviceBindingStatus>;
   getPublicInviteOrigin?: () => Promise<string | null>;
   getRuntimeStatus: () => Promise<DesktopRuntimeStatus>;
+  mintPublicLiveKitToken?: (publicRoomId: string) => Promise<DesktopPublicLiveKitToken>;
   normalizeMedia?: (id: string) => Promise<DesktopMediaSelection>;
   onMediaNormalizationProgress?: (
     listener: (progress: DesktopMediaNormalizationProgress) => void,

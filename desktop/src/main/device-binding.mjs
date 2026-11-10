@@ -4,6 +4,8 @@ import { join } from "node:path";
 const USER_CODE_PATTERN = /^[A-Z0-9]{4}-[A-Z0-9]{4}$/;
 const DEVICE_SECRET_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const VERIFICATION_PATH = "/internet/link";
+const PUBLIC_ROOM_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function assertPublicHttpsOrigin(rawOrigin) {
   if (typeof rawOrigin !== "string" || !rawOrigin.trim()) {
@@ -359,6 +361,46 @@ export function createDeviceBindingController({
     return response.json();
   }
 
+  async function mintPublicLiveKitToken(publicRoomId, { signal } = {}) {
+    if (
+      typeof publicRoomId !== "string" ||
+      !PUBLIC_ROOM_ID_PATTERN.test(publicRoomId)
+    ) {
+      throw new Error("publicRoomId must be a UUID");
+    }
+    const response = await authorizedFetch(
+      `/api/v2/public-rooms/${encodeURIComponent(publicRoomId)}/livekit-token`,
+      {
+        method: "POST",
+        signal,
+      },
+    );
+    if (!response.ok) {
+      throw await toProblem(response);
+    }
+    const body = await response.json();
+    if (
+      typeof body?.token !== "string" ||
+      body.token.length < 20 ||
+      typeof body?.liveKitUrl !== "string" ||
+      !body.liveKitUrl.startsWith("wss://")
+    ) {
+      throw new Error("Malformed public LiveKit token response");
+    }
+    // Renderer-safe surface only: never include deviceCredential or apiOrigin.
+    return {
+      token: body.token,
+      liveKitUrl: body.liveKitUrl,
+      roomName: body.roomName,
+      participantId: body.participantId,
+      participantIdentity: body.participantIdentity,
+      role: body.role,
+      canPublish: body.canPublish,
+      canPublishData: body.canPublishData,
+      expiresAt: body.expiresAt,
+    };
+  }
+
   return {
     status,
     start,
@@ -369,6 +411,7 @@ export function createDeviceBindingController({
     authorizedFetch,
     createPublicRoom,
     createPublicInvite,
+    mintPublicLiveKitToken,
     _storagePath: storagePath,
   };
 }

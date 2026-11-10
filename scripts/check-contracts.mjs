@@ -46,8 +46,13 @@ assert.equal(
 );
 assert.deepEqual(
   publicLiveKitToken.security,
-  [{ accountSessionCookie: [] }],
-  "Public LiveKit token must require the account session cookie",
+  [{ accountSessionCookie: [] }, { deviceSessionBearer: [] }],
+  "Public LiveKit token must accept account cookie or desktop device Bearer",
+);
+assert.equal(
+  openApi.components.securitySchemes.deviceSessionBearer?.scheme,
+  "bearer",
+  "Desktop device sessions must use HTTP Bearer, not a cookie on loopback",
 );
 const publicTokenSchema =
   publicLiveKitToken.responses["200"].content["application/json"].schema;

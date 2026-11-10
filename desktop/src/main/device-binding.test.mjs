@@ -215,6 +215,90 @@ test("rejects verification path prefix attacks and keeps local credential after 
   await rm(userDataPath, { recursive: true, force: true });
 });
 
+test("mints public LiveKit token via Bearer without exposing device credential to renderer", async () => {
+  const userDataPath = await mkdtemp(join(tmpdir(), "spectemus-binding-"));
+  const publicRoomId = "33333333-3333-4333-8333-333333333333";
+  const liveKitToken = "header.payload.signature-value-livekit";
+  const safeStorageImpl = {
+    isEncryptionAvailable: () => true,
+    encryptString: (value) => Buffer.from(`enc:${value}`, "utf8"),
+    decryptString: (buffer) => Buffer.from(buffer).toString("utf8").slice(4),
+  };
+  const fetchImpl = async (url, init = {}) => {
+    if (
+      String(url).endsWith("/api/v2/auth/device-bindings") &&
+      init.method === "POST"
+    ) {
+      return jsonResponse(201, {
+        bindingId: "11111111-1111-4111-8111-111111111111",
+        userCode: "ABCD-EFGH",
+        verificationUri:
+          "https://app.example.test/internet/link#binding=11111111-1111-4111-8111-111111111111",
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        intervalSeconds: 1,
+        deviceCode: "d".repeat(43),
+      });
+    }
+    if (String(url).includes("/token")) {
+      return jsonResponse(200, {
+        deviceCredential: "c".repeat(43),
+        profile: {
+          accountId: "22222222-2222-4222-8222-222222222222",
+          displayName: "Host",
+          createdAt: "2026-11-10T10:00:00Z",
+        },
+        expiresAt: "2026-11-24T10:00:00Z",
+      });
+    }
+    if (
+      String(url).endsWith(
+        `/api/v2/public-rooms/${publicRoomId}/livekit-token`,
+      ) &&
+      init.method === "POST"
+    ) {
+      assert.match(init.headers.get("Authorization"), /^Bearer c{43}$/);
+      assert.equal(String(url).includes("/api/v1/"), false);
+      assert.equal(String(url).includes("c".repeat(43)), false);
+      return jsonResponse(200, {
+        token: liveKitToken,
+        liveKitUrl: "wss://rtc.example.test",
+        roomName: "r".repeat(43),
+        participantId: "44444444-4444-4444-8444-444444444444",
+        participantIdentity: "p".repeat(43),
+        role: "HOST",
+        canPublish: true,
+        canPublishData: true,
+        expiresAt: "2026-11-10T10:05:00Z",
+        deviceCredential: "must-not-leak",
+        apiOrigin: "https://evil.example.test",
+      });
+    }
+    throw new Error(`unexpected ${url}`);
+  };
+
+  const controller = createDeviceBindingController({
+    apiOrigin: "https://app.example.test",
+    userDataPath,
+    fetchImpl,
+    openExternal: async () => undefined,
+    safeStorageImpl,
+  });
+
+  await controller.start();
+  await controller.pollOnce();
+
+  await assert.rejects(() => controller.mintPublicLiveKitToken("bad-id"));
+  const minted = await controller.mintPublicLiveKitToken(publicRoomId);
+  assert.equal(minted.token, liveKitToken);
+  assert.equal(minted.liveKitUrl, "wss://rtc.example.test");
+  assert.equal(minted.role, "HOST");
+  assert.equal(Object.hasOwn(minted, "deviceCredential"), false);
+  assert.equal(Object.hasOwn(minted, "apiOrigin"), false);
+
+  await controller.clear({ revokeRemote: false });
+  await rm(userDataPath, { recursive: true, force: true });
+});
+
 test("treats expired stored credential as unbound", async () => {
   const userDataPath = await mkdtemp(join(tmpdir(), "spectemus-binding-"));
   let nowMs = Date.parse("2026-11-10T10:30:00Z");

@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld("spectemusDesktop", {
     ipcRenderer.invoke("spectemus:device-binding-create-room", payload),
   createPublicInviteWithDeviceBinding: (payload) =>
     ipcRenderer.invoke("spectemus:device-binding-create-invite", payload),
+  mintPublicLiveKitToken: (publicRoomId) =>
+    ipcRenderer.invoke("spectemus:mint-public-livekit-token", publicRoomId),
   onRuntimeStatus: (listener) => {
     const wrapped = (_event, status) => listener(status);
     ipcRenderer.on("spectemus:runtime-status", wrapped);

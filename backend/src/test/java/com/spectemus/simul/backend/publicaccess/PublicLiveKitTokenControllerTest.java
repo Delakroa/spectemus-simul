@@ -44,6 +44,7 @@ class PublicLiveKitTokenControllerTest {
     private static final UUID ROOM_ID = UUID.fromString("9de974f2-d79c-4bbf-b5ff-6fc83d608164");
     private static final UUID PARTICIPANT_ID = UUID.fromString("78142113-1566-4234-b3a4-9c4f9f631742");
     private static final String ACCOUNT_SESSION = "A".repeat(43);
+    private static final String DEVICE_SESSION = "D".repeat(43);
 
     @Autowired
     private MockMvc mockMvc;
@@ -73,6 +74,48 @@ class PublicLiveKitTokenControllerTest {
                 .andExpect(jsonPath("$.liveKitUrl").value("wss://rtc.example.test"))
                 .andExpect(jsonPath("$.roomName").value("B".repeat(43)))
                 .andExpect(jsonPath("$.role").value("HOST"));
+    }
+
+    @Test
+    void acceptsDesktopDeviceBearer() throws Exception {
+        when(service.mint(ROOM_ID, DEVICE_SESSION))
+                .thenReturn(new PublicLiveKitTokenResponse(
+                        "header.payload.signature-value",
+                        "wss://rtc.example.test",
+                        "B".repeat(43),
+                        PARTICIPANT_ID,
+                        "C".repeat(43),
+                        ParticipantRole.HOST,
+                        true,
+                        true,
+                        Instant.parse("2026-11-06T12:05:00Z")));
+
+        mockMvc.perform(post("/api/v2/public-rooms/{publicRoomId}/livekit-token", ROOM_ID)
+                        .header("Authorization", "Bearer " + DEVICE_SESSION))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").value("header.payload.signature-value"))
+                .andExpect(jsonPath("$.role").value("HOST"));
+    }
+
+    @Test
+    void prefersCookieWhenBothCookieAndBearerPresent() throws Exception {
+        when(service.mint(ROOM_ID, ACCOUNT_SESSION))
+                .thenReturn(new PublicLiveKitTokenResponse(
+                        "header.payload.signature-value",
+                        "wss://rtc.example.test",
+                        "B".repeat(43),
+                        PARTICIPANT_ID,
+                        "C".repeat(43),
+                        ParticipantRole.GUEST,
+                        true,
+                        true,
+                        Instant.parse("2026-11-06T12:05:00Z")));
+
+        mockMvc.perform(post("/api/v2/public-rooms/{publicRoomId}/livekit-token", ROOM_ID)
+                        .cookie(new jakarta.servlet.http.Cookie("wt_account", ACCOUNT_SESSION))
+                        .header("Authorization", "Bearer " + DEVICE_SESSION))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("GUEST"));
     }
 
     @Test

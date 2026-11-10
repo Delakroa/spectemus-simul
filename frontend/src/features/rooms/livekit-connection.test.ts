@@ -48,14 +48,7 @@ describe("connectLiveKitRoom", () => {
     const onStatusChange = vi.fn();
     await connectLiveKitRoom(
       {
-        canPublish: true,
-        canPublishData: true,
-        expiresAt: "2026-08-01T12:00:00.000Z",
         liveKitUrl: "ws://127.0.0.1:7880",
-        participantId: "11111111-1111-4111-8111-111111111111",
-        participantIdentity: "host-identity",
-        role: "HOST",
-        roomName: "AbCdEfGhIjKlMnOpQrStUv",
         token: "header.payload.signature",
       },
       { onError: vi.fn(), onStatusChange },

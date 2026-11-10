@@ -185,6 +185,11 @@ if (isPrimaryInstance) {
       "spectemus:device-binding-create-invite",
       (_event, payload) => deviceBinding.createPublicInvite(payload),
     );
+    ipcMain.handle(
+      "spectemus:mint-public-livekit-token",
+      (_event, publicRoomId) =>
+        deviceBinding.mintPublicLiveKitToken(publicRoomId),
+    );
 
     mainWindow = createWindow();
     await startDesktopHost(process.env.SPECTEMUS_LAN_IP);

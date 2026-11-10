@@ -5,7 +5,10 @@ import type {
   Room as LiveKitRoom,
 } from "livekit-client";
 
-import type { LiveKitTokenResponse } from "./room-api";
+export type LiveKitConnectCredentials = {
+  liveKitUrl: string;
+  token: string;
+};
 
 export type LiveKitConnectionStatus =
   "idle" | "connecting" | "connected" | "reconnecting" | "disconnected" | "error";
@@ -24,7 +27,7 @@ export type LiveKitConnectionHandlers = {
 };
 
 export async function connectLiveKitRoom(
-  token: LiveKitTokenResponse,
+  token: LiveKitConnectCredentials,
   handlers: LiveKitConnectionHandlers,
 ): Promise<LiveKitConnection> {
   const { Room, RoomEvent } = await import("livekit-client");

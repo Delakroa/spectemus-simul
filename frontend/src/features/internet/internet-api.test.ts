@@ -9,6 +9,8 @@ import {
   createPublicRoomInvite,
   getAccount,
   getPublicRoom,
+  mintPublicLiveKitToken,
+  publicLiveKitTokenResponseSchema,
   publicRoomAccessSchema,
   redeemPublicInvite,
   requestEmailChallenge,
@@ -131,6 +133,38 @@ describe("internet-api", () => {
       `/api/v2/public-rooms/${roomAccess.room.publicRoomId}`,
       expect.objectContaining({ method: "GET", credentials: "include" }),
     );
+  });
+
+  it("mintит public LiveKit token по cookie API без LAN path", async () => {
+    const token = {
+      token: "header.payload.signature-value",
+      liveKitUrl: "wss://rtc.example.test",
+      roomName: "r".repeat(43),
+      participantId: "33333333-3333-4333-8333-333333333333",
+      participantIdentity: "p".repeat(43),
+      role: "GUEST",
+      canPublish: true,
+      canPublishData: true,
+      expiresAt: "2026-11-07T18:10:00Z",
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => token,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(mintPublicLiveKitToken(roomAccess.room.publicRoomId)).resolves.toEqual(token);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/v2/public-rooms/${roomAccess.room.publicRoomId}/livekit-token`,
+      expect.objectContaining({ method: "POST", credentials: "include" }),
+    );
+    expect(String(fetchMock.mock.calls[0]?.[0])).not.toContain("/api/v1/");
+    expect(() =>
+      publicLiveKitTokenResponseSchema.parse({
+        ...token,
+        liveKitUrl: "ws://lan.example.test",
+      }),
+    ).toThrow();
   });
 
   it("создаёт public room и hash-only invite отдельными idempotent-командами", async () => {

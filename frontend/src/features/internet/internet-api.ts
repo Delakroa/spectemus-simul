@@ -53,10 +53,26 @@ export const publicInviteCreatedSchema = z
   })
   .strict();
 
+/** Separate from LAN LiveKitTokenResponse: opaque roomName, wss-only URL. */
+export const publicLiveKitTokenResponseSchema = z
+  .object({
+    token: z.string().min(20),
+    liveKitUrl: z.string().regex(/^wss:\/\//),
+    roomName: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    participantId: z.uuid(),
+    participantIdentity: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    role: z.enum(["HOST", "GUEST"]),
+    canPublish: z.boolean(),
+    canPublishData: z.boolean(),
+    expiresAt: dateTimeSchema,
+  })
+  .strict();
+
 export type AccountProfile = z.infer<typeof accountProfileSchema>;
 export type EmailChallengeAccepted = z.infer<typeof emailChallengeAcceptedSchema>;
 export type PublicRoomAccess = z.infer<typeof publicRoomAccessSchema>;
 export type PublicInviteCreated = z.infer<typeof publicInviteCreatedSchema>;
+export type PublicLiveKitTokenResponse = z.infer<typeof publicLiveKitTokenResponseSchema>;
 
 type RequestOptions = {
   body?: unknown;
@@ -139,6 +155,14 @@ export function getPublicRoom(publicRoomId: string, signal?: AbortSignal) {
     `/api/v2/public-rooms/${encodeURIComponent(publicRoomId)}`,
     publicRoomAccessSchema,
     { signal },
+  );
+}
+
+export function mintPublicLiveKitToken(publicRoomId: string, signal?: AbortSignal) {
+  return request(
+    `/api/v2/public-rooms/${encodeURIComponent(publicRoomId)}/livekit-token`,
+    publicLiveKitTokenResponseSchema,
+    { method: "POST", signal },
   );
 }
 
