@@ -23,7 +23,7 @@ export function InternetRoomPage() {
 
   if (!enabled) {
     return (
-      <InternetRoomShell>
+      <InternetRoomShell title="Комната недоступна">
         <InternetRoomError message="Просмотр из другого города пока закрыт." canRetry={false} />
       </InternetRoomShell>
     );
@@ -31,7 +31,7 @@ export function InternetRoomPage() {
 
   if (!roomIdValid) {
     return (
-      <InternetRoomShell>
+      <InternetRoomShell title="Комната недоступна">
         <InternetRoomError message="Ссылка на комнату повреждена." canRetry={false} />
       </InternetRoomShell>
     );
@@ -100,8 +100,15 @@ function InternetRoomMembershipView({ publicRoomId }: { publicRoomId: string }) 
     };
   }, [publicRoomId, retryToken]);
 
+  const title =
+    state.status === "ready"
+      ? "Доступ получен"
+      : state.status === "loading"
+        ? "Проверяем доступ"
+        : "Комната недоступна";
+
   return (
-    <InternetRoomShell>
+    <InternetRoomShell title={title}>
       {state.status === "loading" ? <p role="status">Проверяем членство в комнате…</p> : null}
 
       {state.status === "ready" ? (
@@ -130,14 +137,14 @@ function InternetRoomMembershipView({ publicRoomId }: { publicRoomId: string }) 
   );
 }
 
-function InternetRoomShell({ children }: { children: ReactNode }) {
+function InternetRoomShell({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section
       className="internet-invite internet-invite--guest"
       aria-labelledby="internet-room-title"
     >
       <p className="eyebrow">Internet-комната</p>
-      <h1 id="internet-room-title">Доступ получен</h1>
+      <h1 id="internet-room-title">{title}</h1>
       {children}
     </section>
   );

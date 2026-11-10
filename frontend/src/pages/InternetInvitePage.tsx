@@ -4,11 +4,13 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   ApiProblemError,
   createInviteRedemptionIdempotencyKey,
+  getAccount,
+  isAccountLimitReachedError,
   isAccountRequiredError,
+  isChallengeRejectedError,
   isInviteUnavailableError,
   redeemPublicInvite,
   requestEmailChallenge,
-  getAccount,
   verifyEmailChallenge,
 } from "../features/internet/internet-api";
 import {
@@ -24,7 +26,7 @@ const CHALLENGE_NEUTRAL_MESSAGE =
 type GuestStep = "bootstrap" | "email" | "code" | "redeeming" | "error";
 
 type GuestError = {
-  kind: "invite" | "auth" | "rate" | "temporary";
+  kind: "invite" | "auth" | "limit" | "rate" | "temporary";
   message: string;
   canRetry: boolean;
 };
@@ -36,7 +38,8 @@ export function InternetInvitePage() {
     return <ClosedInternetInviteView hash={location.hash} />;
   }
 
-  return <InternetGuestInviteEntry hash={location.hash} />;
+  // Remount on hash change so a new invite token gets a fresh token/idempotency state.
+  return <InternetGuestInviteEntry key={location.hash || "missing"} hash={location.hash} />;
 }
 
 function ClosedInternetInviteView({ hash }: { hash: string }) {
@@ -95,7 +98,7 @@ function InternetGuestInviteEntry({ hash }: { hash: string }) {
     }
 
     void bootstrapSession();
-    // Bootstrap once for the invite fragment present on mount.
+    // Fresh mount (including hash remount) bootstraps this invite once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -165,6 +168,16 @@ function InternetGuestInviteEntry({ hash }: { hash: string }) {
       setError({
         kind: "invite",
         message: "Приглашение недействительно или больше не доступно",
+        canRetry: false,
+      });
+      return;
+    }
+
+    if (isAccountLimitReachedError(caught)) {
+      setStep("error");
+      setError({
+        kind: "limit",
+        message: "В комнате нет свободных мест",
         canRetry: false,
       });
       return;
@@ -243,20 +256,21 @@ function InternetGuestInviteEntry({ hash }: { hash: string }) {
       if (controller.signal.aborted) {
         return;
       }
-      if (isAccountRequiredError(caught)) {
-        setStep("email");
+      if (isChallengeRejectedError(caught)) {
+        setStep("code");
         setError({
           kind: "auth",
-          message: "Войдите по email, чтобы принять приглашение.",
+          message: "Код не принят. Запросите новый или проверьте ввод.",
           canRetry: false,
         });
         setPending(false);
         return;
       }
-      if (caught instanceof ApiProblemError && caught.problem.status === 401) {
+      if (isAccountRequiredError(caught)) {
+        setStep("email");
         setError({
           kind: "auth",
-          message: "Код не принят. Запросите новый или проверьте ввод.",
+          message: "Войдите по email, чтобы принять приглашение.",
           canRetry: false,
         });
         setPending(false);

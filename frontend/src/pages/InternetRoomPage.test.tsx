@@ -40,16 +40,28 @@ afterEach(() => {
 describe("InternetRoomPage", () => {
   it("проверяет membership и не обещает подключённое media", async () => {
     vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => roomAccess,
-    });
+    let resolveRoom: ((value: unknown) => void) | undefined;
+    const fetchMock = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveRoom = resolve;
+        }),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     renderRoom();
 
-    expect(await screen.findByText(/подключение просмотра готовится/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Проверяем доступ" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Доступ получен" })).not.toBeInTheDocument();
+
+    resolveRoom?.({
+      ok: true,
+      status: 200,
+      json: async () => roomAccess,
+    });
+
+    expect(await screen.findByRole("heading", { name: "Доступ получен" })).toBeInTheDocument();
+    expect(screen.getByText(/подключение просмотра готовится/)).toBeInTheDocument();
     expect(screen.getByText(/Видео и LiveKit в этом шаге ещё не подключаются/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Опубликовать" })).not.toBeInTheDocument();
     expect(screen.queryByRole("slider", { name: "Перемотка" })).not.toBeInTheDocument();
@@ -61,14 +73,35 @@ describe("InternetRoomPage", () => {
     });
   });
 
-  it("при выключенном feature не ходит в API", () => {
+  it("при выключенном feature не ходит в API и не показывает успех", () => {
     vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "false");
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
     renderRoom();
 
+    expect(screen.getByRole("heading", { name: "Комната недоступна" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Доступ получен" })).not.toBeInTheDocument();
     expect(screen.getByText(/Просмотр из другого города пока закрыт/)).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("при 401 не показывает заголовок успеха", async () => {
+    vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      statusText: "Unauthorized",
+      json: async () => ({ code: "ACCOUNT_REQUIRED", status: 401 }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderRoom();
+
+    expect(
+      await screen.findByText("Войдите по приглашению, чтобы открыть эту комнату."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Комната недоступна" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Доступ получен" })).not.toBeInTheDocument();
   });
 });

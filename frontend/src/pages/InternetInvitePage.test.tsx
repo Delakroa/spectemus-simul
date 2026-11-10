@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { InternetInvitePage } from "./InternetInvitePage";
@@ -232,6 +232,136 @@ describe("InternetInvitePage", () => {
     expect(idempotencyKeys[1]).toBe(idempotencyKeys[0]);
     expect(fetchMock.mock.calls.every(([url]) => !String(url).includes(token))).toBe(true);
     expect(document.body.textContent).not.toContain(token);
+  });
+
+  it("неверный код остаётся на шаге кода и не возвращает к email", async () => {
+    vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/v2/account")) {
+        return jsonResponse(401, { code: "ACCOUNT_REQUIRED", status: 401 });
+      }
+      if (url === "/api/v2/auth/email-challenges") {
+        return jsonResponse(202, {
+          challengeId,
+          expiresAt: "2026-11-07T18:10:00Z",
+        });
+      }
+      if (url.endsWith(`/api/v2/auth/email-challenges/${challengeId}/verify`)) {
+        return jsonResponse(401, {
+          code: "CHALLENGE_REJECTED",
+          status: 401,
+          title: "Challenge rejected",
+        });
+      }
+      throw new Error(`unexpected url ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderGuestFlow(`/join#invite=${token}`);
+    expect(await screen.findByLabelText("Email")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Email"), "guest@example.test");
+    await user.click(screen.getByRole("button", { name: "Получить код" }));
+    await user.type(await screen.findByLabelText("Одноразовый код"), "WRONG1");
+    await user.type(screen.getByLabelText("Ваше имя"), "Гость");
+    await user.click(screen.getByRole("button", { name: "Войти" }));
+
+    expect(
+      await screen.findByText("Код не принят. Запросите новый или проверьте ввод."),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Одноразовый код")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
+  });
+
+  it("ACCOUNT_LIMIT_REACHED показывает отсутствие мест без retry", async () => {
+    vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/v2/account")) {
+        return jsonResponse(200, accountProfile);
+      }
+      if (url.endsWith("/api/v2/invite-redemptions")) {
+        return jsonResponse(409, {
+          code: "ACCOUNT_LIMIT_REACHED",
+          status: 409,
+          title: "Limit reached",
+        });
+      }
+      throw new Error(`unexpected url ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderGuestFlow(`/join#invite=${token}`);
+
+    expect(await screen.findByText("В комнате нет свободных мест")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Повторить" })).not.toBeInTheDocument();
+  });
+
+  it("смена invite hash запускает redemption нового token", async () => {
+    vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
+    const user = userEvent.setup();
+    const tokenA = "a".repeat(43);
+    const tokenB = "c".repeat(43);
+    const redeemedTokens: string[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/v2/account")) {
+        return jsonResponse(200, accountProfile);
+      }
+      if (url.endsWith("/api/v2/invite-redemptions")) {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { inviteToken?: string };
+        redeemedTokens.push(body.inviteToken ?? "");
+        if (body.inviteToken === tokenA) {
+          return jsonResponse(404, {
+            code: "INVITE_UNAVAILABLE",
+            status: 404,
+            title: "Invite unavailable",
+          });
+        }
+        return jsonResponse(200, roomAccess);
+      }
+      if (url.endsWith(`/api/v2/public-rooms/${publicRoomId}`)) {
+        return jsonResponse(200, roomAccess);
+      }
+      throw new Error(`unexpected url ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    function HashSwitchButton() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => navigate(`/join#invite=${tokenB}`)}>
+          Сменить приглашение
+        </button>
+      );
+    }
+
+    render(
+      <MemoryRouter initialEntries={[`/join#invite=${tokenA}`]}>
+        <Routes>
+          <Route path="/join" element={<InternetInvitePage />} />
+          <Route path="/internet/rooms/:publicRoomId" element={<InternetRoomPage />} />
+        </Routes>
+        <HashSwitchButton />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByText("Приглашение недействительно или больше не доступно"),
+    ).toBeInTheDocument();
+    expect(redeemedTokens).toEqual([tokenA]);
+
+    await user.click(screen.getByRole("button", { name: "Сменить приглашение" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveAttribute(
+        "data-pathname",
+        `/internet/rooms/${publicRoomId}`,
+      );
+    });
+    expect(redeemedTokens).toEqual([tokenA, tokenB]);
   });
 
   it("INVITE_UNAVAILABLE не раскрывает expired/revoked/unknown", async () => {

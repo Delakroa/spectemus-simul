@@ -141,17 +141,23 @@ export function createInviteRedemptionIdempotencyKey() {
 }
 
 export function isAccountRequiredError(error: unknown) {
+  return error instanceof ApiProblemError && error.problem.code === "ACCOUNT_REQUIRED";
+}
+
+export function isChallengeRejectedError(error: unknown) {
   return (
     error instanceof ApiProblemError &&
-    (error.problem.status === 401 || error.problem.code === "ACCOUNT_REQUIRED")
+    (error.problem.code === "CHALLENGE_REJECTED" ||
+      error.problem.code === "AUTH_CHALLENGE_REJECTED")
   );
 }
 
 export function isInviteUnavailableError(error: unknown) {
-  return (
-    error instanceof ApiProblemError &&
-    (error.problem.status === 404 || error.problem.code === "INVITE_UNAVAILABLE")
-  );
+  return error instanceof ApiProblemError && error.problem.code === "INVITE_UNAVAILABLE";
+}
+
+export function isAccountLimitReachedError(error: unknown) {
+  return error instanceof ApiProblemError && error.problem.code === "ACCOUNT_LIMIT_REACHED";
 }
 
 export { ApiProblemError };
