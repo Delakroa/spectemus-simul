@@ -17,9 +17,10 @@ playback sync и microphone этот тикет не реализует.
 3. Cookie имеет приоритет, если в запросе есть и cookie, и Bearer.
 4. Renderer получает только короткоживущий LiveKit JWT и безопасные поля
    ответа. `deviceCredential`, `apiOrigin` и другие постоянные секреты в
-   renderer не попадают. Ошибки mint через IPC приходят plain-object
-   `ApiProblemError` (`code`, `status`, `retryable`): поля на `Error` Electron
-   не сохраняет, поэтому 401/404/429 остаются различимыми на desktop.
+   renderer не попадают. Mint через Electron IPC возвращает resolved envelope
+   `{ ok: true, data }` / `{ ok: false, problem }`: rejected `handle()` и
+   throw через `contextBridge` сохраняют только message, поэтому 401/404/429
+   живут внутри успешного ответа и разбираются в renderer.
 5. `InternetRoomPage` подключается через существующий `connectLiveKitRoom` и
    показывает состояния подключения / подключено / переподключение / ошибка с
    кнопкой «Подключить снова».
@@ -52,8 +53,8 @@ TURN/DNS/VM deployment, telemetry и включение Internet mode — вне
 - backend: cookie, device Bearer, cookie priority, expired/revoked session,
   non-member, feature off
 - desktop: UUID validation, Bearer mint, renderer-safe payload без
-  `deviceCredential` / `apiOrigin`, без LAN path; 401/404/429 как IPC
-  plain-object problem (не `Error`)
-- frontend: browser cookie path, desktop IPC path, cleanup disconnect, retry,
-  понятные 401/404/429 для browser и desktop, без LAN LiveKit
+  `deviceCredential` / `apiOrigin`, без LAN path; 401/404/429 в resolved IPC
+  envelope (structuredClone-граница), не через rejected Promise
+- frontend: browser cookie path, desktop envelope unwrap, cleanup disconnect,
+  retry, понятные 401/404/429 для browser и desktop, без LAN LiveKit
 - `pnpm check`

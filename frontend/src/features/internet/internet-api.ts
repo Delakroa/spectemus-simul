@@ -252,7 +252,7 @@ function createInternetIdempotencyKey(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
-/** Electron IPC rejects with a plain problem object; Error custom fields do not survive. */
+/** Problem payload inside a resolved desktop IPC envelope. */
 export type DesktopIpcProblem = {
   code?: string;
   detail?: string;
@@ -261,6 +261,8 @@ export type DesktopIpcProblem = {
   status: number;
   title?: string;
 };
+
+export type DesktopIpcResult<T> = { data: T; ok: true } | { ok: false; problem: DesktopIpcProblem };
 
 export function isDesktopIpcProblem(value: unknown): value is DesktopIpcProblem {
   if (!value || typeof value !== "object") {
@@ -287,6 +289,20 @@ export function toApiProblemError(error: unknown): ApiProblemError | null {
     status: error.status,
     title: error.title,
   });
+}
+
+export function unwrapDesktopIpcResult<T>(result: DesktopIpcResult<T>): T {
+  if (result && typeof result === "object" && result.ok === true) {
+    return result.data;
+  }
+  if (result && typeof result === "object" && result.ok === false) {
+    const problem = toApiProblemError(result.problem);
+    if (problem) {
+      throw problem;
+    }
+    throw new Error(result.problem.title ?? "Desktop IPC failure");
+  }
+  throw new Error("Malformed desktop IPC result");
 }
 
 export function isAccountRequiredError(error: unknown) {

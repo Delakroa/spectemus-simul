@@ -127,11 +127,14 @@ describe("InternetRoomPage", () => {
     expect(connectLiveKitRoom.mock.calls[0]?.[0]).not.toHaveProperty("apiOrigin");
   });
 
-  it("desktop owner mintит token через IPC и не ходит в cookie GET membership", async () => {
+  it("desktop owner mintит token через IPC envelope и не ходит в cookie GET membership", async () => {
     vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
     const mintPublicLiveKitToken = vi.fn().mockResolvedValue({
-      ...publicToken,
-      role: "HOST",
+      ok: true,
+      data: {
+        ...publicToken,
+        role: "HOST",
+      },
     });
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -234,38 +237,47 @@ describe("InternetRoomPage", () => {
     }
   });
 
-  it("desktop IPC 401/404/429 показывает те же тексты без бесполезного retry на 401/404", async () => {
+  it("desktop IPC envelope 401/404/429 показывает те же тексты без бесполезного retry на 401/404", async () => {
     vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
     const cases = [
       {
-        ipcProblem: {
-          name: "ApiProblemError",
-          code: "ACCOUNT_REQUIRED",
-          status: 401,
-          title: "Нужен вход",
-          retryable: false,
+        envelope: {
+          ok: false as const,
+          problem: {
+            name: "ApiProblemError",
+            code: "ACCOUNT_REQUIRED",
+            status: 401,
+            title: "Нужен вход",
+            retryable: false,
+          },
         },
         text: "Сессия входа закончилась. Войдите снова и подключитесь.",
         canRetry: false,
       },
       {
-        ipcProblem: {
-          name: "ApiProblemError",
-          code: "MEMBERSHIP_REQUIRED",
-          status: 404,
-          title: "Комната недоступна",
-          retryable: false,
+        envelope: {
+          ok: false as const,
+          problem: {
+            name: "ApiProblemError",
+            code: "MEMBERSHIP_REQUIRED",
+            status: 404,
+            title: "Комната недоступна",
+            retryable: false,
+          },
         },
         text: "Комната недоступна для этого аккаунта.",
         canRetry: false,
       },
       {
-        ipcProblem: {
-          name: "ApiProblemError",
-          code: "RATE_LIMITED",
-          status: 429,
-          title: "Слишком много попыток",
-          retryable: true,
+        envelope: {
+          ok: false as const,
+          problem: {
+            name: "ApiProblemError",
+            code: "RATE_LIMITED",
+            status: 429,
+            title: "Слишком много попыток",
+            retryable: true,
+          },
         },
         text: "Слишком много попыток подключения. Подождите немного и попробуйте снова.",
         canRetry: true,
@@ -274,7 +286,8 @@ describe("InternetRoomPage", () => {
 
     for (const item of cases) {
       cleanup();
-      const mintPublicLiveKitToken = vi.fn().mockRejectedValue(item.ipcProblem);
+      // Simulate preload returning the resolved IPC envelope (not a rejected promise).
+      const mintPublicLiveKitToken = vi.fn().mockResolvedValue(structuredClone(item.envelope));
       vi.stubGlobal("fetch", vi.fn());
       window.spectemusDesktop = {
         getRuntimeStatus: async () => ({ detail: "ok", state: "ready" }),

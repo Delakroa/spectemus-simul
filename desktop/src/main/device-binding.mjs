@@ -296,7 +296,7 @@ export function createDeviceBindingController({
   async function authorizedFetch(path, init = {}) {
     const stored = await readStoredSession();
     if (!stored?.deviceCredential || !stored?.apiOrigin) {
-      // Plain object survives Electron IPC; Error custom fields do not.
+      // Plain problem object; mint IPC wraps it in a resolved {ok:false} envelope.
       throw accountRequiredProblem("Desktop account is not bound");
     }
     if (
@@ -414,8 +414,8 @@ export function createDeviceBindingController({
 }
 
 /**
- * Structured problem for Electron IPC. Custom fields on `Error` are dropped by
- * `ipcRenderer.invoke`, so API failures must reject with a plain object.
+ * Structured API problem. Mint LiveKit IPC must wrap these in a resolved
+ * `{ ok: false, problem }` envelope — rejected handle() promises lose fields.
  */
 async function toProblem(response) {
   const problem = await safeProblem(response);

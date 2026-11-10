@@ -16,6 +16,7 @@ import {
   redeemPublicInvite,
   requestEmailChallenge,
   toApiProblemError,
+  unwrapDesktopIpcResult,
   verifyEmailChallenge,
 } from "./internet-api";
 
@@ -228,22 +229,30 @@ describe("internet-api", () => {
     expect(createPublicInviteIdempotencyKey()).toMatch(/^public-invite-/);
   });
 
-  it("поднимает desktop IPC problem до ApiProblemError", () => {
-    const ipcProblem = {
-      name: "ApiProblemError",
-      code: "ACCOUNT_REQUIRED",
-      status: 401,
-      title: "Нужен вход",
-      retryable: false,
+  it("поднимает desktop IPC envelope problem до ApiProblemError", () => {
+    const envelope = {
+      ok: false as const,
+      problem: {
+        name: "ApiProblemError",
+        code: "ACCOUNT_REQUIRED",
+        status: 401,
+        title: "Нужен вход",
+        retryable: false,
+      },
     };
-    const error = toApiProblemError(ipcProblem);
-    expect(error).toBeInstanceOf(ApiProblemError);
-    expect(error?.problem).toMatchObject({
-      code: "ACCOUNT_REQUIRED",
-      status: 401,
-      retryable: false,
-    });
-    expect(isAccountRequiredError(ipcProblem)).toBe(true);
+    expect(() => unwrapDesktopIpcResult(envelope)).toThrow(ApiProblemError);
+    try {
+      unwrapDesktopIpcResult(envelope);
+    } catch (caught) {
+      expect(isAccountRequiredError(caught)).toBe(true);
+      expect(toApiProblemError(caught)?.problem.status).toBe(401);
+    }
+    expect(
+      unwrapDesktopIpcResult({
+        ok: true,
+        data: { token: "header.payload.signature-value" },
+      }),
+    ).toEqual({ token: "header.payload.signature-value" });
     expect(isAccountRequiredError(new Error("ACCOUNT_REQUIRED"))).toBe(false);
   });
 

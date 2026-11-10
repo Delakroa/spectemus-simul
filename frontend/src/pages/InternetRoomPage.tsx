@@ -6,6 +6,7 @@ import {
   isAccountRequiredError,
   mintPublicLiveKitToken,
   toApiProblemError,
+  unwrapDesktopIpcResult,
   type PublicLiveKitTokenResponse,
 } from "../features/internet/internet-api";
 import {
@@ -258,15 +259,7 @@ async function fetchPublicLiveKitToken(
 ): Promise<PublicLiveKitTokenResponse> {
   const desktop = desktopMintApi();
   if (desktop?.mintPublicLiveKitToken) {
-    try {
-      return await desktop.mintPublicLiveKitToken(publicRoomId);
-    } catch (caught: unknown) {
-      const problem = toApiProblemError(caught);
-      if (problem) {
-        throw problem;
-      }
-      throw caught;
-    }
+    return unwrapDesktopIpcResult(await desktop.mintPublicLiveKitToken(publicRoomId));
   }
   return mintPublicLiveKitToken(publicRoomId, signal);
 }

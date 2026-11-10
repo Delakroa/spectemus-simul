@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld("spectemusDesktop", {
     ipcRenderer.invoke("spectemus:device-binding-create-room", payload),
   createPublicInviteWithDeviceBinding: (payload) =>
     ipcRenderer.invoke("spectemus:device-binding-create-invite", payload),
+  // Pass the envelope through unchanged. Do not throw here: contextBridge also
+  // strips custom fields from thrown Errors / rejected reasons.
   mintPublicLiveKitToken: (publicRoomId) =>
     ipcRenderer.invoke("spectemus:mint-public-livekit-token", publicRoomId),
   onRuntimeStatus: (listener) => {
