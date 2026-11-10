@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
+import type { Room as LiveKitRoom } from "livekit-client";
 
 import {
   getPublicRoom,
@@ -9,6 +10,7 @@ import {
   unwrapDesktopIpcResult,
   type PublicLiveKitTokenResponse,
 } from "../features/internet/internet-api";
+import { useInternetHostMediaPublish } from "../features/internet/use-internet-host-media-publish";
 import {
   connectLiveKitRoom,
   type LiveKitConnection,
@@ -18,9 +20,11 @@ import { isInternetRoomChoiceEnabled } from "../features/rooms/room-mode";
 
 const PUBLIC_ROOM_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+type MediaRole = "HOST" | "GUEST";
+
 type MembershipState =
   | { status: "loading" }
-  | { status: "ready"; roleLabel: string }
+  | { status: "ready"; mediaRole: MediaRole; roleLabel: string }
   | { status: "error"; message: string; canRetry: boolean };
 
 type MediaUiStatus = Exclude<LiveKitConnectionStatus, "error">;
@@ -64,6 +68,17 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
   const [mediaRetry, setMediaRetry] = useState(0);
   const [membership, setMembership] = useState<MembershipState>({ status: "loading" });
   const [media, setMedia] = useState<MediaState>({ status: "idle" });
+  const [liveKitRoom, setLiveKitRoom] = useState<LiveKitRoom | null>(null);
+
+  const isHost = membership.status === "ready" && membership.mediaRole === "HOST";
+  const desktopMediaReady = Boolean(
+    window.spectemusDesktop?.pickMediaFile && window.spectemusDesktop?.releaseMedia,
+  );
+  const hostMedia = useInternetHostMediaPublish({
+    enabled: isHost && desktopMediaReady,
+    liveKitStatus: media.status,
+    room: liveKitRoom,
+  });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -78,15 +93,17 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
         }
         if (desktop?.mintPublicLiveKitToken) {
           // Desktop membership is enforced by Bearer mint; cookie getPublicRoom is unavailable on loopback.
-          setMembership({ status: "ready", roleLabel: "хозяин" });
+          setMembership({ status: "ready", mediaRole: "HOST", roleLabel: "хозяин" });
           return;
         }
 
         const access = await getPublicRoom(publicRoomId, controller.signal);
         if (!controller.signal.aborted) {
+          const mediaRole: MediaRole = access.membership.role === "OWNER" ? "HOST" : "GUEST";
           setMembership({
             status: "ready",
-            roleLabel: access.membership.role === "OWNER" ? "хозяин" : "гость",
+            mediaRole,
+            roleLabel: mediaRole === "HOST" ? "хозяин" : "гость",
           });
         }
       } catch (caught: unknown) {
@@ -125,6 +142,7 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
           return;
         }
         setMedia({ status: "connecting" });
+        setLiveKitRoom(null);
         const token = await fetchPublicLiveKitToken(publicRoomId, controller.signal);
         if (cancelled || controller.signal.aborted) {
           return;
@@ -132,21 +150,24 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
         if ("deviceCredential" in token || "apiOrigin" in token) {
           throw new Error("Device secret leaked into renderer LiveKit payload");
         }
-        if (desktopMintApi()) {
-          setMembership({
-            status: "ready",
-            roleLabel: token.role === "HOST" ? "хозяин" : "гость",
-          });
-        }
+        setMembership({
+          status: "ready",
+          mediaRole: token.role,
+          roleLabel: token.role === "HOST" ? "хозяин" : "гость",
+        });
         const connection = await connectLiveKitRoom(token, {
           onError: (message) => {
             if (!cancelled) {
+              setLiveKitRoom(null);
               setMedia({ status: "error", message, canRetry: true });
             }
           },
           onStatusChange: (status) => {
             if (cancelled || status === "error") {
               return;
+            }
+            if (status === "disconnected") {
+              setLiveKitRoom(null);
             }
             setMedia({ status });
           },
@@ -156,10 +177,12 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
           return;
         }
         connectionRef.current = connection;
+        setLiveKitRoom(connection.room);
       } catch (caught: unknown) {
         if (cancelled || controller.signal.aborted) {
           return;
         }
+        setLiveKitRoom(null);
         setMedia({
           status: "error",
           message: liveKitErrorMessage(caught),
@@ -173,6 +196,7 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
       controller.abort();
       connectionRef.current?.disconnect();
       connectionRef.current = null;
+      setLiveKitRoom(null);
     };
   }, [publicRoomId, membership.status, mediaRetry]);
 
@@ -182,7 +206,9 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
       : membership.status === "loading"
         ? "Проверяем доступ"
         : media.status === "connected"
-          ? "Подключено"
+          ? hostMedia.status === "live"
+            ? "Фильм опубликован"
+            : "Подключено"
           : media.status === "reconnecting"
             ? "Переподключение"
             : media.status === "connecting" || media.status === "idle"
@@ -201,8 +227,16 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
           {media.status === "connecting" || media.status === "idle" ? (
             <p role="status">Подключаемся к public LiveKit…</p>
           ) : null}
-          {media.status === "connected" ? (
-            <p role="status">Подключение установлено. Передача фильма появится отдельным шагом.</p>
+          {media.status === "connected" && !isHost ? (
+            <p role="status">
+              Подключение установлено. Просмотр фильма появится, когда хозяин начнёт передачу.
+            </p>
+          ) : null}
+          {media.status === "connected" && isHost ? (
+            <InternetHostMediaPanel
+              hostMedia={hostMedia}
+              liveKitConnected={media.status === "connected"}
+            />
           ) : null}
           {media.status === "reconnecting" ? (
             <p role="status">Восстанавливаем соединение…</p>
@@ -250,6 +284,79 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
         </button>
       ) : null}
     </InternetRoomShell>
+  );
+}
+
+function InternetHostMediaPanel({
+  hostMedia,
+  liveKitConnected,
+}: {
+  hostMedia: ReturnType<typeof useInternetHostMediaPublish>;
+  liveKitConnected: boolean;
+}) {
+  if (!hostMedia.canUseDesktopMedia) {
+    return (
+      <p role="status">
+        Подключение установлено. Публикация фильма доступна только в desktop-приложении хозяина.
+      </p>
+    );
+  }
+
+  return (
+    <div className="internet-invite__form" aria-label="Публикация фильма">
+      {hostMedia.status === "idle" ? (
+        <p role="status">Выберите локальный фильм, чтобы опубликовать его в комнате.</p>
+      ) : null}
+      {hostMedia.status === "checking" ? <p role="status">Проверяем выбранный файл…</p> : null}
+      {hostMedia.status === "normalizing" ? (
+        <p role="status">
+          Готовим файл к публикации
+          {hostMedia.preparationProgress !== null ? `… ${hostMedia.preparationProgress}%` : "…"}
+        </p>
+      ) : null}
+      {hostMedia.status === "ready" && hostMedia.displayName ? (
+        <p role="status">Файл готов: {hostMedia.displayName}</p>
+      ) : null}
+      {hostMedia.status === "publishing" ? (
+        <p role="status">Публикуем фильм в public LiveKit…</p>
+      ) : null}
+      {hostMedia.status === "live" ? (
+        <p role="status">
+          Фильм опубликован
+          {hostMedia.displayName ? `: ${hostMedia.displayName}` : ""}. Дорожки movie-video /
+          movie-audio активны.
+        </p>
+      ) : null}
+      {hostMedia.status === "error" && hostMedia.error ? (
+        <div className="internet-invite__error" role="alert">
+          <p>{hostMedia.error}</p>
+        </div>
+      ) : null}
+
+      <div className="internet-invite__meta">
+        {hostMedia.status !== "publishing" &&
+        hostMedia.status !== "checking" &&
+        hostMedia.status !== "normalizing" ? (
+          <button
+            className="button"
+            onClick={() => void hostMedia.selectAndPrepare()}
+            type="button"
+          >
+            Выбрать файл
+          </button>
+        ) : null}
+        {hostMedia.status === "ready" && liveKitConnected ? (
+          <button className="button" onClick={() => void hostMedia.publish()} type="button">
+            Опубликовать
+          </button>
+        ) : null}
+        {hostMedia.status === "live" ? (
+          <button className="button" onClick={() => hostMedia.stop()} type="button">
+            Остановить публикацию
+          </button>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
