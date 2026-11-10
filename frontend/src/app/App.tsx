@@ -2,6 +2,7 @@ import { Route, Routes } from "react-router-dom";
 
 import { AppShell } from "../components/AppShell";
 import { HomePage } from "../pages/HomePage";
+import { InternetHostPage } from "../pages/InternetHostPage";
 import { InternetInvitePage } from "../pages/InternetInvitePage";
 import { InternetRoomPage } from "../pages/InternetRoomPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
@@ -12,6 +13,7 @@ export function App() {
     <Routes>
       <Route element={<AppShell />}>
         <Route index element={<HomePage />} />
+        <Route path="internet/host" element={<InternetHostPage />} />
         <Route path="join" element={<InternetInvitePage />} />
         <Route path="internet/rooms/:publicRoomId" element={<InternetRoomPage />} />
         <Route path="operator" element={<OperatorDashboardPage />} />

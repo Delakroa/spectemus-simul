@@ -8,6 +8,7 @@ import { createAppQueryClient } from "./query-client";
 describe("App", () => {
   afterEach(() => {
     cleanup();
+    vi.unstubAllEnvs();
     globalThis.localStorage?.removeItem?.("spectemusSimul.operatorToken");
   });
 
@@ -55,5 +56,21 @@ describe("App", () => {
 
     expect(screen.getByRole("heading", { name: "Операторская панель" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Оператор" })).toHaveAttribute("href", "/operator");
+  });
+
+  it("открывает отдельный host Internet route за выключенным feature", () => {
+    vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "false");
+
+    render(
+      <QueryClientProvider client={createAppQueryClient()}>
+        <MemoryRouter initialEntries={["/internet/host"]}>
+          <App />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Internet-комната пока закрыта" }),
+    ).toBeInTheDocument();
   });
 });

@@ -43,6 +43,9 @@
 - [SPS-722_INTERNET_GUEST_INVITE_ENTRY.md](SPS-722_INTERNET_GUEST_INVITE_ENTRY.md) —
   guest entry `/join#invite=` → email challenge → redemption → Internet-комната
   без media; флаг по умолчанию выключен.
+- [SPS-723_INTERNET_HOST_ROOM_ENTRY.md](SPS-723_INTERNET_HOST_ROOM_ENTRY.md) —
+  browser host entry через email account до public room и hash-only invite;
+  LAN и media не затронуты.
 - [WT-690_PRODUCT_ROADMAP_STATE.md](WT-690_PRODUCT_ROADMAP_STATE.md) —
   фактический статус LAN hardening, public access foundation и внешний gate
   перед Internet mode.
@@ -250,6 +253,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [SPS-720_PUBLIC_LIVEKIT_TOKEN.md](SPS-720_PUBLIC_LIVEKIT_TOKEN.md) — `/api/v2/.../livekit-token` с opaque room identity и отдельной wss-конфигурацией; LAN token не изменён.
 - [SPS-721_PUBLIC_LIVEKIT_REVOKE_DISCONNECT.md](SPS-721_PUBLIC_LIVEKIT_REVOKE_DISCONNECT.md) — revoke member → RemoveParticipant; 503 при сбое disconnect без отката membership.
 - [SPS-722_INTERNET_GUEST_INVITE_ENTRY.md](SPS-722_INTERNET_GUEST_INVITE_ENTRY.md) — guest invite entry до membership без LiveKit/media; LAN не затронут.
+- [SPS-723_INTERNET_HOST_ROOM_ENTRY.md](SPS-723_INTERNET_HOST_ROOM_ENTRY.md) — browser host создаёт public room и public HTTPS invite без LAN fallback и media.
 - [WT-652_INTERNET_MODE_ARCHITECTURE.md](WT-652_INTERNET_MODE_ARCHITECTURE.md) — отдельный public Internet mode: account/invite, TLS/TURN, privacy, cost gates и последовательность запуска.
 - [WT-653_PUBLIC_ACCESS_CONTRACTS.md](WT-653_PUBLIC_ACCESS_CONTRACTS.md) — контракт изолированного `/api/v2` для account, membership и hash-only invite; LAN API не меняется.
 - [WT-657_DESKTOP_INSTALL_SMOKE.md](WT-657_DESKTOP_INSTALL_SMOKE.md) — CI монтирует DMG и устанавливает NSIS, затем проверяет runtime-компоненты готового приложения.

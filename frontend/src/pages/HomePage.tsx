@@ -589,7 +589,11 @@ export function HomePage() {
   function handleCreateRoom(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const mode = internetRoomChoiceEnabled ? roomMode : "lan";
-    void roomSession.create(hostDisplayName, mode);
+    if (mode === "internet") {
+      navigate("/internet/host");
+      return;
+    }
+    void roomSession.create(hostDisplayName, "lan");
   }
 
   function handleJoinRoom(event: FormEvent<HTMLFormElement>) {
@@ -929,26 +933,34 @@ export function HomePage() {
                     </label>
                   </fieldset>
                 )}
-                <label htmlFor="host-display-name">Создать комнату</label>
+                {roomMode === "internet" ? (
+                  <strong className="room-form__label">Создать Internet-комнату</strong>
+                ) : (
+                  <label htmlFor="host-display-name">Создать комнату</label>
+                )}
                 <div className="room-form__row">
-                  <input
-                    aria-label="Имя host"
-                    id="host-display-name"
-                    maxLength={64}
-                    minLength={1}
-                    name="hostDisplayName"
-                    onChange={(event) => setHostDisplayName(event.target.value)}
-                    required
-                    type="text"
-                    value={hostDisplayName}
-                  />
+                  {roomMode === "lan" ? (
+                    <input
+                      aria-label="Имя host"
+                      id="host-display-name"
+                      maxLength={64}
+                      minLength={1}
+                      name="hostDisplayName"
+                      onChange={(event) => setHostDisplayName(event.target.value)}
+                      required
+                      type="text"
+                      value={hostDisplayName}
+                    />
+                  ) : (
+                    <p>Сначала подтвердите email, затем получите приватную ссылку для гостя.</p>
+                  )}
                   <button
                     className="button button--primary"
                     disabled={isRoomActionPending}
                     type="submit"
                   >
                     <Plus size={18} aria-hidden="true" />
-                    Создать
+                    {roomMode === "internet" ? "Продолжить" : "Создать"}
                   </button>
                 </div>
               </form>

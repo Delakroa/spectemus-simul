@@ -107,6 +107,7 @@ function renderPage(initialEntries = ["/"]) {
         <LocationProbe />
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/internet/host" element={<div>Internet host entry</div>} />
           <Route path="/rooms/:roomId" element={<HomePage />} />
         </Routes>
       </MemoryRouter>
@@ -1782,7 +1783,7 @@ describe("HomePage", () => {
     });
   });
 
-  it("не создаёт LAN-комнату, когда выбран закрытый Internet mode", async () => {
+  it("переходит в отдельный host Internet flow и не создаёт LAN-комнату", async () => {
     vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
     const user = userEvent.setup();
     const roomPosts: unknown[] = [];
@@ -1824,15 +1825,12 @@ describe("HomePage", () => {
     await screen.findByText("Сервис готов");
     expect(screen.getByRole("radio", { name: "В одной сети" })).toBeChecked();
     await user.click(screen.getByRole("radio", { name: "Из разных городов" }));
-    await user.click(screen.getByRole("button", { name: "Создать" }));
+    expect(screen.queryByLabelText("Имя host")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Продолжить" }));
 
-    await screen.findByText(
-      "Просмотр из другого города сейчас закрыт. Локальная комната вместо него не создаётся.",
-    );
     expect(roomPosts).toEqual([]);
     expect(screen.queryByText("Видеофайл")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Повторить" })).not.toBeInTheDocument();
-    expect(screen.getByTestId("location-path")).toHaveTextContent("/");
+    expect(screen.getByTestId("location-path")).toHaveTextContent("/internet/host");
   });
 });
 

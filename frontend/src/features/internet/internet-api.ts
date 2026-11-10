@@ -44,9 +44,19 @@ export const publicRoomAccessSchema = z
   })
   .strict();
 
+export const publicInviteCreatedSchema = z
+  .object({
+    inviteId: z.uuid(),
+    invitePath: z.string().regex(/^\/join#invite=[A-Za-z0-9_-]{43}$/),
+    expiresAt: dateTimeSchema,
+    maxRedemptions: z.number().int().min(1).max(3),
+  })
+  .strict();
+
 export type AccountProfile = z.infer<typeof accountProfileSchema>;
 export type EmailChallengeAccepted = z.infer<typeof emailChallengeAcceptedSchema>;
 export type PublicRoomAccess = z.infer<typeof publicRoomAccessSchema>;
+export type PublicInviteCreated = z.infer<typeof publicInviteCreatedSchema>;
 
 type RequestOptions = {
   body?: unknown;
@@ -132,12 +142,63 @@ export function getPublicRoom(publicRoomId: string, signal?: AbortSignal) {
   );
 }
 
+export function createPublicRoom(
+  expiresInMinutes: number,
+  idempotencyKey: string,
+  signal?: AbortSignal,
+) {
+  return request("/api/v2/public-rooms", publicRoomAccessSchema, {
+    method: "POST",
+    body: { expiresInMinutes },
+    headers: {
+      "Idempotency-Key": idempotencyKey,
+    },
+    signal,
+  });
+}
+
+export function createPublicRoomInvite(
+  publicRoomId: string,
+  payload: { expiresInMinutes: number; maxRedemptions: number },
+  idempotencyKey: string,
+  signal?: AbortSignal,
+) {
+  return request(
+    `/api/v2/public-rooms/${encodeURIComponent(publicRoomId)}/invites`,
+    publicInviteCreatedSchema,
+    {
+      method: "POST",
+      body: payload,
+      headers: {
+        "Idempotency-Key": idempotencyKey,
+      },
+      signal,
+    },
+  );
+}
+
 export function createInviteRedemptionIdempotencyKey() {
   if (globalThis.crypto?.randomUUID) {
     return `invite-redeem-${globalThis.crypto.randomUUID()}`;
   }
 
   return `invite-redeem-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+export function createPublicRoomIdempotencyKey() {
+  return createInternetIdempotencyKey("public-room");
+}
+
+export function createPublicInviteIdempotencyKey() {
+  return createInternetIdempotencyKey("public-invite");
+}
+
+function createInternetIdempotencyKey(prefix: string) {
+  if (globalThis.crypto?.randomUUID) {
+    return `${prefix}-${globalThis.crypto.randomUUID()}`;
+  }
+
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
 export function isAccountRequiredError(error: unknown) {
@@ -158,6 +219,12 @@ export function isInviteUnavailableError(error: unknown) {
 
 export function isAccountLimitReachedError(error: unknown) {
   return error instanceof ApiProblemError && error.problem.code === "ACCOUNT_LIMIT_REACHED";
+}
+
+export function isIdempotencyReplayUnavailableError(error: unknown) {
+  return (
+    error instanceof ApiProblemError && error.problem.code === "IDEMPOTENCY_REPLAY_UNAVAILABLE"
+  );
 }
 
 export { ApiProblemError };

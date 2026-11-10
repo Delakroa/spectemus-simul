@@ -41,8 +41,11 @@ pnpm dev:frontend
 
 `VITE_INTERNET_ROOM_RUNTIME_ENABLED` по умолчанию выключен. При `true` гость может
 пройти `/join#invite=<token>` → email challenge → redemption →
-`/internet/rooms/{publicRoomId}` без media/LiveKit. Host Internet flow этим
-флагом не открывается.
+`/internet/rooms/{publicRoomId}` без media/LiveKit. Host может пройти email
+challenge, создать public room и получить hash-only invite. Для этого
+обязателен `VITE_INTERNET_APP_ORIGIN=https://app.<domain>`: HTTP, loopback,
+IP literals и URL с path/query/hash не принимаются. Media/LiveKit по-прежнему не
+подключаются, а Internet runtime в release build остаётся выключенным.
 
 ## Проверки
 
