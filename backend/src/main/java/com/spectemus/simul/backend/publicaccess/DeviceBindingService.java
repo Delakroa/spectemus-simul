@@ -81,27 +81,28 @@ final class DeviceBindingService {
             throw deviceCodeRejected();
         }
         Instant now = Instant.now(clock);
-        DeviceBindingStore.ExchangeResult result =
-                store.exchangeBinding(bindingId, secrets.deviceCodeFingerprint(deviceCode), now);
+        String deviceCredential = secrets.credential();
+        Instant expiresAt = now.plus(properties.deviceSessionTtl());
+        DeviceBindingStore.ExchangeResult result = store.exchangeBinding(
+                bindingId,
+                secrets.deviceCodeFingerprint(deviceCode),
+                secrets.deviceCredentialFingerprint(deviceCredential),
+                expiresAt,
+                now);
         return switch (result.outcome()) {
             case PENDING -> throw authorizationPending(result.binding());
             case REJECTED -> throw deviceCodeRejected();
             case UNAVAILABLE -> throw bindingUnavailable();
             case ISSUED -> {
-                DeviceBindingStore.StoredBinding binding = result.binding();
-                String deviceCredential = secrets.credential();
-                Instant expiresAt = now.plus(properties.deviceSessionTtl());
-                store.saveDeviceSession(new DeviceBindingStore.StoredDeviceSession(
-                        secrets.deviceCredentialFingerprint(deviceCredential),
-                        binding.accountId(),
-                        binding.bindingId(),
-                        expiresAt,
-                        now));
                 PublicAccessStore.StoredAccount account = store.findAccountByDeviceSession(
                                 secrets.deviceCredentialFingerprint(deviceCredential), now)
                         .orElseThrow(DeviceBindingService::bindingUnavailable);
-                accountStore.recordAudit(
-                        null, account.accountId(), "DEVICE_BINDING_EXCHANGED", UUID.randomUUID(), now);
+                try {
+                    accountStore.recordAudit(
+                            null, account.accountId(), "DEVICE_BINDING_EXCHANGED", UUID.randomUUID(), now);
+                } catch (RuntimeException ignored) {
+                    // Audit must not invalidate an already issued device session.
+                }
                 yield new DeviceBindingSessionResponse(
                         deviceCredential,
                         new AccountProfileResponse(

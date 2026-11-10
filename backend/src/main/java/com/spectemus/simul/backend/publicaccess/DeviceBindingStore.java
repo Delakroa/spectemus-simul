@@ -13,10 +13,17 @@ interface DeviceBindingStore {
     boolean approveBinding(
             UUID bindingId, String userCodeFingerprint, UUID accountId, Instant now);
 
+    /**
+     * Atomically validates the device code, marks the binding {@code EXCHANGED}, and inserts the
+     * device session using the locked binding's account id. Callers must not persist the session
+     * in a separate transaction.
+     */
     ExchangeResult exchangeBinding(
-            UUID bindingId, String deviceCodeFingerprint, Instant now);
-
-    void saveDeviceSession(StoredDeviceSession session);
+            UUID bindingId,
+            String deviceCodeFingerprint,
+            String sessionFingerprint,
+            Instant sessionExpiresAt,
+            Instant now);
 
     Optional<PublicAccessStore.StoredAccount> findAccountByDeviceSession(
             String sessionFingerprint, Instant now);

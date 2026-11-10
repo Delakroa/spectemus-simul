@@ -82,8 +82,10 @@ spectemus-simul:
     device-binding-approve:
       requests: ${RATE_LIMIT_DEVICE_BINDING_APPROVE:20}
       window: ${RATE_LIMIT_DEVICE_BINDING_APPROVE_WINDOW:15m}
+    # Keep this above ceil(PUBLIC_DEVICE_BINDING_TTL / PUBLIC_DEVICE_POLL_INTERVAL).
+    # Defaults: 10m / 5s = 120 polls; budget 150 / 15m leaves headroom for retries.
     device-binding-token:
-      requests: ${RATE_LIMIT_DEVICE_BINDING_TOKEN:60}
+      requests: ${RATE_LIMIT_DEVICE_BINDING_TOKEN:150}
       window: ${RATE_LIMIT_DEVICE_BINDING_TOKEN_WINDOW:15m}
   public-access:
     # Internet mode is deliberately fail-closed. LAN `/api/v1` does not depend on

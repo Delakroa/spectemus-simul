@@ -3,16 +3,17 @@ import { join } from "node:path";
 
 const USER_CODE_PATTERN = /^[A-Z0-9]{4}-[A-Z0-9]{4}$/;
 const DEVICE_SECRET_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+const VERIFICATION_PATH = "/internet/link";
 
 export function assertPublicHttpsOrigin(rawOrigin) {
   if (typeof rawOrigin !== "string" || !rawOrigin.trim()) {
-    throw new Error("PUBLIC_API_ORIGIN is required");
+    throw new Error("SPECTEMUS_PUBLIC_API_ORIGIN is required");
   }
   let url;
   try {
     url = new URL(rawOrigin.trim());
   } catch {
-    throw new Error("PUBLIC_API_ORIGIN must be a valid URL");
+    throw new Error("SPECTEMUS_PUBLIC_API_ORIGIN must be a valid URL");
   }
   if (
     url.protocol !== "https:" ||
@@ -24,7 +25,7 @@ export function assertPublicHttpsOrigin(rawOrigin) {
     url.hash
   ) {
     throw new Error(
-      "PUBLIC_API_ORIGIN must be a public https:// origin without credentials, path, query or fragment",
+      "SPECTEMUS_PUBLIC_API_ORIGIN must be a public https:// origin without credentials, path, query or fragment",
     );
   }
   return url.origin;
@@ -47,7 +48,26 @@ function isPublicHostname(rawHostname) {
   return true;
 }
 
+function assertVerificationUri(verificationUri, expectedOrigin) {
+  const url = new URL(verificationUri);
+  assertPublicHttpsOrigin(url.origin);
+  if (
+    url.origin !== expectedOrigin ||
+    url.pathname !== VERIFICATION_PATH ||
+    url.username ||
+    url.password ||
+    url.search
+  ) {
+    throw new Error(
+      "verification URI is outside the configured public origin allowlist",
+    );
+  }
+  return url.toString();
+}
+
 export function createDeviceBindingController({
+  apiOrigin,
+  resolveApiOrigin,
   userDataPath,
   fetchImpl = globalThis.fetch,
   openExternal,
@@ -56,6 +76,12 @@ export function createDeviceBindingController({
 }) {
   let activePoll = null;
   const storagePath = join(userDataPath, "device-binding.bin");
+
+  function requireOrigin() {
+    const configured =
+      typeof resolveApiOrigin === "function" ? resolveApiOrigin() : apiOrigin;
+    return assertPublicHttpsOrigin(configured);
+  }
 
   function requireSafeStorage() {
     if (!safeStorageImpl?.isEncryptionAvailable?.()) {
@@ -94,6 +120,14 @@ export function createDeviceBindingController({
     if (!stored?.deviceCredential || !stored?.profile) {
       return { bound: false };
     }
+    if (
+      typeof stored.expiresAt === "string" &&
+      Number.isFinite(Date.parse(stored.expiresAt)) &&
+      Date.parse(stored.expiresAt) <= now()
+    ) {
+      await clearStoredSession();
+      return { bound: false };
+    }
     return {
       bound: true,
       profile: {
@@ -104,8 +138,8 @@ export function createDeviceBindingController({
     };
   }
 
-  async function start({ apiOrigin, signal } = {}) {
-    const origin = assertPublicHttpsOrigin(apiOrigin);
+  async function start({ signal } = {}) {
+    const origin = requireOrigin();
     cancel();
     const response = await fetchImpl(`${origin}/api/v2/auth/device-bindings`, {
       method: "POST",
@@ -124,20 +158,12 @@ export function createDeviceBindingController({
     ) {
       throw new Error("Malformed device binding start response");
     }
-    const verificationUrl = new URL(body.verificationUri);
-    assertPublicHttpsOrigin(verificationUrl.origin);
-    if (
-      verificationUrl.origin !== origin ||
-      !verificationUrl.pathname.startsWith("/internet/link")
-    ) {
-      throw new Error(
-        "verification URI is outside the configured public origin",
-      );
-    }
+    const verificationUri = assertVerificationUri(body.verificationUri, origin);
     activePoll = {
       origin,
       bindingId: body.bindingId,
       deviceCode: body.deviceCode,
+      verificationUri,
       intervalMs: Math.max(1000, Number(body.intervalSeconds || 5) * 1000),
       expiresAtMs: Date.parse(body.expiresAt),
       controller: new AbortController(),
@@ -145,29 +171,18 @@ export function createDeviceBindingController({
     return {
       bindingId: body.bindingId,
       userCode: body.userCode,
-      verificationUri: body.verificationUri,
+      verificationUri,
       expiresAt: body.expiresAt,
       intervalSeconds: body.intervalSeconds,
     };
   }
 
-  async function openVerification(verificationUri) {
-    if (!activePoll?.origin) {
+  async function openVerification() {
+    if (!activePoll?.verificationUri) {
       throw new Error("Device binding is not active");
     }
-    const url = new URL(verificationUri);
-    assertPublicHttpsOrigin(url.origin);
-    if (
-      url.origin !== activePoll.origin ||
-      !url.pathname.startsWith("/internet/link") ||
-      url.username ||
-      url.password
-    ) {
-      throw new Error(
-        "verification URI is outside the active public origin allowlist",
-      );
-    }
-    await openExternal(url.toString());
+    assertVerificationUri(activePoll.verificationUri, activePoll.origin);
+    await openExternal(activePoll.verificationUri);
   }
 
   async function pollOnce() {
@@ -234,9 +249,20 @@ export function createDeviceBindingController({
   async function clear({ revokeRemote = true } = {}) {
     const stored = await readStoredSession();
     cancel();
-    if (stored?.deviceCredential && stored?.apiOrigin && revokeRemote) {
+    if (!stored?.deviceCredential) {
+      await clearStoredSession();
+      return { bound: false };
+    }
+    if (revokeRemote) {
+      if (!stored.apiOrigin) {
+        const error = new Error("Stored device session is missing apiOrigin");
+        error.code = "DEVICE_SESSION_REVOKE_FAILED";
+        error.retryable = true;
+        throw error;
+      }
+      let response;
       try {
-        await fetchImpl(
+        response = await fetchImpl(
           `${stored.apiOrigin}/api/v2/account/device-sessions/revoke`,
           {
             method: "POST",
@@ -247,8 +273,18 @@ export function createDeviceBindingController({
             body: JSON.stringify({ deviceCredential: stored.deviceCredential }),
           },
         );
-      } catch {
-        // Local clear remains authoritative if remote revoke fails.
+      } catch (cause) {
+        const error = new Error("Device session revoke failed");
+        error.code = "DEVICE_SESSION_REVOKE_FAILED";
+        error.retryable = true;
+        error.cause = cause;
+        throw error;
+      }
+      if (!response.ok) {
+        const problem = await toProblem(response);
+        problem.code = problem.code || "DEVICE_SESSION_REVOKE_FAILED";
+        problem.retryable = true;
+        throw problem;
       }
     }
     await clearStoredSession();
@@ -259,6 +295,16 @@ export function createDeviceBindingController({
     const stored = await readStoredSession();
     if (!stored?.deviceCredential || !stored?.apiOrigin) {
       const error = new Error("Desktop account is not bound");
+      error.code = "ACCOUNT_REQUIRED";
+      throw error;
+    }
+    if (
+      typeof stored.expiresAt === "string" &&
+      Number.isFinite(Date.parse(stored.expiresAt)) &&
+      Date.parse(stored.expiresAt) <= now()
+    ) {
+      await clearStoredSession();
+      const error = new Error("Desktop account session expired");
       error.code = "ACCOUNT_REQUIRED";
       throw error;
     }

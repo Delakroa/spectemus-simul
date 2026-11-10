@@ -240,8 +240,10 @@ describe("InternetHostPage", () => {
         expiresAt: "2026-11-10T10:10:00Z",
         intervalSeconds: 0,
       }),
-      openDeviceBinding: async (uri) => {
-        opened.push(uri);
+      openDeviceBinding: async () => {
+        opened.push(
+          "https://app.example.test/internet/link#binding=11111111-1111-4111-8111-111111111111",
+        );
       },
       pollDeviceBinding: async () => {
         await pollGate;

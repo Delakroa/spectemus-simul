@@ -154,6 +154,7 @@ if (isPrimaryInstance) {
     });
 
     const deviceBinding = createDeviceBindingController({
+      resolveApiOrigin: () => process.env.SPECTEMUS_PUBLIC_API_ORIGIN,
       userDataPath: app.getPath("userData"),
       openExternal: (url) => shell.openExternal(url),
       safeStorageImpl: safeStorage,
@@ -161,11 +162,11 @@ if (isPrimaryInstance) {
     ipcMain.handle("spectemus:device-binding-status", () =>
       deviceBinding.status(),
     );
-    ipcMain.handle("spectemus:device-binding-start", (_event, apiOrigin) =>
-      deviceBinding.start({ apiOrigin }),
+    ipcMain.handle("spectemus:device-binding-start", () =>
+      deviceBinding.start(),
     );
-    ipcMain.handle("spectemus:device-binding-open", (_event, verificationUri) =>
-      deviceBinding.openVerification(verificationUri),
+    ipcMain.handle("spectemus:device-binding-open", () =>
+      deviceBinding.openVerification(),
     );
     ipcMain.handle("spectemus:device-binding-poll", () =>
       deviceBinding.pollOnce(),

@@ -14,10 +14,9 @@ contextBridge.exposeInMainWorld("spectemusDesktop", {
     ipcRenderer.invoke("spectemus:select-lan-address", address),
   getDeviceBindingStatus: () =>
     ipcRenderer.invoke("spectemus:device-binding-status"),
-  startDeviceBinding: (apiOrigin) =>
-    ipcRenderer.invoke("spectemus:device-binding-start", apiOrigin),
-  openDeviceBinding: (verificationUri) =>
-    ipcRenderer.invoke("spectemus:device-binding-open", verificationUri),
+  startDeviceBinding: () =>
+    ipcRenderer.invoke("spectemus:device-binding-start"),
+  openDeviceBinding: () => ipcRenderer.invoke("spectemus:device-binding-open"),
   pollDeviceBinding: () => ipcRenderer.invoke("spectemus:device-binding-poll"),
   cancelDeviceBinding: () =>
     ipcRenderer.invoke("spectemus:device-binding-cancel"),

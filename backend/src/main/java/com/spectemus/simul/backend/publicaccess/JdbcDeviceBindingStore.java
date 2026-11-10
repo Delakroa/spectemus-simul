@@ -106,7 +106,11 @@ final class JdbcDeviceBindingStore implements DeviceBindingStore {
 
     @Override
     public ExchangeResult exchangeBinding(
-            UUID bindingId, String deviceCodeFingerprint, Instant now) {
+            UUID bindingId,
+            String deviceCodeFingerprint,
+            String sessionFingerprint,
+            Instant sessionExpiresAt,
+            Instant now) {
         return transaction(connection -> {
             try (PreparedStatement statement = connection.prepareStatement("""
                     SELECT binding_id, device_code_hash, user_code_hash, status, account_id,
@@ -146,6 +150,18 @@ final class JdbcDeviceBindingStore implements DeviceBindingStore {
                         update.setObject(3, bindingId);
                         update.executeUpdate();
                     }
+                    try (PreparedStatement insert = connection.prepareStatement("""
+                            INSERT INTO wt_device_session
+                                (session_hash, account_id, binding_id, expires_at, created_at)
+                            VALUES (?, ?, ?, ?, ?)
+                            """)) {
+                        insert.setString(1, sessionFingerprint);
+                        insert.setObject(2, binding.accountId());
+                        insert.setObject(3, binding.bindingId());
+                        insert.setTimestamp(4, timestamp(sessionExpiresAt));
+                        insert.setTimestamp(5, timestamp(now));
+                        insert.executeUpdate();
+                    }
                     StoredBinding exchanged = new StoredBinding(
                             binding.bindingId(),
                             binding.deviceCodeFingerprint(),
@@ -160,25 +176,6 @@ final class JdbcDeviceBindingStore implements DeviceBindingStore {
                     return new ExchangeResult(ExchangeOutcome.ISSUED, exchanged);
                 }
             }
-        });
-    }
-
-    @Override
-    public void saveDeviceSession(StoredDeviceSession session) {
-        execute(connection -> {
-            try (PreparedStatement statement = connection.prepareStatement("""
-                    INSERT INTO wt_device_session
-                        (session_hash, account_id, binding_id, expires_at, created_at)
-                    VALUES (?, ?, ?, ?, ?)
-                    """)) {
-                statement.setString(1, session.sessionFingerprint());
-                statement.setObject(2, session.accountId());
-                statement.setObject(3, session.bindingId());
-                statement.setTimestamp(4, timestamp(session.expiresAt()));
-                statement.setTimestamp(5, timestamp(session.createdAt()));
-                statement.executeUpdate();
-            }
-            return null;
         });
     }
 

@@ -39,7 +39,7 @@ type HostStep =
 
 type HostError = {
   message: string;
-  retryAction: "bootstrap" | "email" | "code" | "bind" | "create" | null;
+  retryAction: "bootstrap" | "email" | "code" | "bind" | "create" | "clear" | null;
   canRequestNewCode?: boolean;
 };
 
@@ -172,12 +172,12 @@ function DesktopInternetHostEntry({
     setPending(true);
     setError(null);
     try {
-      const started = await desktop.startDeviceBinding!(appOrigin);
+      const started = await desktop.startDeviceBinding!();
       if ("deviceCode" in started || "deviceCredential" in started) {
         throw new Error("Device secret leaked into renderer payload");
       }
       setBinding(started);
-      await desktop.openDeviceBinding!(started.verificationUri);
+      await desktop.openDeviceBinding!();
       setStep("waiting");
       schedulePoll(started.intervalSeconds);
     } catch {
@@ -231,6 +231,28 @@ function DesktopInternetHostEntry({
       message: "Подтверждение отменено. Можно начать привязку заново.",
       retryAction: "bind",
     });
+  }
+
+  async function clearBinding() {
+    setPending(true);
+    setError(null);
+    try {
+      await desktop.clearDeviceBinding!();
+      createdRoomRef.current = null;
+      setHasCreatedRoom(false);
+      setCreated(null);
+      setDisplayName(null);
+      setStep("bind");
+    } catch {
+      setStep("error");
+      setError({
+        message:
+          "Не удалось отозвать desktop-сессию на сервере. Локальный credential сохранён — повторите отзыв.",
+        retryAction: "clear",
+      });
+    } finally {
+      setPending(false);
+    }
   }
 
   async function createRoomAndInvite() {
@@ -352,15 +374,7 @@ function DesktopInternetHostEntry({
           <button
             className="button"
             disabled={pending}
-            onClick={() => {
-              void desktop.clearDeviceBinding?.().then(() => {
-                createdRoomRef.current = null;
-                setHasCreatedRoom(false);
-                setCreated(null);
-                setDisplayName(null);
-                setStep("bind");
-              });
-            }}
+            onClick={() => void clearBinding()}
             type="button"
           >
             Отвязать аккаунт
@@ -409,6 +423,16 @@ function DesktopInternetHostEntry({
               type="button"
             >
               Повторить
+            </button>
+          ) : null}
+          {error.retryAction === "clear" ? (
+            <button
+              className="button"
+              disabled={pending}
+              onClick={() => void clearBinding()}
+              type="button"
+            >
+              Повторить отзыв
             </button>
           ) : null}
         </div>
@@ -664,6 +688,7 @@ function InternetHostEntry({ appOrigin }: { appOrigin: string }) {
         void verifyChallenge();
         break;
       case "bind":
+      case "clear":
         break;
       case "create":
         void createRoomAndInvite();

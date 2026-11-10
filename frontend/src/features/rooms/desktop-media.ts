@@ -80,13 +80,13 @@ export type SpectemusDesktopApi = {
     listener: (progress: DesktopMediaNormalizationProgress) => void,
   ) => () => void;
   onRuntimeStatus: (listener: (status: DesktopRuntimeStatus) => void) => () => void;
-  openDeviceBinding?: (verificationUri: string) => Promise<void>;
+  openDeviceBinding?: () => Promise<void>;
   pickMediaFile?: () => Promise<DesktopMediaSelection | null>;
   pollDeviceBinding?: () => Promise<DesktopDeviceBindingPoll>;
   releaseMedia?: (id: string) => Promise<void>;
   restartRuntime: () => Promise<DesktopRuntimeStatus>;
   selectLanAddress?: (address: string) => Promise<DesktopRuntimeStatus>;
-  startDeviceBinding?: (apiOrigin: string) => Promise<DesktopDeviceBindingStart>;
+  startDeviceBinding?: () => Promise<DesktopDeviceBindingStart>;
 };
 
 declare global {

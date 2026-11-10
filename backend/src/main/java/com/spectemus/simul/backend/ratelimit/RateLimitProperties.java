@@ -38,7 +38,8 @@ public record RateLimitProperties(
     private static final Limit DEFAULT_INVITE_REDEMPTION = new Limit(20, Duration.ofMinutes(15));
     private static final Limit DEFAULT_DEVICE_BINDING_START = new Limit(10, Duration.ofMinutes(15));
     private static final Limit DEFAULT_DEVICE_BINDING_APPROVE = new Limit(20, Duration.ofMinutes(15));
-    private static final Limit DEFAULT_DEVICE_BINDING_TOKEN = new Limit(60, Duration.ofMinutes(15));
+    // Must cover a full binding TTL of polling: default TTL 10m / interval 5s = 120 polls.
+    private static final Limit DEFAULT_DEVICE_BINDING_TOKEN = new Limit(150, Duration.ofMinutes(15));
 
     public RateLimitProperties {
         enabled = enabled == null ? Boolean.TRUE : enabled;
