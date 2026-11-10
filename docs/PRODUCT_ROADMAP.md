@@ -50,24 +50,28 @@ full scan fail-closed. SPS-719 закрывает найденные уязви�
 без fallback на LAN LiveKit credentials. SPS-721 после revoke member вызывает
 LiveKit `RemoveParticipant` по opaque identity; membership revoke в БД остаётся
 источником истины. Self-hosted LiveKit не отзывает уже выданный JWT — только
-отключает participant и блокирует новый token.
+отключает participant и блокирует новый token. SPS-722 добавляет guest entry
+`/join#invite=<token>` → email challenge → redemption → страница Internet-комнаты
+за тем же `VITE_INTERNET_ROOM_RUNTIME_ENABLED=false`; media/LiveKit и host flow
+ещё не подключаются.
 
 ## Порядок задач
 
-| Фаза | Состояние                                     | Результат                                                                                                                                          | Незавершённый gate                                                                                             |
-| ---- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| 0    | Код готов: WT-682, WT-684–WT-689, SPS-711–715 | Локальная подготовка и исправления desktop/LAN. Физически форматы и платформы ещё не подтверждены                                                  | Mac ↔ Windows matrix перенесена в финальный release-candidate gate                                             |
-| 1    | Код готов, feature выключена: WT-654          | Изолированный `/api/v2`: account, email challenge, membership, отзыв invite и audit                                                                | PostgreSQL, SMTP и sender domain; revoked invite не даёт access                                                |
-| 2    | Код готов, feature выключена: SPS-716/720/721 | Явный выбор LAN/Internet. LiveKit token и revoke→RemoveParticipant за `PUBLIC_LIVEKIT_ENABLED=false`. Закрытый Internet mode не открывает просмотр | Публичные WSS/TURN и диагностика. Публичный доступ выключен. Уже выданный JWT живёт до TTL на self-hosted LK   |
-| 3    | Запланировано: private alpha                  | Ограниченная invite-only проверка «host дома → гость в другом городе»                                                                              | Сессии из разных сетей, включая сложную сеть; измерены QoS, TURN usage, стоимость и support load               |
-| 4    | Запланировано: closed beta → release          | Понятная установка, операционный контур и честный UX для малых private rooms                                                                       | Успешность сессий, privacy/deletion policy, incident/revoke runbook, физическая matrix и проверенная экономика |
+| Фаза | Состояние                                         | Результат                                                                                                                                                                        | Незавершённый gate                                                                                             |
+| ---- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 0    | Код готов: WT-682, WT-684–WT-689, SPS-711–715     | Локальная подготовка и исправления desktop/LAN. Физически форматы и платформы ещё не подтверждены                                                                                | Mac ↔ Windows matrix перенесена в финальный release-candidate gate                                             |
+| 1    | Код готов, feature выключена: WT-654              | Изолированный `/api/v2`: account, email challenge, membership, отзыв invite и audit                                                                                              | PostgreSQL, SMTP и sender domain; revoked invite не даёт access                                                |
+| 2    | Код готов, feature выключена: SPS-716/720/721/722 | Явный выбор LAN/Internet. LiveKit token и revoke→RemoveParticipant за `PUBLIC_LIVEKIT_ENABLED=false`. Guest invite entry за `VITE_INTERNET_ROOM_RUNTIME_ENABLED=false` без media | Публичные WSS/TURN и диагностика. Публичный доступ выключен. Уже выданный JWT живёт до TTL на self-hosted LK   |
+| 3    | Запланировано: private alpha                      | Ограниченная invite-only проверка «host дома → гость в другом городе»                                                                                                            | Сессии из разных сетей, включая сложную сеть; измерены QoS, TURN usage, стоимость и support load               |
+| 4    | Запланировано: closed beta → release              | Понятная установка, операционный контур и честный UX для малых private rooms                                                                                                     | Успешность сессий, privacy/deletion policy, incident/revoke runbook, физическая matrix и проверенная экономика |
 
 ## Что делаем следующим
 
 SPS-716 фиксирует границу режимов, SPS-720 выдаёт короткоживущий public LiveKit
-token, SPS-721 отключает participant после revoke member. Internet mode
-остаётся закрытым. Следующие отдельные тикеты: публичные WSS/TURN, диагностика
-сети и privacy-safe telemetry. Ни один из них не делает LAN-комнату публичной.
+token, SPS-721 отключает participant после revoke member, SPS-722 проводит гостя
+от invite fragment до membership без media. Internet mode остаётся закрытым.
+Следующие отдельные тикеты: публичные WSS/TURN, host Internet flow, подключение
+media и privacy-safe telemetry. Ни один из них не делает LAN-комнату публичной.
 
 Публичный доступ и заявление о готовности Internet mode невозможны, пока не
 пройдена финальная проверка VM, DNS, HTTPS, WSS и TURN. До неё же остаётся
