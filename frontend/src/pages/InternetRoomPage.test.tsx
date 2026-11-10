@@ -225,9 +225,11 @@ describe("InternetRoomPage", () => {
     expect(await screen.findByRole("heading", { name: "Фильм опубликован" })).toBeInTheDocument();
     expect(publishFileToLiveKit).toHaveBeenCalled();
     expect(screen.getByText(/movie-video/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Выбрать файл" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Остановить публикацию" }));
     expect(stopFilePublication).toHaveBeenCalled();
+    expect(await screen.findByRole("button", { name: "Выбрать файл" })).toBeInTheDocument();
   });
 
   it("browser guest не видит управление файлом даже при desktop API в window", async () => {

@@ -336,7 +336,8 @@ function InternetHostMediaPanel({
       <div className="internet-invite__meta">
         {hostMedia.status !== "publishing" &&
         hostMedia.status !== "checking" &&
-        hostMedia.status !== "normalizing" ? (
+        hostMedia.status !== "normalizing" &&
+        hostMedia.status !== "live" ? (
           <button
             className="button"
             onClick={() => void hostMedia.selectAndPrepare()}

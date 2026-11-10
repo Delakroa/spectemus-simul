@@ -59,6 +59,20 @@ function mockRoom() {
   return { localParticipant: { publishTrack: vi.fn() } };
 }
 
+function installDesktop(overrides: Partial<NonNullable<typeof window.spectemusDesktop>> = {}) {
+  const desktop = {
+    getRuntimeStatus: async () => ({ detail: "ok", state: "ready" as const }),
+    onRuntimeStatus: () => () => undefined,
+    restartRuntime: async () => ({ detail: "ok", state: "ready" as const }),
+    pickMediaFile: vi.fn().mockResolvedValue(selection),
+    releaseMedia: vi.fn().mockResolvedValue(undefined),
+    normalizeMedia: vi.fn(),
+    ...overrides,
+  };
+  window.spectemusDesktop = desktop;
+  return desktop;
+}
+
 beforeEach(() => {
   publishFileToLiveKit.mockReset();
   stopFilePublication.mockReset();
@@ -96,17 +110,7 @@ describe("useInternetHostMediaPublish", () => {
   });
 
   it("host выбирает, готовит и публикует movie tracks, затем останавливает с cleanup", async () => {
-    const pickMediaFile = vi.fn().mockResolvedValue(selection);
-    const releaseMedia = vi.fn().mockResolvedValue(undefined);
-    const normalizeMedia = vi.fn();
-    window.spectemusDesktop = {
-      getRuntimeStatus: async () => ({ detail: "ok", state: "ready" }),
-      onRuntimeStatus: () => () => undefined,
-      restartRuntime: async () => ({ detail: "ok", state: "ready" }),
-      pickMediaFile,
-      releaseMedia,
-      normalizeMedia,
-    };
+    const desktop = installDesktop();
     const room = mockRoom();
 
     const { result } = renderHook(() =>
@@ -122,7 +126,7 @@ describe("useInternetHostMediaPublish", () => {
     });
     await waitFor(() => expect(result.current.status).toBe("ready"));
     expect(diagnoseMediaSource).toHaveBeenCalled();
-    expect(normalizeMedia).not.toHaveBeenCalled();
+    expect(desktop.normalizeMedia).not.toHaveBeenCalled();
 
     await act(async () => {
       await result.current.publish();
@@ -141,8 +145,73 @@ describe("useInternetHostMediaPublish", () => {
     act(() => {
       result.current.clearAll();
     });
-    expect(releaseMedia).toHaveBeenCalledWith("media-1");
+    expect(desktop.releaseMedia).toHaveBeenCalledWith("media-1");
     expect(result.current.status).toBe("idle");
+  });
+
+  it("во время live не открывает новый выбор файла", async () => {
+    const desktop = installDesktop();
+    const { result } = renderHook(() =>
+      useInternetHostMediaPublish({
+        enabled: true,
+        liveKitStatus: "connected",
+        room: mockRoom() as never,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.selectAndPrepare();
+    });
+    await act(async () => {
+      await result.current.publish();
+    });
+    await waitFor(() => expect(result.current.status).toBe("live"));
+    desktop.pickMediaFile.mockClear();
+
+    await act(async () => {
+      await result.current.selectAndPrepare();
+    });
+    expect(desktop.pickMediaFile).not.toHaveBeenCalled();
+    expect(result.current.status).toBe("live");
+    expect(stopFilePublication).toHaveBeenCalledTimes(0);
+  });
+
+  it("поздний выбор после clearAll освобождает media id и не регистрирует файл", async () => {
+    let resolvePick: (value: typeof selection) => void = () => undefined;
+    const pickMediaFile = vi.fn(
+      () =>
+        new Promise<typeof selection>((resolve) => {
+          resolvePick = resolve;
+        }),
+    );
+    const desktop = installDesktop({ pickMediaFile });
+    const { result } = renderHook(() =>
+      useInternetHostMediaPublish({
+        enabled: true,
+        liveKitStatus: "connected",
+        room: mockRoom() as never,
+      }),
+    );
+
+    let selectPromise: Promise<void> = Promise.resolve();
+    act(() => {
+      selectPromise = result.current.selectAndPrepare();
+    });
+    expect(pickMediaFile).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      result.current.clearAll();
+    });
+
+    await act(async () => {
+      resolvePick(selection);
+      await selectPromise;
+    });
+
+    expect(desktop.releaseMedia).toHaveBeenCalledWith("media-1");
+    expect(result.current.status).toBe("idle");
+    expect(result.current.displayName).toBeNull();
+    expect(diagnoseMediaSource).not.toHaveBeenCalled();
   });
 
   it("нормализует experimental файл перед публикацией", async () => {
@@ -155,14 +224,7 @@ describe("useInternetHostMediaPublish", () => {
       isNormalized: true,
       playbackName: "film.mp4",
     });
-    window.spectemusDesktop = {
-      getRuntimeStatus: async () => ({ detail: "ok", state: "ready" }),
-      onRuntimeStatus: () => () => undefined,
-      restartRuntime: async () => ({ detail: "ok", state: "ready" }),
-      pickMediaFile: vi.fn().mockResolvedValue(selection),
-      releaseMedia: vi.fn(),
-      normalizeMedia,
-    };
+    installDesktop({ normalizeMedia });
 
     const { result } = renderHook(() =>
       useInternetHostMediaPublish({
@@ -180,15 +242,29 @@ describe("useInternetHostMediaPublish", () => {
     expect(result.current.displayName).toBe("film.mp4");
   });
 
+  it("при ошибке pickMediaFile показывает сообщение в UI", async () => {
+    installDesktop({
+      pickMediaFile: vi.fn().mockRejectedValue(new Error("picker failed")),
+    });
+
+    const { result } = renderHook(() =>
+      useInternetHostMediaPublish({
+        enabled: true,
+        liveKitStatus: "connected",
+        room: mockRoom() as never,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.selectAndPrepare();
+    });
+    expect(result.current.status).toBe("error");
+    expect(result.current.error).toMatch(/picker failed/);
+  });
+
   it("при ошибке публикации показывает сообщение и не оставляет live tracks", async () => {
     publishFileToLiveKit.mockRejectedValue(new Error("publish boom"));
-    window.spectemusDesktop = {
-      getRuntimeStatus: async () => ({ detail: "ok", state: "ready" }),
-      onRuntimeStatus: () => () => undefined,
-      restartRuntime: async () => ({ detail: "ok", state: "ready" }),
-      pickMediaFile: vi.fn().mockResolvedValue(selection),
-      releaseMedia: vi.fn(),
-    };
+    installDesktop();
 
     const { result } = renderHook(() =>
       useInternetHostMediaPublish({
@@ -210,14 +286,62 @@ describe("useInternetHostMediaPublish", () => {
     expect(result.current.trackCount).toBe(0);
   });
 
-  it("при потере LiveKit соединения снимает публикацию", async () => {
-    window.spectemusDesktop = {
-      getRuntimeStatus: async () => ({ detail: "ok", state: "ready" }),
-      onRuntimeStatus: () => () => undefined,
-      restartRuntime: async () => ({ detail: "ok", state: "ready" }),
+  it("при потере LiveKit соединения снимает публикацию, отменяет подготовку и releaseMedia", async () => {
+    let resolveNormalize: (value: typeof selection) => void = () => undefined;
+    diagnoseMediaSource.mockResolvedValueOnce({
+      ...fileResult,
+      compatibility: "experimental",
+    });
+    const normalizeMedia = vi.fn(
+      () =>
+        new Promise<typeof selection>((resolve) => {
+          resolveNormalize = resolve;
+        }),
+    );
+    const desktop = installDesktop({
       pickMediaFile: vi.fn().mockResolvedValue(selection),
-      releaseMedia: vi.fn(),
-    };
+      normalizeMedia,
+    });
+    const room = mockRoom();
+    const { result, rerender } = renderHook(
+      ({ liveKitStatus }) =>
+        useInternetHostMediaPublish({
+          enabled: true,
+          liveKitStatus,
+          room: room as never,
+        }),
+      { initialProps: { liveKitStatus: "connected" } },
+    );
+
+    let preparePromise: Promise<void> = Promise.resolve();
+    act(() => {
+      preparePromise = result.current.selectAndPrepare();
+    });
+    await waitFor(() => expect(normalizeMedia).toHaveBeenCalled());
+    expect(result.current.status).toBe("normalizing");
+
+    rerender({ liveKitStatus: "disconnected" });
+    await waitFor(() => expect(result.current.status).toBe("idle"));
+    expect(stopFilePublication).not.toHaveBeenCalled();
+    expect(desktop.releaseMedia).toHaveBeenCalledWith("media-1");
+
+    await act(async () => {
+      resolveNormalize({
+        displayName: "film.mp4",
+        id: "media-normalized",
+        isNormalized: true,
+        playbackName: "film.mp4",
+      });
+      await preparePromise;
+    });
+
+    expect(desktop.releaseMedia).toHaveBeenCalledWith("media-normalized");
+    expect(result.current.status).toBe("idle");
+    expect(result.current.displayName).toBeNull();
+  });
+
+  it("при disconnect после live освобождает media id", async () => {
+    const desktop = installDesktop();
     const room = mockRoom();
     const { result, rerender } = renderHook(
       ({ liveKitStatus }) =>
@@ -238,7 +362,8 @@ describe("useInternetHostMediaPublish", () => {
     await waitFor(() => expect(result.current.status).toBe("live"));
 
     rerender({ liveKitStatus: "disconnected" });
-    await waitFor(() => expect(result.current.status).toBe("ready"));
+    await waitFor(() => expect(result.current.status).toBe("idle"));
     expect(stopFilePublication).toHaveBeenCalled();
+    expect(desktop.releaseMedia).toHaveBeenCalledWith("media-1");
   });
 });

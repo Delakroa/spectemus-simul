@@ -45,6 +45,15 @@ function desktopMediaApi(): SpectemusDesktopApi | null {
   return desktop;
 }
 
+function isBusySelectionStatus(status: InternetHostMediaStatus) {
+  return (
+    status === "live" ||
+    status === "publishing" ||
+    status === "checking" ||
+    status === "normalizing"
+  );
+}
+
 function isNormalizableDiagnosticFailure(error: unknown) {
   return (
     error instanceof FileDiagnosticsFailure &&
@@ -69,6 +78,8 @@ export function useInternetHostMediaPublish(options: {
   const publicationRef = useRef<FilePublication | null>(null);
   const prepareRequestIdRef = useRef(0);
   const publishRequestIdRef = useRef(0);
+  const statusRef = useRef<InternetHostMediaStatus>(state.status);
+  statusRef.current = state.status;
   const roomRef = useRef(room);
   roomRef.current = room;
 
@@ -120,9 +131,9 @@ export function useInternetHostMediaPublish(options: {
       return;
     }
     if (liveKitStatus === "disconnected" || liveKitStatus === "error") {
-      stopPublication();
+      clearAll();
     }
-  }, [enabled, liveKitStatus, stopPublication]);
+  }, [clearAll, enabled, liveKitStatus]);
 
   useEffect(() => {
     if (!enabled) {
@@ -158,9 +169,39 @@ export function useInternetHostMediaPublish(options: {
     if (!enabled || !desktop?.pickMediaFile) {
       return;
     }
+    // Как в LAN: во время показа сначала явная остановка, иначе новый выбор
+    // снимет live-публикацию и временную копию раньше, чем гость успеет
+    // отключиться от текущих tracks.
+    if (isBusySelectionStatus(statusRef.current)) {
+      return;
+    }
 
-    const selection = await desktop.pickMediaFile();
+    const requestIdBeforePick = prepareRequestIdRef.current;
+    let selection: DesktopMediaSelection | null;
+    try {
+      selection = await desktop.pickMediaFile();
+    } catch (caught: unknown) {
+      if (prepareRequestIdRef.current !== requestIdBeforePick) {
+        return;
+      }
+      setState({
+        displayName: null,
+        error: prepareErrorMessage(caught),
+        preparationProgress: null,
+        status: "error",
+        trackCount: 0,
+      });
+      return;
+    }
+
     if (!selection) {
+      return;
+    }
+
+    // clearAll / unmount во время системного диалога уже освободили текущие
+    // ресурсы; поздний выбор нельзя регистрировать — только release.
+    if (prepareRequestIdRef.current !== requestIdBeforePick) {
+      releaseDesktopMedia(selection.id);
       return;
     }
 

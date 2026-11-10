@@ -18,14 +18,20 @@ play/pause/seek, микрофон и включение Internet mode — вне
    `stopFilePublication`. Отдельная копия LAN session hook не создаётся.
 3. Состояния UI: idle / checking / normalizing / ready / publishing / live /
    error; при live заголовок «Фильм опубликован» и явные дорожки
-   `movie-video` / `movie-audio`.
+   `movie-video` / `movie-audio`. Пока публикация live/publishing, кнопка
+   «Выбрать файл» скрыта, а обработчик отклоняет новый выбор — сначала явная
+   остановка, как в LAN.
 4. Browser HOST без desktop media API видит, что публикация доступна только в
    desktop-приложении. Guest не видит кнопки выбора/публикации.
-5. Остановка публикации, выход из комнаты (unmount), `enabled=false` и потеря
-   LiveKit-соединения (`disconnected` / `error`) снимают tracks и освобождают
-   временные desktop media id через `releaseMedia`.
+5. Остановка публикации снимает tracks и оставляет готовый файл. Выход из
+   комнаты (unmount), `enabled=false` и потеря LiveKit-соединения
+   (`disconnected` / `error`) делают полный `clearAll`: tracks, отмена
+   подготовки и `releaseMedia` для временных desktop media id. Если системный
+   диалог выбора файла закрывается после `clearAll`, поздний media id сразу
+   освобождается и не регистрируется.
 6. Оригинал файла и путь к нему в backend не отправляются: в renderer только
    opaque media id и object URL `/_desktop/media/...`.
+7. Ошибка `pickMediaFile` показывается в UI, а не проглатывается вне try.
 
 ## Безопасность и границы режимов
 
@@ -44,8 +50,10 @@ WSS/TURN/VM, telemetry и заявление о готовности Internet mo
 ## Проверки
 
 - frontend hook: отказ без desktop/host, select→prepare→publish→stop,
-  нормализация experimental, ошибка publish, cleanup на disconnect/unmount
+  блок выбора во время live, поздний pick после clearAll → releaseMedia,
+  нормализация experimental, ошибка pick/publish, disconnect → clearAll
+  (releaseMedia + отмена подготовки)
 - frontend page: guest без управления файлом; desktop HOST публикует и
-  останавливает; browser guest с `spectemusDesktop` в window всё равно без
-  publish UI
+  останавливает; во время live нет «Выбрать файл»; browser guest с
+  `spectemusDesktop` в window всё равно без publish UI
 - `pnpm check`
