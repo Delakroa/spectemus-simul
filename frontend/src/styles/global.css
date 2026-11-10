@@ -523,7 +523,8 @@ a {
   gap: 9px;
 }
 
-.room-form label {
+.room-form label,
+.room-form__label {
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
@@ -2226,6 +2227,41 @@ a {
 .internet-invite__meta {
   margin-top: 0;
   color: var(--muted);
+}
+
+.internet-host__ready,
+.internet-host__result {
+  display: grid;
+  gap: 14px;
+  width: min(100%, 560px);
+}
+
+.internet-host__ready p,
+.internet-host__result p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.internet-host__result label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.internet-host__result input {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 12px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface) 92%, white);
+}
+
+.internet-host__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .fatal-error__icon {

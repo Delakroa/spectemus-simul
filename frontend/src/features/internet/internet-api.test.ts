@@ -3,6 +3,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ApiProblemError,
   createInviteRedemptionIdempotencyKey,
+  createPublicInviteIdempotencyKey,
+  createPublicRoom,
+  createPublicRoomIdempotencyKey,
+  createPublicRoomInvite,
   getAccount,
   getPublicRoom,
   publicRoomAccessSchema,
@@ -129,6 +133,48 @@ describe("internet-api", () => {
     );
   });
 
+  it("создаёт public room и hash-only invite отдельными idempotent-командами", async () => {
+    const invite = {
+      inviteId: "44444444-4444-4444-8444-444444444444",
+      invitePath: `/join#invite=${"d".repeat(43)}`,
+      expiresAt: "2026-11-07T20:00:00Z",
+      maxRedemptions: 3,
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => roomAccess })
+      .mockResolvedValueOnce({ ok: true, json: async () => invite });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createPublicRoom(180, "public-room-stable-key-0001");
+    await createPublicRoomInvite(
+      roomAccess.room.publicRoomId,
+      { expiresInMinutes: 180, maxRedemptions: 3 },
+      "public-invite-stable-key-0001",
+    );
+
+    expect(fetchMock.mock.calls[0]).toEqual([
+      "/api/v2/public-rooms",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ expiresInMinutes: 180 }),
+        headers: expect.objectContaining({
+          "Idempotency-Key": "public-room-stable-key-0001",
+        }),
+      }),
+    ]);
+    expect(fetchMock.mock.calls[1]).toEqual([
+      `/api/v2/public-rooms/${roomAccess.room.publicRoomId}/invites`,
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ expiresInMinutes: 180, maxRedemptions: 3 }),
+        headers: expect.objectContaining({
+          "Idempotency-Key": "public-invite-stable-key-0001",
+        }),
+      }),
+    ]);
+  });
+
   it("отклоняет malformed PublicRoomAccess через Zod", () => {
     expect(() =>
       publicRoomAccessSchema.parse({
@@ -142,6 +188,8 @@ describe("internet-api", () => {
     const key = createInviteRedemptionIdempotencyKey();
     expect(key).toMatch(/^invite-redeem-/);
     expect(key).not.toContain("invite=");
+    expect(createPublicRoomIdempotencyKey()).toMatch(/^public-room-/);
+    expect(createPublicInviteIdempotencyKey()).toMatch(/^public-invite-/);
   });
 
   it("пробрасывает problem details без raw body в message для 404", async () => {
