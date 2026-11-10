@@ -10,6 +10,12 @@ import {
   unwrapDesktopIpcResult,
   type PublicLiveKitTokenResponse,
 } from "../features/internet/internet-api";
+import {
+  formatInternetRemotePlaybackHint,
+  formatInternetRemotePlaybackStatus,
+  isInternetRemotePlaybackUserActionRequired,
+  useInternetGuestRemotePlayback,
+} from "../features/internet/use-internet-guest-remote-playback";
 import { useInternetHostMediaPublish } from "../features/internet/use-internet-host-media-publish";
 import {
   connectLiveKitRoom,
@@ -71,12 +77,17 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
   const [liveKitRoom, setLiveKitRoom] = useState<LiveKitRoom | null>(null);
 
   const isHost = membership.status === "ready" && membership.mediaRole === "HOST";
+  const isGuest = membership.status === "ready" && membership.mediaRole === "GUEST";
   const desktopMediaReady = Boolean(
     window.spectemusDesktop?.pickMediaFile && window.spectemusDesktop?.releaseMedia,
   );
   const hostMedia = useInternetHostMediaPublish({
     enabled: isHost && desktopMediaReady,
     liveKitStatus: media.status,
+    room: liveKitRoom,
+  });
+  const guestPlayback = useInternetGuestRemotePlayback({
+    enabled: isGuest && media.status === "connected",
     room: liveKitRoom,
   });
 
@@ -206,9 +217,11 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
       : membership.status === "loading"
         ? "Проверяем доступ"
         : media.status === "connected"
-          ? hostMedia.status === "live"
-            ? "Фильм опубликован"
-            : "Подключено"
+          ? isHost
+            ? hostMedia.status === "live"
+              ? "Фильм опубликован"
+              : "Подключено"
+            : formatInternetRemotePlaybackStatus(guestPlayback.status)
           : media.status === "reconnecting"
             ? "Переподключение"
             : media.status === "connecting" || media.status === "idle"
@@ -227,10 +240,8 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
           {media.status === "connecting" || media.status === "idle" ? (
             <p role="status">Подключаемся к public LiveKit…</p>
           ) : null}
-          {media.status === "connected" && !isHost ? (
-            <p role="status">
-              Подключение установлено. Просмотр фильма появится, когда хозяин начнёт передачу.
-            </p>
+          {media.status === "connected" && isGuest ? (
+            <InternetGuestPlaybackPanel playback={guestPlayback} />
           ) : null}
           {media.status === "connected" && isHost ? (
             <InternetHostMediaPanel
@@ -284,6 +295,63 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
         </button>
       ) : null}
     </InternetRoomShell>
+  );
+}
+
+function InternetGuestPlaybackPanel({
+  playback,
+}: {
+  playback: ReturnType<typeof useInternetGuestRemotePlayback>;
+}) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const { setElements, resumePlayback } = playback;
+
+  useEffect(() => {
+    setElements({
+      audioElement: audioRef.current,
+      videoElement: videoRef.current,
+    });
+    return () => {
+      setElements({ audioElement: null, videoElement: null });
+    };
+  }, [setElements]);
+
+  const statusLabel = formatInternetRemotePlaybackStatus(playback.status);
+  const hint = formatInternetRemotePlaybackHint(playback.status, playback.error);
+  const needsUserStart = isInternetRemotePlaybackUserActionRequired(playback.error);
+
+  return (
+    <div className="internet-invite__form" aria-label="Просмотр фильма">
+      <div className="remote-player">
+        <video ref={videoRef} className="remote-player__video" autoPlay playsInline muted />
+        <audio ref={audioRef} autoPlay />
+        {playback.status !== "receiving" ? (
+          <div className="remote-player__overlay">
+            <strong>{statusLabel}</strong>
+            {hint ? <span>{hint}</span> : null}
+            {playback.status === "error" && needsUserStart ? (
+              <button
+                className="button button--primary remote-player__resume-action"
+                type="button"
+                onClick={() => void resumePlayback()}
+              >
+                Запустить просмотр
+              </button>
+            ) : null}
+            {playback.status === "error" && !needsUserStart && playback.error ? (
+              <span role="alert">{playback.error}</span>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+      <p className="internet-invite__meta" role="status">
+        {statusLabel}
+        {playback.videoTrackName ? ` · ${playback.videoTrackName}` : ""}
+        {playback.audioTrackName ? ` · ${playback.audioTrackName}` : ""}
+        {playback.status === "receiving" && !playback.audioTrackName ? " · без звука" : ""}
+      </p>
+    </div>
   );
 }
 
