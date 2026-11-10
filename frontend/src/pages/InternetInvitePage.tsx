@@ -29,6 +29,7 @@ type GuestError = {
   kind: "invite" | "auth" | "limit" | "rate" | "temporary";
   message: string;
   canRetry: boolean;
+  canRequestNewCode?: boolean;
 };
 
 export function InternetInvitePage() {
@@ -260,8 +261,9 @@ function InternetGuestInviteEntry({ hash }: { hash: string }) {
         setStep("code");
         setError({
           kind: "auth",
-          message: "Код не принят. Запросите новый или проверьте ввод.",
+          message: "Код не принят. Проверьте ввод или получите новый код.",
           canRetry: false,
+          canRequestNewCode: true,
         });
         setPending(false);
         return;
@@ -295,6 +297,15 @@ function InternetGuestInviteEntry({ hash }: { hash: string }) {
       return;
     }
     void bootstrapSession();
+  }
+
+  function handleRequestNewCode() {
+    challengeIdRef.current = null;
+    codeRef.current = "";
+    setCode("");
+    setChallengeHint(null);
+    setError(null);
+    setStep("email");
   }
 
   return (
@@ -371,6 +382,16 @@ function InternetGuestInviteEntry({ hash }: { hash: string }) {
           {error.canRetry ? (
             <button className="button" disabled={pending} onClick={handleRetry} type="button">
               Повторить
+            </button>
+          ) : null}
+          {error.canRequestNewCode ? (
+            <button
+              className="button"
+              disabled={pending}
+              onClick={handleRequestNewCode}
+              type="button"
+            >
+              Получить новый код
             </button>
           ) : null}
         </div>

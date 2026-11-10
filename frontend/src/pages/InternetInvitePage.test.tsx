@@ -268,10 +268,24 @@ describe("InternetInvitePage", () => {
     await user.click(screen.getByRole("button", { name: "Войти" }));
 
     expect(
-      await screen.findByText("Код не принят. Запросите новый или проверьте ввод."),
+      await screen.findByText("Код не принят. Проверьте ввод или получите новый код."),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Одноразовый код")).toBeInTheDocument();
     expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Получить новый код" }));
+
+    expect(await screen.findByLabelText("Email")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Одноразовый код")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toHaveValue("guest@example.test");
+
+    await user.click(screen.getByRole("button", { name: "Получить код" }));
+    expect(
+      await screen.findByText(/Если этот адрес подходит, мы отправили одноразовый код/),
+    ).toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.filter(([url]) => String(url) === "/api/v2/auth/email-challenges"),
+    ).toHaveLength(2);
   });
 
   it("ACCOUNT_LIMIT_REACHED показывает отсутствие мест без retry", async () => {
