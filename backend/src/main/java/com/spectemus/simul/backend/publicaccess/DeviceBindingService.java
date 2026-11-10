@@ -83,25 +83,22 @@ final class DeviceBindingService {
         Instant now = Instant.now(clock);
         String deviceCredential = secrets.credential();
         Instant expiresAt = now.plus(properties.deviceSessionTtl());
+        UUID auditCorrelationId = UUID.randomUUID();
         DeviceBindingStore.ExchangeResult result = store.exchangeBinding(
                 bindingId,
                 secrets.deviceCodeFingerprint(deviceCode),
                 secrets.deviceCredentialFingerprint(deviceCredential),
                 expiresAt,
+                auditCorrelationId,
                 now);
         return switch (result.outcome()) {
             case PENDING -> throw authorizationPending(result.binding());
             case REJECTED -> throw deviceCodeRejected();
             case UNAVAILABLE -> throw bindingUnavailable();
             case ISSUED -> {
-                PublicAccessStore.StoredAccount account = store.findAccountByDeviceSession(
-                                secrets.deviceCredentialFingerprint(deviceCredential), now)
-                        .orElseThrow(DeviceBindingService::bindingUnavailable);
-                try {
-                    accountStore.recordAudit(
-                            null, account.accountId(), "DEVICE_BINDING_EXCHANGED", UUID.randomUUID(), now);
-                } catch (RuntimeException ignored) {
-                    // Audit must not invalidate an already issued device session.
+                PublicAccessStore.StoredAccount account = result.account();
+                if (account == null) {
+                    throw new IllegalStateException("Issued device binding is missing account profile");
                 }
                 yield new DeviceBindingSessionResponse(
                         deviceCredential,

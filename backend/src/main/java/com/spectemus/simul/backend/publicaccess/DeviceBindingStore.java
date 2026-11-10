@@ -14,15 +14,16 @@ interface DeviceBindingStore {
             UUID bindingId, String userCodeFingerprint, UUID accountId, Instant now);
 
     /**
-     * Atomically validates the device code, marks the binding {@code EXCHANGED}, and inserts the
-     * device session using the locked binding's account id. Callers must not persist the session
-     * in a separate transaction.
+     * Atomically validates the device code, marks the binding {@code EXCHANGED}, inserts the device
+     * session and its audit event, and returns the account profile required by the response. Callers
+     * must not perform response-critical persistence or reads after this transaction.
      */
     ExchangeResult exchangeBinding(
             UUID bindingId,
             String deviceCodeFingerprint,
             String sessionFingerprint,
             Instant sessionExpiresAt,
+            UUID auditCorrelationId,
             Instant now);
 
     Optional<PublicAccessStore.StoredAccount> findAccountByDeviceSession(
@@ -57,7 +58,10 @@ interface DeviceBindingStore {
             Instant approvedAt,
             Instant exchangedAt) {}
 
-    record ExchangeResult(ExchangeOutcome outcome, StoredBinding binding) {}
+    record ExchangeResult(
+            ExchangeOutcome outcome,
+            StoredBinding binding,
+            PublicAccessStore.StoredAccount account) {}
 
     record StoredDeviceSession(
             String sessionFingerprint,

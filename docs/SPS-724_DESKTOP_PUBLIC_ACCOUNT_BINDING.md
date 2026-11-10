@@ -17,8 +17,9 @@ session credential, email или секрета привязки в URL.
 4. В системном браузере пользователь входит по email (`wt_account`) и
    подтверждает одноразовый `userCode`.
 5. Desktop обменивает `deviceCode` через POST body на короткоживущую
-   account-сессию устройства. Exchange и insert session атомарны; сбой
-   audit не уничтожает уже выданный credential.
+   account-сессию устройства. Exchange, insert session, чтение профиля и
+   audit выполняются в одной транзакции. Любая ошибка откатывает binding
+   в `APPROVED`, поэтому desktop может безопасно повторить exchange.
 6. Credential остаётся в Electron main process, шифруется через
    `safeStorage` и не попадает в renderer, localStorage, sessionStorage
    или URL.
@@ -64,7 +65,8 @@ session credential, email или секрета привязки в URL.
 
 - `pnpm contracts:check`
 - backend: expiry, replay, wrong code/account, feature off, atomic
-  exchange + audit resilience
+  exchange/profile/audit rollback и проверка polling-бюджета по реальным
+  default properties
 - desktop: fixed origin, path allowlist, openExternal, poll cancel,
   safeStorage, fail-closed revoke, expired status, TTL/rate-limit budget
 - frontend: waiting / confirm / error / cancel на `/internet/link` и

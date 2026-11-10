@@ -264,17 +264,6 @@ test("treats expired stored credential as unbound", async () => {
   await rm(userDataPath, { recursive: true, force: true });
 });
 
-test("token rate-limit budget covers a full binding TTL of polling", () => {
-  const bindingTtlSeconds = 10 * 60;
-  const pollIntervalSeconds = 5;
-  const tokenBudget = 150;
-  const requiredPolls = Math.ceil(bindingTtlSeconds / pollIntervalSeconds);
-  assert.ok(
-    tokenBudget >= requiredPolls,
-    `device-binding-token budget ${tokenBudget} must cover ${requiredPolls} polls over TTL`,
-  );
-});
-
 function jsonResponse(status, body) {
   return {
     ok: status >= 200 && status < 300,

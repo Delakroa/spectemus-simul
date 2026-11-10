@@ -110,6 +110,7 @@ final class JdbcDeviceBindingStore implements DeviceBindingStore {
             String deviceCodeFingerprint,
             String sessionFingerprint,
             Instant sessionExpiresAt,
+            UUID auditCorrelationId,
             Instant now) {
         return transaction(connection -> {
             try (PreparedStatement statement = connection.prepareStatement("""
@@ -122,23 +123,23 @@ final class JdbcDeviceBindingStore implements DeviceBindingStore {
                 statement.setObject(1, bindingId);
                 try (ResultSet result = statement.executeQuery()) {
                     if (!result.next()) {
-                        return new ExchangeResult(ExchangeOutcome.UNAVAILABLE, null);
+                        return new ExchangeResult(ExchangeOutcome.UNAVAILABLE, null, null);
                     }
                     StoredBinding binding = readBinding(result);
                     if (!constantTimeEquals(binding.deviceCodeFingerprint(), deviceCodeFingerprint)) {
-                        return new ExchangeResult(ExchangeOutcome.REJECTED, binding);
+                        return new ExchangeResult(ExchangeOutcome.REJECTED, binding, null);
                     }
                     if (!binding.expiresAt().isAfter(now)
                             || binding.status() == BindingStatus.EXCHANGED
                             || binding.status() == BindingStatus.DENIED
                             || binding.status() == BindingStatus.EXPIRED) {
-                        return new ExchangeResult(ExchangeOutcome.UNAVAILABLE, binding);
+                        return new ExchangeResult(ExchangeOutcome.UNAVAILABLE, binding, null);
                     }
                     if (binding.status() == BindingStatus.PENDING) {
-                        return new ExchangeResult(ExchangeOutcome.PENDING, binding);
+                        return new ExchangeResult(ExchangeOutcome.PENDING, binding, null);
                     }
                     if (binding.status() != BindingStatus.APPROVED || binding.accountId() == null) {
-                        return new ExchangeResult(ExchangeOutcome.UNAVAILABLE, binding);
+                        return new ExchangeResult(ExchangeOutcome.UNAVAILABLE, binding, null);
                     }
                     try (PreparedStatement update = connection.prepareStatement("""
                             UPDATE wt_device_binding
@@ -162,6 +163,35 @@ final class JdbcDeviceBindingStore implements DeviceBindingStore {
                         insert.setTimestamp(5, timestamp(now));
                         insert.executeUpdate();
                     }
+                    PublicAccessStore.StoredAccount account;
+                    try (PreparedStatement accountQuery = connection.prepareStatement("""
+                            SELECT account_id, display_name, created_at
+                            FROM wt_public_account
+                            WHERE account_id = ?
+                            """)) {
+                        accountQuery.setObject(1, binding.accountId());
+                        try (ResultSet accountResult = accountQuery.executeQuery()) {
+                            if (!accountResult.next()) {
+                                throw new SQLException("Device binding account disappeared during exchange");
+                            }
+                            account = new PublicAccessStore.StoredAccount(
+                                    (UUID) accountResult.getObject("account_id"),
+                                    accountResult.getString("display_name"),
+                                    accountResult.getTimestamp("created_at").toInstant());
+                        }
+                    }
+                    try (PreparedStatement audit = connection.prepareStatement("""
+                            INSERT INTO wt_public_audit_event
+                                (audit_id, public_room_id, actor_account_id, action, correlation_id, occurred_at)
+                            VALUES (?, NULL, ?, ?, ?, ?)
+                            """)) {
+                        audit.setObject(1, UUID.randomUUID());
+                        audit.setObject(2, binding.accountId());
+                        audit.setString(3, "DEVICE_BINDING_EXCHANGED");
+                        audit.setObject(4, auditCorrelationId);
+                        audit.setTimestamp(5, timestamp(now));
+                        audit.executeUpdate();
+                    }
                     StoredBinding exchanged = new StoredBinding(
                             binding.bindingId(),
                             binding.deviceCodeFingerprint(),
@@ -173,7 +203,7 @@ final class JdbcDeviceBindingStore implements DeviceBindingStore {
                             binding.createdAt(),
                             binding.approvedAt(),
                             now);
-                    return new ExchangeResult(ExchangeOutcome.ISSUED, exchanged);
+                    return new ExchangeResult(ExchangeOutcome.ISSUED, exchanged, account);
                 }
             }
         });

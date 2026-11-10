@@ -130,14 +130,22 @@ class DeviceBindingServiceTest {
     }
 
     @Test
-    void exchangeCreatesSessionAtomicallyAndSurvivesAuditFailure() {
+    void exchangeRollsBackWhenAuditFailsAndCanBeRetried() {
         Fixture fixture = Fixture.enabled();
         PublicAccessService.AccountSessionResult account =
                 fixture.login("host@example.test", "Host");
         DeviceBindingStartedResponse started = fixture.deviceBinding.startBinding();
         fixture.deviceBinding.approveBinding(
                 started.bindingId(), account.sessionCredential(), started.userCode());
-        fixture.accountStore.failNextAudit = true;
+        fixture.deviceStore.failNextExchangeAudit = true;
+
+        assertThatThrownBy(() -> fixture.deviceBinding.exchangeBinding(
+                        started.bindingId(), started.deviceCode()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("audit unavailable");
+        assertThat(fixture.deviceStore.bindings.get(started.bindingId()).status())
+                .isEqualTo(DeviceBindingStore.BindingStatus.APPROVED);
+        assertThat(fixture.deviceStore.sessions).isEmpty();
 
         DeviceBindingSessionResponse session =
                 fixture.deviceBinding.exchangeBinding(started.bindingId(), started.deviceCode());
@@ -231,6 +239,7 @@ class DeviceBindingServiceTest {
         private final Map<String, StoredDeviceSession> sessions = new ConcurrentHashMap<>();
         private final Map<String, Instant> revokedSessions = new ConcurrentHashMap<>();
         private final InMemoryPublicAccessStore accounts;
+        private boolean failNextExchangeAudit;
 
         private InMemoryDeviceBindingStore(InMemoryPublicAccessStore accounts) {
             this.accounts = accounts;
@@ -278,25 +287,34 @@ class DeviceBindingServiceTest {
                 String deviceCodeFingerprint,
                 String sessionFingerprint,
                 Instant sessionExpiresAt,
+                UUID auditCorrelationId,
                 Instant now) {
             StoredBinding binding = bindings.get(bindingId);
             if (binding == null) {
-                return new ExchangeResult(ExchangeOutcome.UNAVAILABLE, null);
+                return new ExchangeResult(ExchangeOutcome.UNAVAILABLE, null, null);
             }
             if (!binding.deviceCodeFingerprint().equals(deviceCodeFingerprint)) {
-                return new ExchangeResult(ExchangeOutcome.REJECTED, binding);
+                return new ExchangeResult(ExchangeOutcome.REJECTED, binding, null);
             }
             if (!binding.expiresAt().isAfter(now)
                     || binding.status() == BindingStatus.EXCHANGED
                     || binding.status() == BindingStatus.EXPIRED
                     || binding.status() == BindingStatus.DENIED) {
-                return new ExchangeResult(ExchangeOutcome.UNAVAILABLE, binding);
+                return new ExchangeResult(ExchangeOutcome.UNAVAILABLE, binding, null);
             }
             if (binding.status() == BindingStatus.PENDING) {
-                return new ExchangeResult(ExchangeOutcome.PENDING, binding);
+                return new ExchangeResult(ExchangeOutcome.PENDING, binding, null);
             }
             if (binding.status() != BindingStatus.APPROVED || binding.accountId() == null) {
-                return new ExchangeResult(ExchangeOutcome.UNAVAILABLE, binding);
+                return new ExchangeResult(ExchangeOutcome.UNAVAILABLE, binding, null);
+            }
+            PublicAccessStore.StoredAccount account = accounts.accountsById.get(binding.accountId());
+            if (account == null) {
+                throw new IllegalStateException("binding account unavailable");
+            }
+            if (failNextExchangeAudit) {
+                failNextExchangeAudit = false;
+                throw new IllegalStateException("audit unavailable");
             }
             StoredBinding exchanged = new StoredBinding(
                     binding.bindingId(),
@@ -318,7 +336,7 @@ class DeviceBindingServiceTest {
                             binding.bindingId(),
                             sessionExpiresAt,
                             now));
-            return new ExchangeResult(ExchangeOutcome.ISSUED, exchanged);
+            return new ExchangeResult(ExchangeOutcome.ISSUED, exchanged, account);
         }
 
         @Override
@@ -436,15 +454,8 @@ class DeviceBindingServiceTest {
             return false;
         }
 
-        private boolean failNextAudit;
-
         @Override
         public void recordAudit(
-                UUID publicRoomId, UUID actorAccountId, String action, UUID correlationId, Instant occurredAt) {
-            if (failNextAudit) {
-                failNextAudit = false;
-                throw new IllegalStateException("audit unavailable");
-            }
-        }
+                UUID publicRoomId, UUID actorAccountId, String action, UUID correlationId, Instant occurredAt) {}
     }
 }
