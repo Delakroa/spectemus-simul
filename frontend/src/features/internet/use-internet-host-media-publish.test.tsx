@@ -150,7 +150,8 @@ describe("useInternetHostMediaPublish", () => {
   });
 
   it("во время live не открывает новый выбор файла", async () => {
-    const desktop = installDesktop();
+    const pickMediaFile = vi.fn().mockResolvedValue(selection);
+    installDesktop({ pickMediaFile });
     const { result } = renderHook(() =>
       useInternetHostMediaPublish({
         enabled: true,
@@ -166,12 +167,12 @@ describe("useInternetHostMediaPublish", () => {
       await result.current.publish();
     });
     await waitFor(() => expect(result.current.status).toBe("live"));
-    desktop.pickMediaFile.mockClear();
+    pickMediaFile.mockClear();
 
     await act(async () => {
       await result.current.selectAndPrepare();
     });
-    expect(desktop.pickMediaFile).not.toHaveBeenCalled();
+    expect(pickMediaFile).not.toHaveBeenCalled();
     expect(result.current.status).toBe("live");
     expect(stopFilePublication).toHaveBeenCalledTimes(0);
   });
