@@ -4,10 +4,37 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const connectLiveKitRoom = vi.fn();
+const publishFileToLiveKit = vi.fn();
+const stopFilePublication = vi.fn();
+const diagnoseMediaSource = vi.fn();
 
 vi.mock("../features/rooms/livekit-connection", () => ({
   connectLiveKitRoom: (...args: unknown[]) => connectLiveKitRoom(...args),
 }));
+
+vi.mock("../features/rooms/file-publication", () => ({
+  FilePublicationFailure: class FilePublicationFailure extends Error {
+    constructor(
+      public readonly code: string,
+      message: string,
+    ) {
+      super(message);
+      this.name = "FilePublicationFailure";
+    }
+  },
+  publishFileToLiveKit: (...args: unknown[]) => publishFileToLiveKit(...args),
+  stopFilePublication: (...args: unknown[]) => stopFilePublication(...args),
+}));
+
+vi.mock("../features/rooms/file-diagnostics", async () => {
+  const actual = await vi.importActual<typeof import("../features/rooms/file-diagnostics")>(
+    "../features/rooms/file-diagnostics",
+  );
+  return {
+    ...actual,
+    diagnoseMediaSource: (...args: unknown[]) => diagnoseMediaSource(...args),
+  };
+});
 
 import { InternetRoomPage } from "./InternetRoomPage";
 
@@ -68,12 +95,38 @@ function problem(status: number, code: string) {
 
 beforeEach(() => {
   connectLiveKitRoom.mockReset();
+  publishFileToLiveKit.mockReset();
+  stopFilePublication.mockReset();
+  diagnoseMediaSource.mockReset();
+  diagnoseMediaSource.mockResolvedValue({
+    compatibility: "native",
+    displayName: "film.mp4",
+    durationMs: 1000,
+    format: "mp4",
+    formatLabel: "MP4",
+    hasAudio: true,
+    hasVideo: true,
+    height: 720,
+    mimeType: "video/mp4",
+    normalization: "direct",
+    objectUrl: "/_desktop/media/media-1",
+    verdict: "CAN_STREAM",
+    verdictLabel: "ok",
+    width: 1280,
+  });
+  publishFileToLiveKit.mockResolvedValue({
+    audioTrack: {},
+    stream: { getTracks: () => [] },
+    tracks: [{}, {}],
+    videoElement: document.createElement("video"),
+    videoTrack: {},
+  });
   connectLiveKitRoom.mockImplementation(
     async (_token: unknown, handlers: { onStatusChange: (status: string) => void }) => {
       handlers.onStatusChange("connected");
       return {
         disconnect: vi.fn(),
-        room: {},
+        room: { localParticipant: { publishTrack: vi.fn() } },
       };
     },
   );
@@ -100,7 +153,10 @@ describe("InternetRoomPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Подключено" })).toBeInTheDocument();
     expect(screen.getByText(/Роль: гость/)).toBeInTheDocument();
-    expect(screen.getByText(/Передача фильма появится отдельным шагом/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Просмотр фильма появится, когда хозяин начнёт передачу/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Выбрать файл" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Опубликовать" })).not.toBeInTheDocument();
 
     await waitFor(() => {
@@ -127,8 +183,9 @@ describe("InternetRoomPage", () => {
     expect(connectLiveKitRoom.mock.calls[0]?.[0]).not.toHaveProperty("apiOrigin");
   });
 
-  it("desktop owner mintит token через IPC envelope и не ходит в cookie GET membership", async () => {
+  it("desktop owner mintит token через IPC envelope и публикует локальный фильм", async () => {
     vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
+    const user = userEvent.setup();
     const mintPublicLiveKitToken = vi.fn().mockResolvedValue({
       ok: true,
       data: {
@@ -136,6 +193,13 @@ describe("InternetRoomPage", () => {
         role: "HOST",
       },
     });
+    const pickMediaFile = vi.fn().mockResolvedValue({
+      displayName: "film.mp4",
+      id: "media-1",
+      isNormalized: false,
+      playbackName: "film.mp4",
+    });
+    const releaseMedia = vi.fn().mockResolvedValue(undefined);
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     window.spectemusDesktop = {
@@ -143,6 +207,8 @@ describe("InternetRoomPage", () => {
       onRuntimeStatus: () => () => undefined,
       restartRuntime: async () => ({ detail: "ok", state: "ready" }),
       mintPublicLiveKitToken,
+      pickMediaFile,
+      releaseMedia,
     };
 
     renderRoom();
@@ -151,10 +217,41 @@ describe("InternetRoomPage", () => {
     expect(screen.getByText(/Роль: хозяин/)).toBeInTheDocument();
     expect(mintPublicLiveKitToken).toHaveBeenCalledWith(publicRoomId);
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(connectLiveKitRoom).toHaveBeenCalledWith(
-      expect.objectContaining({ liveKitUrl: "wss://rtc.example.test", role: "HOST" }),
-      expect.any(Object),
-    );
+    expect(screen.queryByText(/когда хозяин начнёт передачу/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Выбрать файл" }));
+    expect(await screen.findByText(/Файл готов: film.mp4/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Опубликовать" }));
+    expect(await screen.findByRole("heading", { name: "Фильм опубликован" })).toBeInTheDocument();
+    expect(publishFileToLiveKit).toHaveBeenCalled();
+    expect(screen.getByText(/movie-video/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Выбрать файл" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Остановить публикацию" }));
+    expect(stopFilePublication).toHaveBeenCalled();
+    expect(await screen.findByRole("button", { name: "Выбрать файл" })).toBeInTheDocument();
+  });
+
+  it("browser guest не видит управление файлом даже при desktop API в window", async () => {
+    vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(okJson(roomAccess))
+      .mockResolvedValueOnce(okJson(publicToken));
+    vi.stubGlobal("fetch", fetchMock);
+    window.spectemusDesktop = {
+      getRuntimeStatus: async () => ({ detail: "ok", state: "ready" }),
+      onRuntimeStatus: () => () => undefined,
+      restartRuntime: async () => ({ detail: "ok", state: "ready" }),
+      pickMediaFile: vi.fn(),
+      releaseMedia: vi.fn(),
+    };
+
+    renderRoom();
+
+    expect(await screen.findByText(/Роль: гость/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Выбрать файл" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Опубликовать" })).not.toBeInTheDocument();
   });
 
   it("при выключенном feature не ходит в API и не подключает LiveKit", () => {

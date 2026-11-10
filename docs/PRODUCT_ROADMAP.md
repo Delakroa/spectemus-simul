@@ -57,18 +57,19 @@ LiveKit `RemoveParticipant` по opaque identity; membership revoke в БД ос
 public room и hash-only invite с обязательным public HTTPS origin. SPS-724
 даёт Electron host одноразовую device-authorization привязку к public
 account без ослабления Strict cookie и без credential в URL. SPS-725
-подключает browser guest и desktop host к public LiveKit после mint token;
-передачу фильма и publish tracks ещё не делает.
+подключает browser guest и desktop host к public LiveKit после mint token.
+SPS-726 даёт desktop HOST публикацию локального фильма в public LiveKit
+через переиспользованный LAN media pipeline; guest remote playback ещё нет.
 
 ## Порядок задач
 
-| Фаза | Состояние                                     | Результат                                                                                                                                                                                      | Незавершённый gate                                                                                                |
-| ---- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| 0    | Код готов: WT-682, WT-684–WT-689, SPS-711–715 | Локальная подготовка и исправления desktop/LAN. Физически форматы и платформы ещё не подтверждены                                                                                              | Mac ↔ Windows matrix перенесена в финальный release-candidate gate                                                |
-| 1    | Код готов, feature выключена: WT-654          | Изолированный `/api/v2`: account, email challenge, membership, отзыв invite и audit                                                                                                            | PostgreSQL, SMTP и sender domain; revoked invite не даёт access                                                   |
-| 2    | Код готов, feature выключена: SPS-716/720–725 | Явный выбор LAN/Internet. Public account, room/invite, guest/host entry, desktop binding, LiveKit token/client connect и revoke→RemoveParticipant изолированы от LAN; фильм ещё не публикуется | Publish/media, WSS/TURN и диагностика. Публичный доступ выключен. Уже выданный JWT живёт до TTL на self-hosted LK |
-| 3    | Запланировано: private alpha                  | Ограниченная invite-only проверка «host дома → гость в другом городе»                                                                                                                          | Сессии из разных сетей, включая сложную сеть; измерены QoS, TURN usage, стоимость и support load                  |
-| 4    | Запланировано: closed beta → release          | Понятная установка, операционный контур и честный UX для малых private rooms                                                                                                                   | Успешность сессий, privacy/deletion policy, incident/revoke runbook, физическая matrix и проверенная экономика    |
+| Фаза | Состояние                                     | Результат                                                                                                                                                                                    | Незавершённый gate                                                                                                            |
+| ---- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 0    | Код готов: WT-682, WT-684–WT-689, SPS-711–715 | Локальная подготовка и исправления desktop/LAN. Физически форматы и платформы ещё не подтверждены                                                                                            | Mac ↔ Windows matrix перенесена в финальный release-candidate gate                                                            |
+| 1    | Код готов, feature выключена: WT-654          | Изолированный `/api/v2`: account, email challenge, membership, отзыв invite и audit                                                                                                          | PostgreSQL, SMTP и sender domain; revoked invite не даёт access                                                               |
+| 2    | Код готов, feature выключена: SPS-716/720–726 | Явный выбор LAN/Internet. Public account, room/invite, guest/host entry, desktop binding, LiveKit connect и HOST publish movie tracks изолированы от LAN; guest remote playback ещё не готов | Guest remote tracks, sync, WSS/TURN и диагностика. Публичный доступ выключен. Уже выданный JWT живёт до TTL на self-hosted LK |
+| 3    | Запланировано: private alpha                  | Ограниченная invite-only проверка «host дома → гость в другом городе»                                                                                                                        | Сессии из разных сетей, включая сложную сеть; измерены QoS, TURN usage, стоимость и support load                              |
+| 4    | Запланировано: closed beta → release          | Понятная установка, операционный контур и честный UX для малых private rooms                                                                                                                 | Успешность сессий, privacy/deletion policy, incident/revoke runbook, физическая matrix и проверенная экономика                |
 
 ## Что делаем следующим
 
@@ -77,9 +78,11 @@ token, SPS-721 отключает participant после revoke member, SPS-722 
 от invite fragment до membership без media, SPS-723 создаёт public room и invite
 из browser host flow, SPS-724 безопасно привязывает Electron host к public
 account через device-authorization exchange без credential в URL, SPS-725
-подключает Internet-комнату к public LiveKit без публикации фильма. Internet
-mode остаётся закрытым. Следующий срез — publish/media, WSS/TURN, диагностика и
-privacy-safe telemetry. Ни один из этих тикетов не делает LAN-комнату публичной.
+подключает Internet-комнату к public LiveKit, SPS-726 публикует локальный
+фильм desktop HOST в public LiveKit без guest remote playback. Internet mode
+остаётся закрытым. Следующий срез — guest remote tracks и sync, WSS/TURN,
+диагностика и privacy-safe telemetry. Ни один из этих тикетов не делает
+LAN-комнату публичной.
 
 Публичный доступ и заявление о готовности Internet mode невозможны, пока не
 пройдена финальная проверка VM, DNS, HTTPS, WSS и TURN. До неё же остаётся
