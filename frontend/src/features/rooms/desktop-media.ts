@@ -58,6 +58,30 @@ export type DesktopPublicInvite = {
   maxRedemptions: number;
 };
 
+export type DesktopPublicLiveKitToken = {
+  canPublish: boolean;
+  canPublishData: boolean;
+  expiresAt: string;
+  liveKitUrl: string;
+  participantId: string;
+  participantIdentity: string;
+  role: "HOST" | "GUEST";
+  roomName: string;
+  token: string;
+};
+
+/** Resolved IPC envelope — never reject across Electron invoke/contextBridge. */
+export type DesktopIpcProblem = {
+  code?: string;
+  detail?: string;
+  name?: string;
+  retryable?: boolean;
+  status: number;
+  title?: string;
+};
+
+export type DesktopIpcResult<T> = { data: T; ok: true } | { ok: false; problem: DesktopIpcProblem };
+
 export type SpectemusDesktopApi = {
   cancelDeviceBinding?: () => Promise<{ cancelled: boolean }>;
   cancelMediaNormalization?: (id: string) => Promise<void>;
@@ -75,6 +99,9 @@ export type SpectemusDesktopApi = {
   getDeviceBindingStatus?: () => Promise<DesktopDeviceBindingStatus>;
   getPublicInviteOrigin?: () => Promise<string | null>;
   getRuntimeStatus: () => Promise<DesktopRuntimeStatus>;
+  mintPublicLiveKitToken?: (
+    publicRoomId: string,
+  ) => Promise<DesktopIpcResult<DesktopPublicLiveKitToken>>;
   normalizeMedia?: (id: string) => Promise<DesktopMediaSelection>;
   onMediaNormalizationProgress?: (
     listener: (progress: DesktopMediaNormalizationProgress) => void,

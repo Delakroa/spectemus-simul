@@ -8,6 +8,7 @@ import {
   assertPublicHttpsOrigin,
   createDeviceBindingController,
 } from "./device-binding.mjs";
+import { runAsIpcResult } from "./ipc-result.mjs";
 
 test("rejects loopback and IP public API origins", () => {
   assert.throws(() => assertPublicHttpsOrigin("http://127.0.0.1:8080"));
@@ -212,6 +213,286 @@ test("rejects verification path prefix attacks and keeps local credential after 
   revokeStatus = 204;
   await controller.clear();
   assert.equal((await controller.status()).bound, false);
+  await rm(userDataPath, { recursive: true, force: true });
+});
+
+test("mints public LiveKit token via Bearer without exposing device credential to renderer", async () => {
+  const userDataPath = await mkdtemp(join(tmpdir(), "spectemus-binding-"));
+  const publicRoomId = "33333333-3333-4333-8333-333333333333";
+  const liveKitToken = "header.payload.signature-value-livekit";
+  const safeStorageImpl = {
+    isEncryptionAvailable: () => true,
+    encryptString: (value) => Buffer.from(`enc:${value}`, "utf8"),
+    decryptString: (buffer) => Buffer.from(buffer).toString("utf8").slice(4),
+  };
+  const fetchImpl = async (url, init = {}) => {
+    if (
+      String(url).endsWith("/api/v2/auth/device-bindings") &&
+      init.method === "POST"
+    ) {
+      return jsonResponse(201, {
+        bindingId: "11111111-1111-4111-8111-111111111111",
+        userCode: "ABCD-EFGH",
+        verificationUri:
+          "https://app.example.test/internet/link#binding=11111111-1111-4111-8111-111111111111",
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        intervalSeconds: 1,
+        deviceCode: "d".repeat(43),
+      });
+    }
+    if (String(url).includes("/token")) {
+      return jsonResponse(200, {
+        deviceCredential: "c".repeat(43),
+        profile: {
+          accountId: "22222222-2222-4222-8222-222222222222",
+          displayName: "Host",
+          createdAt: "2026-11-10T10:00:00Z",
+        },
+        expiresAt: "2026-11-24T10:00:00Z",
+      });
+    }
+    if (
+      String(url).endsWith(
+        `/api/v2/public-rooms/${publicRoomId}/livekit-token`,
+      ) &&
+      init.method === "POST"
+    ) {
+      assert.match(init.headers.get("Authorization"), /^Bearer c{43}$/);
+      assert.equal(String(url).includes("/api/v1/"), false);
+      assert.equal(String(url).includes("c".repeat(43)), false);
+      return jsonResponse(200, {
+        token: liveKitToken,
+        liveKitUrl: "wss://rtc.example.test",
+        roomName: "r".repeat(43),
+        participantId: "44444444-4444-4444-8444-444444444444",
+        participantIdentity: "p".repeat(43),
+        role: "HOST",
+        canPublish: true,
+        canPublishData: true,
+        expiresAt: "2026-11-10T10:05:00Z",
+        deviceCredential: "must-not-leak",
+        apiOrigin: "https://evil.example.test",
+      });
+    }
+    throw new Error(`unexpected ${url}`);
+  };
+
+  const controller = createDeviceBindingController({
+    apiOrigin: "https://app.example.test",
+    userDataPath,
+    fetchImpl,
+    openExternal: async () => undefined,
+    safeStorageImpl,
+  });
+
+  await controller.start();
+  await controller.pollOnce();
+
+  await assert.rejects(() => controller.mintPublicLiveKitToken("bad-id"));
+  const minted = await controller.mintPublicLiveKitToken(publicRoomId);
+  assert.equal(minted.token, liveKitToken);
+  assert.equal(minted.liveKitUrl, "wss://rtc.example.test");
+  assert.equal(minted.role, "HOST");
+  assert.equal(Object.hasOwn(minted, "deviceCredential"), false);
+  assert.equal(Object.hasOwn(minted, "apiOrigin"), false);
+
+  await controller.clear({ revokeRemote: false });
+  await rm(userDataPath, { recursive: true, force: true });
+});
+
+test("mint throws 401/404/429 as plain problems for IPC envelope wrapping", async () => {
+  const userDataPath = await mkdtemp(join(tmpdir(), "spectemus-binding-"));
+  const publicRoomId = "33333333-3333-4333-8333-333333333333";
+  let liveKitStatus = 200;
+  let liveKitBody = {
+    token: "header.payload.signature-value-livekit",
+    liveKitUrl: "wss://rtc.example.test",
+    roomName: "r".repeat(43),
+    participantId: "44444444-4444-4444-8444-444444444444",
+    participantIdentity: "p".repeat(43),
+    role: "HOST",
+    canPublish: true,
+    canPublishData: true,
+    expiresAt: "2026-11-10T10:05:00Z",
+  };
+  const safeStorageImpl = {
+    isEncryptionAvailable: () => true,
+    encryptString: (value) => Buffer.from(`enc:${value}`, "utf8"),
+    decryptString: (buffer) => Buffer.from(buffer).toString("utf8").slice(4),
+  };
+  const controller = createDeviceBindingController({
+    apiOrigin: "https://app.example.test",
+    userDataPath,
+    fetchImpl: async (url, init = {}) => {
+      if (
+        String(url).endsWith("/api/v2/auth/device-bindings") &&
+        init.method === "POST"
+      ) {
+        return jsonResponse(201, {
+          bindingId: "11111111-1111-4111-8111-111111111111",
+          userCode: "ABCD-EFGH",
+          verificationUri:
+            "https://app.example.test/internet/link#binding=11111111-1111-4111-8111-111111111111",
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          intervalSeconds: 1,
+          deviceCode: "d".repeat(43),
+        });
+      }
+      if (String(url).includes("/token")) {
+        return jsonResponse(200, {
+          deviceCredential: "c".repeat(43),
+          profile: {
+            accountId: "22222222-2222-4222-8222-222222222222",
+            displayName: "Host",
+            createdAt: "2026-11-10T10:00:00Z",
+          },
+          expiresAt: "2026-11-24T10:00:00Z",
+        });
+      }
+      if (
+        String(url).endsWith(
+          `/api/v2/public-rooms/${publicRoomId}/livekit-token`,
+        ) &&
+        init.method === "POST"
+      ) {
+        return jsonResponse(liveKitStatus, liveKitBody);
+      }
+      throw new Error(`unexpected ${url}`);
+    },
+    openExternal: async () => undefined,
+    safeStorageImpl,
+  });
+
+  await controller.start();
+  await controller.pollOnce();
+
+  const cases = [
+    {
+      status: 401,
+      code: "ACCOUNT_REQUIRED",
+      title: "Нужен вход",
+      retryable: false,
+    },
+    {
+      status: 404,
+      code: "MEMBERSHIP_REQUIRED",
+      title: "Комната недоступна",
+      retryable: false,
+    },
+    {
+      status: 429,
+      code: "RATE_LIMITED",
+      title: "Слишком много попыток",
+      retryable: true,
+    },
+  ];
+
+  for (const item of cases) {
+    liveKitStatus = item.status;
+    liveKitBody = {
+      code: item.code,
+      status: item.status,
+      title: item.title,
+      retryable: item.retryable,
+    };
+    await assert.rejects(
+      () => controller.mintPublicLiveKitToken(publicRoomId),
+      (error) => {
+        assert.equal(error instanceof Error, false);
+        assert.equal(error.name, "ApiProblemError");
+        assert.equal(error.status, item.status);
+        assert.equal(error.code, item.code);
+        assert.equal(error.title, item.title);
+        assert.equal(error.retryable, item.retryable);
+        assert.equal(Object.hasOwn(error, "deviceCredential"), false);
+        return true;
+      },
+    );
+  }
+
+  await controller.clear({ revokeRemote: false });
+  await assert.rejects(
+    () => controller.mintPublicLiveKitToken(publicRoomId),
+    (error) => {
+      assert.equal(error instanceof Error, false);
+      assert.equal(error.name, "ApiProblemError");
+      assert.equal(error.code, "ACCOUNT_REQUIRED");
+      assert.equal(error.status, 401);
+      assert.equal(error.retryable, false);
+      return true;
+    },
+  );
+
+  // Same path as ipcMain.handle: resolved envelope + structured clone, not reject.
+  liveKitStatus = 401;
+  liveKitBody = {
+    code: "ACCOUNT_REQUIRED",
+    status: 401,
+    title: "Нужен вход",
+    retryable: false,
+  };
+  // Re-bind for envelope path after clear above wiped storage.
+  const rebound = createDeviceBindingController({
+    apiOrigin: "https://app.example.test",
+    userDataPath,
+    fetchImpl: async (url, init = {}) => {
+      if (
+        String(url).endsWith("/api/v2/auth/device-bindings") &&
+        init.method === "POST"
+      ) {
+        return jsonResponse(201, {
+          bindingId: "11111111-1111-4111-8111-111111111111",
+          userCode: "ABCD-EFGH",
+          verificationUri:
+            "https://app.example.test/internet/link#binding=11111111-1111-4111-8111-111111111111",
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          intervalSeconds: 1,
+          deviceCode: "d".repeat(43),
+        });
+      }
+      if (String(url).includes("/token")) {
+        return jsonResponse(200, {
+          deviceCredential: "c".repeat(43),
+          profile: {
+            accountId: "22222222-2222-4222-8222-222222222222",
+            displayName: "Host",
+            createdAt: "2026-11-10T10:00:00Z",
+          },
+          expiresAt: "2026-11-24T10:00:00Z",
+        });
+      }
+      if (
+        String(url).endsWith(
+          `/api/v2/public-rooms/${publicRoomId}/livekit-token`,
+        )
+      ) {
+        return jsonResponse(liveKitStatus, liveKitBody);
+      }
+      throw new Error(`unexpected ${url}`);
+    },
+    openExternal: async () => undefined,
+    safeStorageImpl,
+  });
+  await rebound.start();
+  await rebound.pollOnce();
+  for (const item of cases) {
+    liveKitStatus = item.status;
+    liveKitBody = {
+      code: item.code,
+      status: item.status,
+      title: item.title,
+      retryable: item.retryable,
+    };
+    const cloned = structuredClone(
+      await runAsIpcResult(() => rebound.mintPublicLiveKitToken(publicRoomId)),
+    );
+    assert.equal(cloned.ok, false);
+    assert.equal(cloned.problem.code, item.code);
+    assert.equal(cloned.problem.status, item.status);
+    assert.equal(cloned.problem.retryable, item.retryable);
+  }
+
+  await rebound.clear({ revokeRemote: false });
   await rm(userDataPath, { recursive: true, force: true });
 });
 

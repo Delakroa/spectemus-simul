@@ -641,9 +641,13 @@ paths:
         `room.expiresAt`. После завершённого revoke новый mint получает
         `MEMBERSHIP_REQUIRED`; in-flight mint, уже прошедший membership check,
         остаётся допустимым исключением до disconnect runtime.
+        Авторизация: browser cookie `wt_account` или desktop `Authorization: Bearer`
+        с device credential. При наличии обоих cookie имеет приоритет. LAN LiveKit
+        credentials не используются.
       x-implementation-status: implemented
       security:
         - accountSessionCookie: []
+        - deviceSessionBearer: []
       responses:
         "200":
           description: Краткоживущий LiveKit JWT с grants текущей media-роли
@@ -947,6 +951,14 @@ components:
       description: |
         Planned opaque account credential for Internet mode. Не заменяет
         `wt_session` и не передаётся в URL, JavaScript storage или WebSocket query.
+    deviceSessionBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: |
+        Desktop device session credential from SPS-724 exchange. Только в
+        `Authorization` header; не в URL, fragment, query или renderer storage.
+        Альтернатива `wt_account` для Electron main process.
     feedbackAdminToken:
       type: apiKey
       in: header

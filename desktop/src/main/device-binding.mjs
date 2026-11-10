@@ -4,6 +4,8 @@ import { join } from "node:path";
 const USER_CODE_PATTERN = /^[A-Z0-9]{4}-[A-Z0-9]{4}$/;
 const DEVICE_SECRET_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const VERIFICATION_PATH = "/internet/link";
+const PUBLIC_ROOM_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function assertPublicHttpsOrigin(rawOrigin) {
   if (typeof rawOrigin !== "string" || !rawOrigin.trim()) {
@@ -294,9 +296,8 @@ export function createDeviceBindingController({
   async function authorizedFetch(path, init = {}) {
     const stored = await readStoredSession();
     if (!stored?.deviceCredential || !stored?.apiOrigin) {
-      const error = new Error("Desktop account is not bound");
-      error.code = "ACCOUNT_REQUIRED";
-      throw error;
+      // Plain problem object; mint IPC wraps it in a resolved {ok:false} envelope.
+      throw accountRequiredProblem("Desktop account is not bound");
     }
     if (
       typeof stored.expiresAt === "string" &&
@@ -304,9 +305,7 @@ export function createDeviceBindingController({
       Date.parse(stored.expiresAt) <= now()
     ) {
       await clearStoredSession();
-      const error = new Error("Desktop account session expired");
-      error.code = "ACCOUNT_REQUIRED";
-      throw error;
+      throw accountRequiredProblem("Desktop account session expired");
     }
     const headers = new Headers(init.headers ?? {});
     headers.set("Authorization", `Bearer ${stored.deviceCredential}`);
@@ -359,6 +358,46 @@ export function createDeviceBindingController({
     return response.json();
   }
 
+  async function mintPublicLiveKitToken(publicRoomId, { signal } = {}) {
+    if (
+      typeof publicRoomId !== "string" ||
+      !PUBLIC_ROOM_ID_PATTERN.test(publicRoomId)
+    ) {
+      throw new Error("publicRoomId must be a UUID");
+    }
+    const response = await authorizedFetch(
+      `/api/v2/public-rooms/${encodeURIComponent(publicRoomId)}/livekit-token`,
+      {
+        method: "POST",
+        signal,
+      },
+    );
+    if (!response.ok) {
+      throw await toProblem(response);
+    }
+    const body = await response.json();
+    if (
+      typeof body?.token !== "string" ||
+      body.token.length < 20 ||
+      typeof body?.liveKitUrl !== "string" ||
+      !body.liveKitUrl.startsWith("wss://")
+    ) {
+      throw new Error("Malformed public LiveKit token response");
+    }
+    // Renderer-safe surface only: never include deviceCredential or apiOrigin.
+    return {
+      token: body.token,
+      liveKitUrl: body.liveKitUrl,
+      roomName: body.roomName,
+      participantId: body.participantId,
+      participantIdentity: body.participantIdentity,
+      role: body.role,
+      canPublish: body.canPublish,
+      canPublishData: body.canPublishData,
+      expiresAt: body.expiresAt,
+    };
+  }
+
   return {
     status,
     start,
@@ -369,17 +408,41 @@ export function createDeviceBindingController({
     authorizedFetch,
     createPublicRoom,
     createPublicInvite,
+    mintPublicLiveKitToken,
     _storagePath: storagePath,
   };
 }
 
+/**
+ * Structured API problem. Mint LiveKit IPC must wrap these in a resolved
+ * `{ ok: false, problem }` envelope — rejected handle() promises lose fields.
+ */
 async function toProblem(response) {
   const problem = await safeProblem(response);
-  const error = new Error(problem?.title || `HTTP ${response.status}`);
-  error.code = problem?.code;
-  error.status = response.status;
-  error.retryable = problem?.retryable;
-  return error;
+  return {
+    name: "ApiProblemError",
+    code: typeof problem?.code === "string" ? problem.code : undefined,
+    status: response.status,
+    title:
+      typeof problem?.title === "string"
+        ? problem.title
+        : `HTTP ${response.status}`,
+    detail: typeof problem?.detail === "string" ? problem.detail : undefined,
+    retryable:
+      typeof problem?.retryable === "boolean"
+        ? problem.retryable
+        : response.status === 429 || response.status >= 500,
+  };
+}
+
+function accountRequiredProblem(title) {
+  return {
+    name: "ApiProblemError",
+    code: "ACCOUNT_REQUIRED",
+    status: 401,
+    title,
+    retryable: false,
+  };
 }
 
 async function safeProblem(response) {

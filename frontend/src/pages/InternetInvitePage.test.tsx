@@ -3,12 +3,33 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("../features/rooms/livekit-connection", () => ({
+  connectLiveKitRoom: vi.fn(
+    async (_token: unknown, handlers: { onStatusChange: (status: string) => void }) => {
+      handlers.onStatusChange("connected");
+      return { disconnect: vi.fn(), room: {} };
+    },
+  ),
+}));
+
 import { InternetInvitePage } from "./InternetInvitePage";
 import { InternetRoomPage } from "./InternetRoomPage";
 
 const token = "b".repeat(43);
 const publicRoomId = "22222222-2222-4222-8222-222222222222";
 const challengeId = "33333333-3333-4333-8333-333333333333";
+
+const publicLiveKitToken = {
+  token: "header.payload.signature-value",
+  liveKitUrl: "wss://rtc.example.test",
+  roomName: "r".repeat(43),
+  participantId: "44444444-4444-4444-8444-444444444444",
+  participantIdentity: "p".repeat(43),
+  role: "GUEST",
+  canPublish: true,
+  canPublishData: true,
+  expiresAt: "2026-11-07T18:10:00Z",
+};
 
 const accountProfile = {
   accountId: "11111111-1111-4111-8111-111111111111",
@@ -65,6 +86,7 @@ function jsonResponse(status: number, body: unknown) {
 
 afterEach(() => {
   cleanup();
+  delete window.spectemusDesktop;
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -132,6 +154,9 @@ describe("InternetInvitePage", () => {
       if (url.endsWith(`/api/v2/public-rooms/${publicRoomId}`)) {
         return jsonResponse(200, roomAccess);
       }
+      if (url.endsWith(`/api/v2/public-rooms/${publicRoomId}/livekit-token`)) {
+        return jsonResponse(200, publicLiveKitToken);
+      }
       throw new Error(`unexpected url ${url}`);
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -145,7 +170,7 @@ describe("InternetInvitePage", () => {
       );
     });
     expect(screen.getByTestId("location")).toHaveAttribute("data-hash", "");
-    expect(await screen.findByText(/подключение просмотра готовится/)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Подключено" })).toBeInTheDocument();
     expect(document.body.textContent).not.toContain(token);
     expect(JSON.stringify({ ...globalThis.localStorage })).not.toContain(token);
     expect(JSON.stringify({ ...globalThis.sessionStorage })).not.toContain(token);
@@ -195,6 +220,9 @@ describe("InternetInvitePage", () => {
       }
       if (url.endsWith(`/api/v2/public-rooms/${publicRoomId}`)) {
         return jsonResponse(200, roomAccess);
+      }
+      if (url.endsWith(`/api/v2/public-rooms/${publicRoomId}/livekit-token`)) {
+        return jsonResponse(200, publicLiveKitToken);
       }
       throw new Error(`unexpected url ${url}`);
     });
@@ -337,6 +365,9 @@ describe("InternetInvitePage", () => {
       }
       if (url.endsWith(`/api/v2/public-rooms/${publicRoomId}`)) {
         return jsonResponse(200, roomAccess);
+      }
+      if (url.endsWith(`/api/v2/public-rooms/${publicRoomId}/livekit-token`)) {
+        return jsonResponse(200, publicLiveKitToken);
       }
       throw new Error(`unexpected url ${url}`);
     });

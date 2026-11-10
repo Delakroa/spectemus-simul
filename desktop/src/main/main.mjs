@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createDeviceBindingController } from "./device-binding.mjs";
+import { runAsIpcResult } from "./ipc-result.mjs";
 import { acquireDesktopInstanceLock } from "./instance-lock.mjs";
 import { DesktopMediaLibrary } from "./media-library.mjs";
 import {
@@ -184,6 +185,14 @@ if (isPrimaryInstance) {
     ipcMain.handle(
       "spectemus:device-binding-create-invite",
       (_event, payload) => deviceBinding.createPublicInvite(payload),
+    );
+    ipcMain.handle(
+      "spectemus:mint-public-livekit-token",
+      (_event, publicRoomId) =>
+        // Resolved envelope only: rejected promises from handle() drop problem fields.
+        runAsIpcResult(() =>
+          deviceBinding.mintPublicLiveKitToken(publicRoomId),
+        ),
     );
 
     mainWindow = createWindow();

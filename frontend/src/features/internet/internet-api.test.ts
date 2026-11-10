@@ -9,9 +9,14 @@ import {
   createPublicRoomInvite,
   getAccount,
   getPublicRoom,
+  isAccountRequiredError,
+  mintPublicLiveKitToken,
+  publicLiveKitTokenResponseSchema,
   publicRoomAccessSchema,
   redeemPublicInvite,
   requestEmailChallenge,
+  toApiProblemError,
+  unwrapDesktopIpcResult,
   verifyEmailChallenge,
 } from "./internet-api";
 
@@ -133,6 +138,38 @@ describe("internet-api", () => {
     );
   });
 
+  it("mintит public LiveKit token по cookie API без LAN path", async () => {
+    const token = {
+      token: "header.payload.signature-value",
+      liveKitUrl: "wss://rtc.example.test",
+      roomName: "r".repeat(43),
+      participantId: "33333333-3333-4333-8333-333333333333",
+      participantIdentity: "p".repeat(43),
+      role: "GUEST",
+      canPublish: true,
+      canPublishData: true,
+      expiresAt: "2026-11-07T18:10:00Z",
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => token,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(mintPublicLiveKitToken(roomAccess.room.publicRoomId)).resolves.toEqual(token);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/v2/public-rooms/${roomAccess.room.publicRoomId}/livekit-token`,
+      expect.objectContaining({ method: "POST", credentials: "include" }),
+    );
+    expect(String(fetchMock.mock.calls[0]?.[0])).not.toContain("/api/v1/");
+    expect(() =>
+      publicLiveKitTokenResponseSchema.parse({
+        ...token,
+        liveKitUrl: "ws://lan.example.test",
+      }),
+    ).toThrow();
+  });
+
   it("создаёт public room и hash-only invite отдельными idempotent-командами", async () => {
     const invite = {
       inviteId: "44444444-4444-4444-8444-444444444444",
@@ -190,6 +227,33 @@ describe("internet-api", () => {
     expect(key).not.toContain("invite=");
     expect(createPublicRoomIdempotencyKey()).toMatch(/^public-room-/);
     expect(createPublicInviteIdempotencyKey()).toMatch(/^public-invite-/);
+  });
+
+  it("поднимает desktop IPC envelope problem до ApiProblemError", () => {
+    const envelope = {
+      ok: false as const,
+      problem: {
+        name: "ApiProblemError",
+        code: "ACCOUNT_REQUIRED",
+        status: 401,
+        title: "Нужен вход",
+        retryable: false,
+      },
+    };
+    expect(() => unwrapDesktopIpcResult(envelope)).toThrow(ApiProblemError);
+    try {
+      unwrapDesktopIpcResult(envelope);
+    } catch (caught) {
+      expect(isAccountRequiredError(caught)).toBe(true);
+      expect(toApiProblemError(caught)?.problem.status).toBe(401);
+    }
+    expect(
+      unwrapDesktopIpcResult({
+        ok: true,
+        data: { token: "header.payload.signature-value" },
+      }),
+    ).toEqual({ token: "header.payload.signature-value" });
+    expect(isAccountRequiredError(new Error("ACCOUNT_REQUIRED"))).toBe(false);
   });
 
   it("пробрасывает problem details без raw body в message для 404", async () => {

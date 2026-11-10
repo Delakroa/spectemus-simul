@@ -157,6 +157,29 @@ class PublicLiveKitTokenServiceTest {
     }
 
     @Test
+    void acceptsActiveDeviceCredentialAndRejectsRevokedOrExpired() throws Exception {
+        Fixture fixture = new Fixture();
+        PublicAccessService.AccountSessionResult owner = fixture.login("owner@example.test", "Host");
+        PublicRoomAccessResponse room = fixture.createRoom(owner);
+        String deviceCredential = "E".repeat(43);
+        fixture.bindDeviceSession(owner.profile().accountId(), deviceCredential, NOW.plus(Duration.ofDays(1)));
+
+        PublicLiveKitTokenResponse response =
+                fixture.tokenService.mint(room.room().publicRoomId(), deviceCredential);
+        assertThat(response.role()).isEqualTo(ParticipantRole.HOST);
+        assertValidSignature(response.token());
+
+        fixture.revokeDeviceSession(deviceCredential);
+        assertAccountRequired(
+                () -> fixture.tokenService.mint(room.room().publicRoomId(), deviceCredential));
+
+        String expiredCredential = "F".repeat(43);
+        fixture.bindDeviceSession(owner.profile().accountId(), expiredCredential, NOW.minusSeconds(1));
+        assertAccountRequired(
+                () -> fixture.tokenService.mint(room.room().publicRoomId(), expiredCredential));
+    }
+
+    @Test
     void collapsesMembershipFailuresToSameNotFound() {
         Fixture fixture = new Fixture();
         PublicAccessService.AccountSessionResult owner = fixture.login("owner@example.test", "Host");
@@ -260,6 +283,7 @@ class PublicLiveKitTokenServiceTest {
     private static final class Fixture {
 
         private final InMemoryPublicAccessStore store = new InMemoryPublicAccessStore();
+        private final InMemoryDeviceBindingStore deviceStore = new InMemoryDeviceBindingStore(store);
         private final CapturingDelivery delivery = new CapturingDelivery();
         private final PublicAccessSecrets secrets = new PublicAccessSecrets(PEPPER);
         private final PublicAccessService service = new PublicAccessService(
@@ -267,6 +291,8 @@ class PublicLiveKitTokenServiceTest {
                 delivery,
                 secrets,
                 publicAccessProperties(),
+                null,
+                deviceStore,
                 Clock.fixed(NOW, ZoneOffset.UTC));
         private final PublicLiveKitTokenService tokenService = new PublicLiveKitTokenService(
                 service,
@@ -286,6 +312,21 @@ class PublicLiveKitTokenServiceTest {
         private PublicAccessService.AccountSessionResult login(String email, String displayName) {
             EmailChallengeAcceptedResponse challenge = service.requestEmailChallenge(email);
             return service.verifyEmailChallenge(challenge.challengeId(), delivery.code, displayName);
+        }
+
+        private void bindDeviceSession(UUID accountId, String deviceCredential, Instant expiresAt) {
+            deviceStore.sessions.put(
+                    secrets.deviceCredentialFingerprint(deviceCredential),
+                    new DeviceBindingStore.StoredDeviceSession(
+                            secrets.deviceCredentialFingerprint(deviceCredential),
+                            accountId,
+                            UUID.fromString("11111111-1111-4111-8111-111111111111"),
+                            expiresAt,
+                            NOW));
+        }
+
+        private void revokeDeviceSession(String deviceCredential) {
+            deviceStore.revoked.add(secrets.deviceCredentialFingerprint(deviceCredential));
         }
 
         private PublicRoomAccessResponse createRoom(PublicAccessService.AccountSessionResult owner) {
@@ -334,6 +375,60 @@ class PublicLiveKitTokenServiceTest {
         @Override
         public void deliver(String email, String code, Instant expiresAt) {
             this.code = code;
+        }
+    }
+
+    private static final class InMemoryDeviceBindingStore implements DeviceBindingStore {
+
+        private final InMemoryPublicAccessStore accounts;
+        private final Map<String, StoredDeviceSession> sessions = new HashMap<>();
+        private final java.util.Set<String> revoked = new java.util.HashSet<>();
+
+        private InMemoryDeviceBindingStore(InMemoryPublicAccessStore accounts) {
+            this.accounts = accounts;
+        }
+
+        @Override
+        public void saveBinding(StoredBinding binding) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<StoredBinding> findBinding(UUID bindingId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public boolean approveBinding(
+                UUID bindingId, String userCodeFingerprint, UUID accountId, Instant now) {
+            return false;
+        }
+
+        @Override
+        public ExchangeResult exchangeBinding(
+                UUID bindingId,
+                String deviceCodeFingerprint,
+                String sessionFingerprint,
+                Instant sessionExpiresAt,
+                UUID auditCorrelationId,
+                Instant now) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<StoredAccount> findAccountByDeviceSession(String sessionFingerprint, Instant now) {
+            StoredDeviceSession session = sessions.get(sessionFingerprint);
+            if (session == null
+                    || !session.expiresAt().isAfter(now)
+                    || revoked.contains(sessionFingerprint)) {
+                return Optional.empty();
+            }
+            return Optional.ofNullable(accounts.accountsById.get(session.accountId()));
+        }
+
+        @Override
+        public boolean revokeDeviceSession(String sessionFingerprint, Instant now) {
+            return revoked.add(sessionFingerprint);
         }
     }
 

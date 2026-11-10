@@ -53,10 +53,26 @@ export const publicInviteCreatedSchema = z
   })
   .strict();
 
+/** Separate from LAN LiveKitTokenResponse: opaque roomName, wss-only URL. */
+export const publicLiveKitTokenResponseSchema = z
+  .object({
+    token: z.string().min(20),
+    liveKitUrl: z.string().regex(/^wss:\/\//),
+    roomName: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    participantId: z.uuid(),
+    participantIdentity: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    role: z.enum(["HOST", "GUEST"]),
+    canPublish: z.boolean(),
+    canPublishData: z.boolean(),
+    expiresAt: dateTimeSchema,
+  })
+  .strict();
+
 export type AccountProfile = z.infer<typeof accountProfileSchema>;
 export type EmailChallengeAccepted = z.infer<typeof emailChallengeAcceptedSchema>;
 export type PublicRoomAccess = z.infer<typeof publicRoomAccessSchema>;
 export type PublicInviteCreated = z.infer<typeof publicInviteCreatedSchema>;
+export type PublicLiveKitTokenResponse = z.infer<typeof publicLiveKitTokenResponseSchema>;
 
 type RequestOptions = {
   body?: unknown;
@@ -139,6 +155,14 @@ export function getPublicRoom(publicRoomId: string, signal?: AbortSignal) {
     `/api/v2/public-rooms/${encodeURIComponent(publicRoomId)}`,
     publicRoomAccessSchema,
     { signal },
+  );
+}
+
+export function mintPublicLiveKitToken(publicRoomId: string, signal?: AbortSignal) {
+  return request(
+    `/api/v2/public-rooms/${encodeURIComponent(publicRoomId)}/livekit-token`,
+    publicLiveKitTokenResponseSchema,
+    { method: "POST", signal },
   );
 }
 
@@ -228,8 +252,62 @@ function createInternetIdempotencyKey(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
+/** Problem payload inside a resolved desktop IPC envelope. */
+export type DesktopIpcProblem = {
+  code?: string;
+  detail?: string;
+  name?: string;
+  retryable?: boolean;
+  status: number;
+  title?: string;
+};
+
+export type DesktopIpcResult<T> = { data: T; ok: true } | { ok: false; problem: DesktopIpcProblem };
+
+export function isDesktopIpcProblem(value: unknown): value is DesktopIpcProblem {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as DesktopIpcProblem;
+  return (
+    typeof candidate.status === "number" &&
+    (candidate.name === "ApiProblemError" || typeof candidate.code === "string")
+  );
+}
+
+export function toApiProblemError(error: unknown): ApiProblemError | null {
+  if (error instanceof ApiProblemError) {
+    return error;
+  }
+  if (!isDesktopIpcProblem(error)) {
+    return null;
+  }
+  return new ApiProblemError({
+    code: error.code,
+    detail: error.detail,
+    retryable: error.retryable,
+    status: error.status,
+    title: error.title,
+  });
+}
+
+export function unwrapDesktopIpcResult<T>(result: DesktopIpcResult<T>): T {
+  if (result && typeof result === "object" && result.ok === true) {
+    return result.data;
+  }
+  if (result && typeof result === "object" && result.ok === false) {
+    const problem = toApiProblemError(result.problem);
+    if (problem) {
+      throw problem;
+    }
+    throw new Error(result.problem.title ?? "Desktop IPC failure");
+  }
+  throw new Error("Malformed desktop IPC result");
+}
+
 export function isAccountRequiredError(error: unknown) {
-  return error instanceof ApiProblemError && error.problem.code === "ACCOUNT_REQUIRED";
+  const problem = toApiProblemError(error);
+  return problem?.problem.code === "ACCOUNT_REQUIRED";
 }
 
 export function isChallengeRejectedError(error: unknown) {
