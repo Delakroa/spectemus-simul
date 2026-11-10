@@ -2,10 +2,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import {
-  ApiProblemError,
   getPublicRoom,
   isAccountRequiredError,
   mintPublicLiveKitToken,
+  toApiProblemError,
   type PublicLiveKitTokenResponse,
 } from "../features/internet/internet-api";
 import {
@@ -258,19 +258,31 @@ async function fetchPublicLiveKitToken(
 ): Promise<PublicLiveKitTokenResponse> {
   const desktop = desktopMintApi();
   if (desktop?.mintPublicLiveKitToken) {
-    return desktop.mintPublicLiveKitToken(publicRoomId);
+    try {
+      return await desktop.mintPublicLiveKitToken(publicRoomId);
+    } catch (caught: unknown) {
+      const problem = toApiProblemError(caught);
+      if (problem) {
+        throw problem;
+      }
+      throw caught;
+    }
   }
   return mintPublicLiveKitToken(publicRoomId, signal);
+}
+
+function problemStatus(caught: unknown) {
+  return toApiProblemError(caught)?.problem.status;
 }
 
 function membershipErrorMessage(caught: unknown) {
   if (isAccountRequiredError(caught)) {
     return "Войдите по приглашению, чтобы открыть эту комнату.";
   }
-  if (caught instanceof ApiProblemError && caught.problem.status === 404) {
+  if (problemStatus(caught) === 404) {
     return "Комната недоступна для этого аккаунта.";
   }
-  if (caught instanceof ApiProblemError && caught.problem.status === 429) {
+  if (problemStatus(caught) === 429) {
     return "Слишком много попыток. Подождите немного и попробуйте снова.";
   }
   return "Не удалось проверить доступ к комнате. Попробуйте ещё раз чуть позже.";
@@ -280,7 +292,7 @@ function membershipErrorRetryable(caught: unknown) {
   if (isAccountRequiredError(caught)) {
     return false;
   }
-  if (caught instanceof ApiProblemError && caught.problem.status === 404) {
+  if (problemStatus(caught) === 404) {
     return false;
   }
   return true;
@@ -290,13 +302,14 @@ function liveKitErrorMessage(caught: unknown) {
   if (isAccountRequiredError(caught)) {
     return "Сессия входа закончилась. Войдите снова и подключитесь.";
   }
-  if (caught instanceof ApiProblemError && caught.problem.status === 404) {
+  const status = problemStatus(caught);
+  if (status === 404) {
     return "Комната недоступна для этого аккаунта.";
   }
-  if (caught instanceof ApiProblemError && caught.problem.status === 429) {
+  if (status === 429) {
     return "Слишком много попыток подключения. Подождите немного и попробуйте снова.";
   }
-  if (caught instanceof ApiProblemError && caught.problem.status >= 500) {
+  if (status !== undefined && status >= 500) {
     return "Public LiveKit временно недоступен. Попробуйте подключиться снова.";
   }
   return "Не удалось подключиться к public LiveKit. Попробуйте ещё раз.";
@@ -306,7 +319,7 @@ function liveKitErrorRetryable(caught: unknown) {
   if (isAccountRequiredError(caught)) {
     return false;
   }
-  if (caught instanceof ApiProblemError && caught.problem.status === 404) {
+  if (problemStatus(caught) === 404) {
     return false;
   }
   return true;

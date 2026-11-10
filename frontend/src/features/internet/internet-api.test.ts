@@ -9,11 +9,13 @@ import {
   createPublicRoomInvite,
   getAccount,
   getPublicRoom,
+  isAccountRequiredError,
   mintPublicLiveKitToken,
   publicLiveKitTokenResponseSchema,
   publicRoomAccessSchema,
   redeemPublicInvite,
   requestEmailChallenge,
+  toApiProblemError,
   verifyEmailChallenge,
 } from "./internet-api";
 
@@ -224,6 +226,25 @@ describe("internet-api", () => {
     expect(key).not.toContain("invite=");
     expect(createPublicRoomIdempotencyKey()).toMatch(/^public-room-/);
     expect(createPublicInviteIdempotencyKey()).toMatch(/^public-invite-/);
+  });
+
+  it("поднимает desktop IPC problem до ApiProblemError", () => {
+    const ipcProblem = {
+      name: "ApiProblemError",
+      code: "ACCOUNT_REQUIRED",
+      status: 401,
+      title: "Нужен вход",
+      retryable: false,
+    };
+    const error = toApiProblemError(ipcProblem);
+    expect(error).toBeInstanceOf(ApiProblemError);
+    expect(error?.problem).toMatchObject({
+      code: "ACCOUNT_REQUIRED",
+      status: 401,
+      retryable: false,
+    });
+    expect(isAccountRequiredError(ipcProblem)).toBe(true);
+    expect(isAccountRequiredError(new Error("ACCOUNT_REQUIRED"))).toBe(false);
   });
 
   it("пробрасывает problem details без raw body в message для 404", async () => {

@@ -296,9 +296,8 @@ export function createDeviceBindingController({
   async function authorizedFetch(path, init = {}) {
     const stored = await readStoredSession();
     if (!stored?.deviceCredential || !stored?.apiOrigin) {
-      const error = new Error("Desktop account is not bound");
-      error.code = "ACCOUNT_REQUIRED";
-      throw error;
+      // Plain object survives Electron IPC; Error custom fields do not.
+      throw accountRequiredProblem("Desktop account is not bound");
     }
     if (
       typeof stored.expiresAt === "string" &&
@@ -306,9 +305,7 @@ export function createDeviceBindingController({
       Date.parse(stored.expiresAt) <= now()
     ) {
       await clearStoredSession();
-      const error = new Error("Desktop account session expired");
-      error.code = "ACCOUNT_REQUIRED";
-      throw error;
+      throw accountRequiredProblem("Desktop account session expired");
     }
     const headers = new Headers(init.headers ?? {});
     headers.set("Authorization", `Bearer ${stored.deviceCredential}`);
@@ -416,13 +413,36 @@ export function createDeviceBindingController({
   };
 }
 
+/**
+ * Structured problem for Electron IPC. Custom fields on `Error` are dropped by
+ * `ipcRenderer.invoke`, so API failures must reject with a plain object.
+ */
 async function toProblem(response) {
   const problem = await safeProblem(response);
-  const error = new Error(problem?.title || `HTTP ${response.status}`);
-  error.code = problem?.code;
-  error.status = response.status;
-  error.retryable = problem?.retryable;
-  return error;
+  return {
+    name: "ApiProblemError",
+    code: typeof problem?.code === "string" ? problem.code : undefined,
+    status: response.status,
+    title:
+      typeof problem?.title === "string"
+        ? problem.title
+        : `HTTP ${response.status}`,
+    detail: typeof problem?.detail === "string" ? problem.detail : undefined,
+    retryable:
+      typeof problem?.retryable === "boolean"
+        ? problem.retryable
+        : response.status === 429 || response.status >= 500,
+  };
+}
+
+function accountRequiredProblem(title) {
+  return {
+    name: "ApiProblemError",
+    code: "ACCOUNT_REQUIRED",
+    status: 401,
+    title,
+    retryable: false,
+  };
 }
 
 async function safeProblem(response) {

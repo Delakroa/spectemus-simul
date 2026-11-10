@@ -252,8 +252,46 @@ function createInternetIdempotencyKey(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
+/** Electron IPC rejects with a plain problem object; Error custom fields do not survive. */
+export type DesktopIpcProblem = {
+  code?: string;
+  detail?: string;
+  name?: string;
+  retryable?: boolean;
+  status: number;
+  title?: string;
+};
+
+export function isDesktopIpcProblem(value: unknown): value is DesktopIpcProblem {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as DesktopIpcProblem;
+  return (
+    typeof candidate.status === "number" &&
+    (candidate.name === "ApiProblemError" || typeof candidate.code === "string")
+  );
+}
+
+export function toApiProblemError(error: unknown): ApiProblemError | null {
+  if (error instanceof ApiProblemError) {
+    return error;
+  }
+  if (!isDesktopIpcProblem(error)) {
+    return null;
+  }
+  return new ApiProblemError({
+    code: error.code,
+    detail: error.detail,
+    retryable: error.retryable,
+    status: error.status,
+    title: error.title,
+  });
+}
+
 export function isAccountRequiredError(error: unknown) {
-  return error instanceof ApiProblemError && error.problem.code === "ACCOUNT_REQUIRED";
+  const problem = toApiProblemError(error);
+  return problem?.problem.code === "ACCOUNT_REQUIRED";
 }
 
 export function isChallengeRejectedError(error: unknown) {

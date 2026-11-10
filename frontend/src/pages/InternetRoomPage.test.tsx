@@ -200,14 +200,17 @@ describe("InternetRoomPage", () => {
       {
         problem: problem(401, "ACCOUNT_REQUIRED"),
         text: "Сессия входа закончилась. Войдите снова и подключитесь.",
+        canRetry: false,
       },
       {
         problem: problem(404, "MEMBERSHIP_REQUIRED"),
         text: "Комната недоступна для этого аккаунта.",
+        canRetry: false,
       },
       {
         problem: problem(429, "RATE_LIMITED"),
         text: "Слишком много попыток подключения. Подождите немного и попробуйте снова.",
+        canRetry: true,
       },
     ] as const;
 
@@ -222,6 +225,71 @@ describe("InternetRoomPage", () => {
       renderRoom();
       expect(await screen.findByText(item.text)).toBeInTheDocument();
       expect(connectLiveKitRoom).not.toHaveBeenCalled();
+      if (item.canRetry) {
+        expect(screen.getByRole("button", { name: "Подключить снова" })).toBeInTheDocument();
+      } else {
+        expect(screen.queryByRole("button", { name: "Подключить снова" })).not.toBeInTheDocument();
+      }
+      connectLiveKitRoom.mockClear();
+    }
+  });
+
+  it("desktop IPC 401/404/429 показывает те же тексты без бесполезного retry на 401/404", async () => {
+    vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
+    const cases = [
+      {
+        ipcProblem: {
+          name: "ApiProblemError",
+          code: "ACCOUNT_REQUIRED",
+          status: 401,
+          title: "Нужен вход",
+          retryable: false,
+        },
+        text: "Сессия входа закончилась. Войдите снова и подключитесь.",
+        canRetry: false,
+      },
+      {
+        ipcProblem: {
+          name: "ApiProblemError",
+          code: "MEMBERSHIP_REQUIRED",
+          status: 404,
+          title: "Комната недоступна",
+          retryable: false,
+        },
+        text: "Комната недоступна для этого аккаунта.",
+        canRetry: false,
+      },
+      {
+        ipcProblem: {
+          name: "ApiProblemError",
+          code: "RATE_LIMITED",
+          status: 429,
+          title: "Слишком много попыток",
+          retryable: true,
+        },
+        text: "Слишком много попыток подключения. Подождите немного и попробуйте снова.",
+        canRetry: true,
+      },
+    ] as const;
+
+    for (const item of cases) {
+      cleanup();
+      const mintPublicLiveKitToken = vi.fn().mockRejectedValue(item.ipcProblem);
+      vi.stubGlobal("fetch", vi.fn());
+      window.spectemusDesktop = {
+        getRuntimeStatus: async () => ({ detail: "ok", state: "ready" }),
+        onRuntimeStatus: () => () => undefined,
+        restartRuntime: async () => ({ detail: "ok", state: "ready" }),
+        mintPublicLiveKitToken,
+      };
+      renderRoom();
+      expect(await screen.findByText(item.text)).toBeInTheDocument();
+      expect(connectLiveKitRoom).not.toHaveBeenCalled();
+      if (item.canRetry) {
+        expect(screen.getByRole("button", { name: "Подключить снова" })).toBeInTheDocument();
+      } else {
+        expect(screen.queryByRole("button", { name: "Подключить снова" })).not.toBeInTheDocument();
+      }
       connectLiveKitRoom.mockClear();
     }
   });

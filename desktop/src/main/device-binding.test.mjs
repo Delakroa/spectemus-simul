@@ -299,6 +299,132 @@ test("mints public LiveKit token via Bearer without exposing device credential t
   await rm(userDataPath, { recursive: true, force: true });
 });
 
+test("mint rejects 401/404/429 as serializable IPC problems, not Error instances", async () => {
+  const userDataPath = await mkdtemp(join(tmpdir(), "spectemus-binding-"));
+  const publicRoomId = "33333333-3333-4333-8333-333333333333";
+  let liveKitStatus = 200;
+  let liveKitBody = {
+    token: "header.payload.signature-value-livekit",
+    liveKitUrl: "wss://rtc.example.test",
+    roomName: "r".repeat(43),
+    participantId: "44444444-4444-4444-8444-444444444444",
+    participantIdentity: "p".repeat(43),
+    role: "HOST",
+    canPublish: true,
+    canPublishData: true,
+    expiresAt: "2026-11-10T10:05:00Z",
+  };
+  const safeStorageImpl = {
+    isEncryptionAvailable: () => true,
+    encryptString: (value) => Buffer.from(`enc:${value}`, "utf8"),
+    decryptString: (buffer) => Buffer.from(buffer).toString("utf8").slice(4),
+  };
+  const controller = createDeviceBindingController({
+    apiOrigin: "https://app.example.test",
+    userDataPath,
+    fetchImpl: async (url, init = {}) => {
+      if (
+        String(url).endsWith("/api/v2/auth/device-bindings") &&
+        init.method === "POST"
+      ) {
+        return jsonResponse(201, {
+          bindingId: "11111111-1111-4111-8111-111111111111",
+          userCode: "ABCD-EFGH",
+          verificationUri:
+            "https://app.example.test/internet/link#binding=11111111-1111-4111-8111-111111111111",
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          intervalSeconds: 1,
+          deviceCode: "d".repeat(43),
+        });
+      }
+      if (String(url).includes("/token")) {
+        return jsonResponse(200, {
+          deviceCredential: "c".repeat(43),
+          profile: {
+            accountId: "22222222-2222-4222-8222-222222222222",
+            displayName: "Host",
+            createdAt: "2026-11-10T10:00:00Z",
+          },
+          expiresAt: "2026-11-24T10:00:00Z",
+        });
+      }
+      if (
+        String(url).endsWith(
+          `/api/v2/public-rooms/${publicRoomId}/livekit-token`,
+        ) &&
+        init.method === "POST"
+      ) {
+        return jsonResponse(liveKitStatus, liveKitBody);
+      }
+      throw new Error(`unexpected ${url}`);
+    },
+    openExternal: async () => undefined,
+    safeStorageImpl,
+  });
+
+  await controller.start();
+  await controller.pollOnce();
+
+  const cases = [
+    {
+      status: 401,
+      code: "ACCOUNT_REQUIRED",
+      title: "Нужен вход",
+      retryable: false,
+    },
+    {
+      status: 404,
+      code: "MEMBERSHIP_REQUIRED",
+      title: "Комната недоступна",
+      retryable: false,
+    },
+    {
+      status: 429,
+      code: "RATE_LIMITED",
+      title: "Слишком много попыток",
+      retryable: true,
+    },
+  ];
+
+  for (const item of cases) {
+    liveKitStatus = item.status;
+    liveKitBody = {
+      code: item.code,
+      status: item.status,
+      title: item.title,
+      retryable: item.retryable,
+    };
+    await assert.rejects(
+      () => controller.mintPublicLiveKitToken(publicRoomId),
+      (error) => {
+        assert.equal(error instanceof Error, false);
+        assert.equal(error.name, "ApiProblemError");
+        assert.equal(error.status, item.status);
+        assert.equal(error.code, item.code);
+        assert.equal(error.title, item.title);
+        assert.equal(error.retryable, item.retryable);
+        assert.equal(Object.hasOwn(error, "deviceCredential"), false);
+        return true;
+      },
+    );
+  }
+
+  await controller.clear({ revokeRemote: false });
+  await assert.rejects(
+    () => controller.mintPublicLiveKitToken(publicRoomId),
+    (error) => {
+      assert.equal(error instanceof Error, false);
+      assert.equal(error.name, "ApiProblemError");
+      assert.equal(error.code, "ACCOUNT_REQUIRED");
+      assert.equal(error.status, 401);
+      assert.equal(error.retryable, false);
+      return true;
+    },
+  );
+
+  await rm(userDataPath, { recursive: true, force: true });
+});
+
 test("treats expired stored credential as unbound", async () => {
   const userDataPath = await mkdtemp(join(tmpdir(), "spectemus-binding-"));
   let nowMs = Date.parse("2026-11-10T10:30:00Z");
