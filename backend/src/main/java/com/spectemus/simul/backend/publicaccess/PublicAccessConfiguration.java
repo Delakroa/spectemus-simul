@@ -73,6 +73,30 @@ class PublicAccessConfiguration {
     }
 
     @Bean
+    @ConditionalOnProperty(
+            prefix = "spectemus-simul.public-access",
+            name = "device-binding-enabled",
+            havingValue = "true")
+    DeviceBindingStore deviceBindingStore(DataSource publicAccessDataSource, Flyway publicAccessFlyway) {
+        return new JdbcDeviceBindingStore(publicAccessDataSource);
+    }
+
+    @Bean
+    @ConditionalOnProperty(
+            prefix = "spectemus-simul.public-access",
+            name = "device-binding-enabled",
+            havingValue = "true")
+    DeviceBindingService deviceBindingService(
+            DeviceBindingStore deviceBindingStore,
+            PublicAccessStore publicAccessStore,
+            PublicAccessSecrets publicAccessSecrets,
+            PublicAccessProperties properties,
+            java.time.Clock clock) {
+        return new DeviceBindingService(
+                deviceBindingStore, publicAccessStore, publicAccessSecrets, properties, clock);
+    }
+
+    @Bean
     PublicAccessService publicAccessService(
             PublicAccessStore publicAccessStore,
             EmailChallengeDelivery emailChallengeDelivery,
@@ -80,6 +104,7 @@ class PublicAccessConfiguration {
             PublicAccessProperties properties,
             org.springframework.beans.factory.ObjectProvider<PublicLiveKitRoomAdminClient>
                     publicLiveKitRoomAdminClient,
+            org.springframework.beans.factory.ObjectProvider<DeviceBindingStore> deviceBindingStore,
             java.time.Clock clock) {
         return new PublicAccessService(
                 publicAccessStore,
@@ -87,6 +112,7 @@ class PublicAccessConfiguration {
                 publicAccessSecrets,
                 properties,
                 publicLiveKitRoomAdminClient.getIfAvailable(),
+                deviceBindingStore.getIfAvailable(),
                 clock);
     }
 

@@ -95,6 +95,20 @@ public class SecurityConfig {
                                 .permitAll()
                                 .requestMatchers(HttpMethod.POST, "/api/v2/invite-redemptions")
                                 .permitAll();
+                        if (publicAccess.isDeviceBindingEnabled()) {
+                            authorize
+                                    .requestMatchers(HttpMethod.POST, "/api/v2/auth/device-bindings")
+                                    .permitAll()
+                                    .requestMatchers(
+                                            HttpMethod.POST, "/api/v2/auth/device-bindings/*/approve")
+                                    .permitAll()
+                                    .requestMatchers(
+                                            HttpMethod.POST, "/api/v2/auth/device-bindings/*/token")
+                                    .permitAll()
+                                    .requestMatchers(
+                                            HttpMethod.POST, "/api/v2/account/device-sessions/revoke")
+                                    .permitAll();
+                        }
                     }
 
                     authorize.anyRequest().denyAll();

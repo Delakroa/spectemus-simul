@@ -24,7 +24,7 @@ class RateLimitConfigurationPublicLiveKitTest {
     void registersPublicLiveKitTokenOnSharedLivekitTokenBucket() {
         RateLimiter limiter = mock(RateLimiter.class);
         RateLimitProperties properties = new RateLimitProperties(
-                true, null, null, null, null, null, null, null, null, null, null);
+                true, null, null, null, null, null, null, null, null, null, null, null, null, null);
         PublicAccessProperties publicAccess = new PublicAccessProperties(
                 true,
                 "jdbc:postgresql://db.example.test:5432/spectemus",
@@ -34,7 +34,7 @@ class RateLimitConfigurationPublicLiveKitTest {
                 Duration.ofDays(14),
                 true,
                 new PublicAccessProperties.EmailProperties(
-                        "smtp.example.test", 587, "user", "password", "login@example.test", true));
+                        "smtp.example.test", 587, "user", "password", "login@example.test", true), null, null, null, null, null);
 
         RateLimitConfiguration configuration = new RateLimitConfiguration(
                 provider(limiter),

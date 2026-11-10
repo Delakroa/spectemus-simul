@@ -12,6 +12,20 @@ contextBridge.exposeInMainWorld("spectemusDesktop", {
   restartRuntime: () => ipcRenderer.invoke("spectemus:restart-runtime"),
   selectLanAddress: (address) =>
     ipcRenderer.invoke("spectemus:select-lan-address", address),
+  getDeviceBindingStatus: () =>
+    ipcRenderer.invoke("spectemus:device-binding-status"),
+  startDeviceBinding: () =>
+    ipcRenderer.invoke("spectemus:device-binding-start"),
+  openDeviceBinding: () => ipcRenderer.invoke("spectemus:device-binding-open"),
+  pollDeviceBinding: () => ipcRenderer.invoke("spectemus:device-binding-poll"),
+  cancelDeviceBinding: () =>
+    ipcRenderer.invoke("spectemus:device-binding-cancel"),
+  clearDeviceBinding: () =>
+    ipcRenderer.invoke("spectemus:device-binding-clear"),
+  createPublicRoomWithDeviceBinding: (payload) =>
+    ipcRenderer.invoke("spectemus:device-binding-create-room", payload),
+  createPublicInviteWithDeviceBinding: (payload) =>
+    ipcRenderer.invoke("spectemus:device-binding-create-invite", payload),
   onRuntimeStatus: (listener) => {
     const wrapped = (_event, status) => listener(status);
     ipcRenderer.on("spectemus:runtime-status", wrapped);

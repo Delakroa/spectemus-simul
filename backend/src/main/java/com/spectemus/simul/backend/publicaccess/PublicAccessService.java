@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 
 import com.spectemus.simul.backend.api.ApiException;
@@ -23,6 +24,7 @@ final class PublicAccessService {
     private final PublicAccessSecrets secrets;
     private final PublicAccessProperties properties;
     private final PublicLiveKitRoomAdminClient roomAdminClient;
+    private final DeviceBindingStore deviceBindingStore;
     private final Clock clock;
 
     PublicAccessService(
@@ -31,7 +33,7 @@ final class PublicAccessService {
             PublicAccessSecrets secrets,
             PublicAccessProperties properties,
             Clock clock) {
-        this(store, emailDelivery, secrets, properties, null, clock);
+        this(store, emailDelivery, secrets, properties, null, null, clock);
     }
 
     PublicAccessService(
@@ -41,11 +43,23 @@ final class PublicAccessService {
             PublicAccessProperties properties,
             PublicLiveKitRoomAdminClient roomAdminClient,
             Clock clock) {
+        this(store, emailDelivery, secrets, properties, roomAdminClient, null, clock);
+    }
+
+    PublicAccessService(
+            PublicAccessStore store,
+            EmailChallengeDelivery emailDelivery,
+            PublicAccessSecrets secrets,
+            PublicAccessProperties properties,
+            PublicLiveKitRoomAdminClient roomAdminClient,
+            DeviceBindingStore deviceBindingStore,
+            Clock clock) {
         this.store = store;
         this.emailDelivery = emailDelivery;
         this.secrets = secrets;
         this.properties = properties;
         this.roomAdminClient = roomAdminClient;
+        this.deviceBindingStore = deviceBindingStore;
         this.clock = clock;
     }
 
@@ -269,8 +283,12 @@ final class PublicAccessService {
         if (sessionCredential == null || !sessionCredential.matches("^[A-Za-z0-9_-]{43}$")) {
             throw accountRequired();
         }
-        return store.findAccountBySession(
-                        secrets.credentialFingerprint(sessionCredential), Instant.now(clock))
+        Instant now = Instant.now(clock);
+        return store.findAccountBySession(secrets.credentialFingerprint(sessionCredential), now)
+                .or(() -> deviceBindingStore == null
+                        ? Optional.empty()
+                        : deviceBindingStore.findAccountByDeviceSession(
+                                secrets.deviceCredentialFingerprint(sessionCredential), now))
                 .orElseThrow(PublicAccessService::accountRequired);
     }
 

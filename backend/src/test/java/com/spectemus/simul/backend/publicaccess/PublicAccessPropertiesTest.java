@@ -20,15 +20,57 @@ class PublicAccessPropertiesTest {
     @Test
     void staysDisabledWithoutPrivateConfiguration() {
         PublicAccessProperties properties =
-                new PublicAccessProperties(false, null, null, null, null, null, null, null);
+                new PublicAccessProperties(
+                        false, null, null, null, null, null, null, null, null, null, null, null, null);
 
         assertThat(properties.isEnabled()).isFalse();
+        assertThat(properties.isDeviceBindingEnabled()).isFalse();
+    }
+
+    @Test
+    void rejectsDeviceBindingWithoutPublicAccess() {
+        assertThatThrownBy(() -> new PublicAccessProperties(
+                        false,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        true,
+                        "https://app.example.test",
+                        null,
+                        null,
+                        null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("device-binding-enabled requires public-access.enabled=true");
+    }
+
+    @Test
+    void rejectsDeviceBindingWithLoopbackVerificationOrigin() {
+        assertThatThrownBy(() -> new PublicAccessProperties(
+                        true,
+                        JDBC_URL,
+                        JDBC_USERNAME,
+                        JDBC_PASSWORD,
+                        IDENTITY_PEPPER,
+                        null,
+                        true,
+                        email(),
+                        true,
+                        "https://127.0.0.1",
+                        null,
+                        null,
+                        null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("device-binding-verification-origin");
     }
 
     @Test
     void treatsNullEnabledAsDisabled() {
         PublicAccessProperties properties =
-                new PublicAccessProperties(null, " ", null, null, " ", null, false, null);
+                new PublicAccessProperties(null, " ", null, null, " ", null, false, null, null, null, null, null, null);
 
         assertThat(properties.isEnabled()).isFalse();
     }
@@ -156,7 +198,7 @@ class PublicAccessPropertiesTest {
             boolean cookieSecure,
             PublicAccessProperties.EmailProperties email) {
         return new PublicAccessProperties(
-                true, jdbcUrl, jdbcUsername, jdbcPassword, identityPepper, null, cookieSecure, email);
+                true, jdbcUrl, jdbcUsername, jdbcPassword, identityPepper, null, cookieSecure, email, null, null, null, null, null);
     }
 
     private static PublicAccessProperties.EmailProperties email() {

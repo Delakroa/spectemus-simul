@@ -4,6 +4,7 @@ import { AppShell } from "../components/AppShell";
 import { HomePage } from "../pages/HomePage";
 import { InternetHostPage } from "../pages/InternetHostPage";
 import { InternetInvitePage } from "../pages/InternetInvitePage";
+import { InternetLinkPage } from "../pages/InternetLinkPage";
 import { InternetRoomPage } from "../pages/InternetRoomPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { OperatorDashboardPage } from "../pages/OperatorDashboardPage";
@@ -14,6 +15,7 @@ export function App() {
       <Route element={<AppShell />}>
         <Route index element={<HomePage />} />
         <Route path="internet/host" element={<InternetHostPage />} />
+        <Route path="internet/link" element={<InternetLinkPage />} />
         <Route path="join" element={<InternetInvitePage />} />
         <Route path="internet/rooms/:publicRoomId" element={<InternetRoomPage />} />
         <Route path="operator" element={<OperatorDashboardPage />} />

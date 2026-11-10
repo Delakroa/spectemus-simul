@@ -21,6 +21,10 @@ import {
   getInternetAppOrigin,
 } from "../features/internet/internet-origin";
 import { copyText } from "../features/rooms/copy-text";
+import type {
+  DesktopDeviceBindingStart,
+  SpectemusDesktopApi,
+} from "../features/rooms/desktop-media";
 import { isInternetRoomChoiceEnabled } from "../features/rooms/room-mode";
 
 const ROOM_EXPIRES_IN_MINUTES = 180;
@@ -30,11 +34,12 @@ const CHALLENGE_NEUTRAL_MESSAGE =
   "Если этот адрес подходит, мы отправили одноразовый код. Введите его, чтобы продолжить.";
 const INTERNET_ACCOUNT_QUERY_KEY = ["internet", "account"] as const;
 
-type HostStep = "bootstrap" | "email" | "code" | "ready" | "creating" | "created" | "error";
+type HostStep =
+  "bootstrap" | "email" | "code" | "bind" | "waiting" | "ready" | "creating" | "created" | "error";
 
 type HostError = {
   message: string;
-  retryAction: "bootstrap" | "email" | "code" | "create" | null;
+  retryAction: "bootstrap" | "email" | "code" | "bind" | "create" | "clear" | null;
   canRequestNewCode?: boolean;
 };
 
@@ -42,6 +47,22 @@ type CreatedInternetRoom = {
   access: PublicRoomAccess;
   inviteUrl: string;
 };
+
+function desktopBindingApi(): SpectemusDesktopApi | null {
+  const desktop = window.spectemusDesktop;
+  if (
+    !desktop?.getDeviceBindingStatus ||
+    !desktop.startDeviceBinding ||
+    !desktop.openDeviceBinding ||
+    !desktop.pollDeviceBinding ||
+    !desktop.cancelDeviceBinding ||
+    !desktop.createPublicRoomWithDeviceBinding ||
+    !desktop.createPublicInviteWithDeviceBinding
+  ) {
+    return null;
+  }
+  return desktop;
+}
 
 export function InternetHostPage() {
   if (!isInternetRoomChoiceEnabled()) {
@@ -70,7 +91,354 @@ export function InternetHostPage() {
     );
   }
 
+  const desktop = desktopBindingApi();
+  if (desktop) {
+    return <DesktopInternetHostEntry appOrigin={appOrigin} desktop={desktop} />;
+  }
+
   return <InternetHostEntry appOrigin={appOrigin} />;
+}
+
+function DesktopInternetHostEntry({
+  appOrigin,
+  desktop,
+}: {
+  appOrigin: string;
+  desktop: SpectemusDesktopApi;
+}) {
+  const pollTimerRef = useRef<number | null>(null);
+  const roomIdempotencyKeyRef = useRef(createPublicRoomIdempotencyKey());
+  const inviteIdempotencyKeyRef = useRef(createPublicInviteIdempotencyKey());
+  const createdRoomRef = useRef<PublicRoomAccess | null>(null);
+
+  const [step, setStep] = useState<HostStep>("bootstrap");
+  const [pending, setPending] = useState(false);
+  const [binding, setBinding] = useState<DesktopDeviceBindingStart | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [error, setError] = useState<HostError | null>(null);
+  const [created, setCreated] = useState<CreatedInternetRoom | null>(null);
+  const [hasCreatedRoom, setHasCreatedRoom] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">("idle");
+
+  function stopPolling() {
+    if (pollTimerRef.current !== null) {
+      window.clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }
+
+  async function bootstrap() {
+    setPending(true);
+    setError(null);
+    setStep("bootstrap");
+    try {
+      const status = await desktop.getDeviceBindingStatus!();
+      if (status.bound) {
+        setDisplayName(status.profile.displayName);
+        setStep("ready");
+        return;
+      }
+      setStep("bind");
+    } catch {
+      setStep("error");
+      setError({
+        message: "Не удалось проверить привязку desktop. Попробуйте ещё раз чуть позже.",
+        retryAction: "bootstrap",
+      });
+    } finally {
+      setPending(false);
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      await Promise.resolve();
+      if (!cancelled) {
+        await bootstrap();
+      }
+    })();
+    return () => {
+      cancelled = true;
+      stopPolling();
+      void desktop.cancelDeviceBinding?.();
+    };
+    // Bootstrap once on mount for the desktop binding surface.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function startBinding() {
+    stopPolling();
+    setPending(true);
+    setError(null);
+    try {
+      const started = await desktop.startDeviceBinding!();
+      if ("deviceCode" in started || "deviceCredential" in started) {
+        throw new Error("Device secret leaked into renderer payload");
+      }
+      setBinding(started);
+      await desktop.openDeviceBinding!();
+      setStep("waiting");
+      schedulePoll(started.intervalSeconds);
+    } catch {
+      setStep("error");
+      setError({
+        message: "Не удалось начать привязку. Проверьте публичный HTTPS origin и попробуйте снова.",
+        retryAction: "bind",
+      });
+    } finally {
+      setPending(false);
+    }
+  }
+
+  function schedulePoll(intervalSeconds: number) {
+    stopPolling();
+    const delayMs = Math.max(0, Number(intervalSeconds) || 0) * 1000;
+    pollTimerRef.current = window.setTimeout(() => {
+      void pollBinding();
+    }, delayMs);
+  }
+
+  async function pollBinding() {
+    try {
+      const result = await desktop.pollDeviceBinding!();
+      if ("deviceCredential" in result || "deviceCode" in result) {
+        throw new Error("Device secret leaked into renderer payload");
+      }
+      if (result.status === "pending") {
+        schedulePoll(result.intervalSeconds);
+        return;
+      }
+      setDisplayName(result.profile.displayName);
+      setBinding(null);
+      setStep("ready");
+    } catch {
+      stopPolling();
+      setStep("error");
+      setError({
+        message: "Привязка не завершилась. Запросите новое подтверждение.",
+        retryAction: "bind",
+      });
+    }
+  }
+
+  function handleCancelBinding() {
+    stopPolling();
+    void desktop.cancelDeviceBinding?.();
+    setBinding(null);
+    setStep("error");
+    setError({
+      message: "Подтверждение отменено. Можно начать привязку заново.",
+      retryAction: "bind",
+    });
+  }
+
+  async function clearBinding() {
+    setPending(true);
+    setError(null);
+    try {
+      await desktop.clearDeviceBinding!();
+      createdRoomRef.current = null;
+      setHasCreatedRoom(false);
+      setCreated(null);
+      setDisplayName(null);
+      setStep("bind");
+    } catch {
+      setStep("error");
+      setError({
+        message:
+          "Не удалось отозвать desktop-сессию на сервере. Локальный credential сохранён — повторите отзыв.",
+        retryAction: "clear",
+      });
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function createRoomAndInvite() {
+    setPending(true);
+    setError(null);
+    setStep("creating");
+    try {
+      let access = createdRoomRef.current;
+      if (!access) {
+        access = (await desktop.createPublicRoomWithDeviceBinding!({
+          expiresInMinutes: ROOM_EXPIRES_IN_MINUTES,
+          idempotencyKey: roomIdempotencyKeyRef.current,
+        })) as PublicRoomAccess;
+        createdRoomRef.current = access;
+        setHasCreatedRoom(true);
+      }
+
+      const invite = await desktop.createPublicInviteWithDeviceBinding!({
+        publicRoomId: access.room.publicRoomId,
+        expiresInMinutes: INVITE_EXPIRES_IN_MINUTES,
+        maxRedemptions: INVITE_MAX_REDEMPTIONS,
+        idempotencyKey: inviteIdempotencyKeyRef.current,
+      });
+      setCreated({
+        access,
+        inviteUrl: createInternetInviteUrl(appOrigin, invite.invitePath),
+      });
+      setStep("created");
+    } catch (caught) {
+      if (
+        caught &&
+        typeof caught === "object" &&
+        "code" in caught &&
+        (caught as { code?: string }).code === "IDEMPOTENCY_REPLAY_UNAVAILABLE"
+      ) {
+        inviteIdempotencyKeyRef.current = createPublicInviteIdempotencyKey();
+        setStep("error");
+        setError({
+          message: "Прежнюю ссылку нельзя восстановить. Создайте новое приглашение.",
+          retryAction: "create",
+        });
+        return;
+      }
+      setStep("error");
+      setError({
+        message: "Не удалось создать Internet-комнату. Попробуйте ещё раз чуть позже.",
+        retryAction: "create",
+      });
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleCopyInvite() {
+    if (!created) {
+      return;
+    }
+    try {
+      await copyText(created.inviteUrl);
+      setCopyStatus("copied");
+    } catch {
+      setCopyStatus("error");
+    }
+  }
+
+  return (
+    <InternetHostShell title="Создать Internet-комнату">
+      <p>
+        Desktop подтверждает public account в системном браузере. Session credential остаётся в main
+        process и не попадает в renderer.
+      </p>
+
+      {step === "bootstrap" ? <p role="status">Проверяем привязку…</p> : null}
+
+      {step === "bind" ? (
+        <div className="internet-host__ready">
+          <p>
+            Чтобы создать комнату «Из разных городов», подтвердите аккаунт в системном браузере.
+            Cookie браузера не ослабляется ради Electron loopback.
+          </p>
+          <button
+            className="button button--primary"
+            disabled={pending}
+            onClick={() => void startBinding()}
+            type="button"
+          >
+            Подтвердить аккаунт в браузере
+          </button>
+        </div>
+      ) : null}
+
+      {step === "waiting" && binding ? (
+        <div className="internet-host__ready" role="status">
+          <p>Откройте системный браузер и введите код подтверждения:</p>
+          <p>
+            <strong>{binding.userCode}</strong>
+          </p>
+          <p>Ожидаем подтверждение…</p>
+          <button className="button" onClick={handleCancelBinding} type="button">
+            Отменить
+          </button>
+        </div>
+      ) : null}
+
+      {step === "ready" ? (
+        <div className="internet-host__ready">
+          <p>
+            Desktop привязан{displayName ? `: ${displayName}` : ""}. Можно создать приватную комнату
+            и ссылку для гостя.
+          </p>
+          <button
+            className="button button--primary"
+            disabled={pending}
+            onClick={() => void createRoomAndInvite()}
+            type="button"
+          >
+            {hasCreatedRoom ? "Продолжить создание приглашения" : "Создать комнату"}
+          </button>
+          <button
+            className="button"
+            disabled={pending}
+            onClick={() => void clearBinding()}
+            type="button"
+          >
+            Отвязать аккаунт
+          </button>
+        </div>
+      ) : null}
+
+      {step === "creating" ? <p role="status">Создаём комнату и приглашение…</p> : null}
+
+      {step === "created" && created ? (
+        <CreatedRoomResult
+          created={created}
+          copyStatus={copyStatus}
+          onCopy={() => void handleCopyInvite()}
+        />
+      ) : null}
+
+      {error ? (
+        <div className="internet-invite__error" role="alert">
+          <p>{error.message}</p>
+          {error.retryAction === "bootstrap" ? (
+            <button
+              className="button"
+              disabled={pending}
+              onClick={() => void bootstrap()}
+              type="button"
+            >
+              Повторить
+            </button>
+          ) : null}
+          {error.retryAction === "bind" ? (
+            <button
+              className="button"
+              disabled={pending}
+              onClick={() => void startBinding()}
+              type="button"
+            >
+              Повторить
+            </button>
+          ) : null}
+          {error.retryAction === "create" ? (
+            <button
+              className="button"
+              disabled={pending}
+              onClick={() => void createRoomAndInvite()}
+              type="button"
+            >
+              Повторить
+            </button>
+          ) : null}
+          {error.retryAction === "clear" ? (
+            <button
+              className="button"
+              disabled={pending}
+              onClick={() => void clearBinding()}
+              type="button"
+            >
+              Повторить отзыв
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </InternetHostShell>
+  );
 }
 
 function InternetHostEntry({ appOrigin }: { appOrigin: string }) {
@@ -319,6 +687,9 @@ function InternetHostEntry({ appOrigin }: { appOrigin: string }) {
       case "code":
         void verifyChallenge();
         break;
+      case "bind":
+      case "clear":
+        break;
       case "create":
         void createRoomAndInvite();
         break;
@@ -405,35 +776,17 @@ function InternetHostEntry({ appOrigin }: { appOrigin: string }) {
       {step === "creating" ? <p role="status">Создаём комнату и приглашение…</p> : null}
 
       {step === "created" && created ? (
-        <div className="internet-host__result">
-          <h2>Комната создана</h2>
-          <p>Отправьте эту ссылку гостю. Она даёт доступ максимум трём людям.</p>
-          <label htmlFor="internet-host-invite">Ссылка приглашения</label>
-          <input id="internet-host-invite" readOnly type="text" value={created.inviteUrl} />
-          <div className="internet-host__actions">
-            <button className="button" onClick={() => void handleCopyInvite()} type="button">
-              Скопировать ссылку
-            </button>
-            <Link
-              className="button button--primary"
-              to={`/internet/rooms/${created.access.room.publicRoomId}`}
-            >
-              Перейти к комнате
-            </Link>
-          </div>
-          {copyStatus === "copied" ? <p role="status">Ссылка скопирована</p> : null}
-          {copyStatus === "error" ? (
-            <p className="internet-invite__error" role="alert">
-              Не удалось скопировать ссылку. Выделите её вручную.
-            </p>
-          ) : null}
-        </div>
+        <CreatedRoomResult
+          created={created}
+          copyStatus={copyStatus}
+          onCopy={() => void handleCopyInvite()}
+        />
       ) : null}
 
       {visibleError ? (
         <div className="internet-invite__error" role="alert">
           <p>{visibleError.message}</p>
-          {retryAction ? (
+          {retryAction && retryAction !== "bind" ? (
             <button
               className="button"
               disabled={pending}
@@ -451,6 +804,42 @@ function InternetHostEntry({ appOrigin }: { appOrigin: string }) {
         </div>
       ) : null}
     </InternetHostShell>
+  );
+}
+
+function CreatedRoomResult({
+  created,
+  copyStatus,
+  onCopy,
+}: {
+  created: CreatedInternetRoom;
+  copyStatus: "idle" | "copied" | "error";
+  onCopy: () => void;
+}) {
+  return (
+    <div className="internet-host__result">
+      <h2>Комната создана</h2>
+      <p>Отправьте эту ссылку гостю. Она даёт доступ максимум трём людям.</p>
+      <label htmlFor="internet-host-invite">Ссылка приглашения</label>
+      <input id="internet-host-invite" readOnly type="text" value={created.inviteUrl} />
+      <div className="internet-host__actions">
+        <button className="button" onClick={onCopy} type="button">
+          Скопировать ссылку
+        </button>
+        <Link
+          className="button button--primary"
+          to={`/internet/rooms/${created.access.room.publicRoomId}`}
+        >
+          Перейти к комнате
+        </Link>
+      </div>
+      {copyStatus === "copied" ? <p role="status">Ссылка скопирована</p> : null}
+      {copyStatus === "error" ? (
+        <p className="internet-invite__error" role="alert">
+          Не удалось скопировать ссылку. Выделите её вручную.
+        </p>
+      ) : null}
+    </div>
   );
 }
 
