@@ -74,11 +74,15 @@ class PublicAccessController {
     @PostMapping("/public-rooms")
     ResponseEntity<PublicRoomAccessResponse> createPublicRoom(
             @CookieValue(name = ACCOUNT_COOKIE, required = false) String accountCredential,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @Valid @RequestBody CreatePublicRoomRequest request,
             HttpServletRequest servletRequest) {
         PublicRoomAccessResponse response = service.createRoom(
-                accountCredential, idempotencyKey, request, correlationId(servletRequest));
+                resolveCredential(accountCredential, authorization),
+                idempotencyKey,
+                request,
+                correlationId(servletRequest));
         return ResponseEntity.created(URI.create("/api/v2/public-rooms/" + response.room().publicRoomId()))
                 .cacheControl(CacheControl.noStore())
                 .body(response);
@@ -97,6 +101,7 @@ class PublicAccessController {
     ResponseEntity<PublicInviteCreatedResponse> createInvite(
             @PathVariable UUID publicRoomId,
             @CookieValue(name = ACCOUNT_COOKIE, required = false) String accountCredential,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @Valid @RequestBody CreatePublicInviteRequest request,
             HttpServletRequest servletRequest) {
@@ -104,7 +109,7 @@ class PublicAccessController {
                 .cacheControl(CacheControl.noStore())
                 .body(service.createInvite(
                         publicRoomId,
-                        accountCredential,
+                        resolveCredential(accountCredential, authorization),
                         idempotencyKey,
                         request,
                         correlationId(servletRequest)));
@@ -154,6 +159,21 @@ class PublicAccessController {
                 .maxAge(maxAge)
                 .build()
                 .toString();
+    }
+
+    /** Cookie remains preferred; desktop device sessions may use Authorization Bearer. */
+    private static String resolveCredential(String accountCredential, String authorization) {
+        if (accountCredential != null && !accountCredential.isBlank()) {
+            return accountCredential;
+        }
+        if (authorization == null) {
+            return null;
+        }
+        String value = authorization.strip();
+        if (value.length() > 7 && value.regionMatches(true, 0, "Bearer ", 0, 7)) {
+            return value.substring(7).strip();
+        }
+        return null;
     }
 
     private UUID correlationId(HttpServletRequest request) {

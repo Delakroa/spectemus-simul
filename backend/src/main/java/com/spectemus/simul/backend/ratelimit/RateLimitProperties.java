@@ -21,7 +21,10 @@ public record RateLimitProperties(
         Limit emailChallengeVerify,
         Limit publicRoom,
         Limit publicInvite,
-        Limit inviteRedemption) {
+        Limit inviteRedemption,
+        Limit deviceBindingStart,
+        Limit deviceBindingApprove,
+        Limit deviceBindingToken) {
 
     private static final Limit DEFAULT_CREATE_ROOM = new Limit(10, Duration.ofMinutes(1));
     private static final Limit DEFAULT_JOIN_ROOM = new Limit(20, Duration.ofMinutes(1));
@@ -33,6 +36,9 @@ public record RateLimitProperties(
     private static final Limit DEFAULT_PUBLIC_ROOM = new Limit(10, Duration.ofHours(1));
     private static final Limit DEFAULT_PUBLIC_INVITE = new Limit(20, Duration.ofHours(1));
     private static final Limit DEFAULT_INVITE_REDEMPTION = new Limit(20, Duration.ofMinutes(15));
+    private static final Limit DEFAULT_DEVICE_BINDING_START = new Limit(10, Duration.ofMinutes(15));
+    private static final Limit DEFAULT_DEVICE_BINDING_APPROVE = new Limit(20, Duration.ofMinutes(15));
+    private static final Limit DEFAULT_DEVICE_BINDING_TOKEN = new Limit(60, Duration.ofMinutes(15));
 
     public RateLimitProperties {
         enabled = enabled == null ? Boolean.TRUE : enabled;
@@ -48,6 +54,12 @@ public record RateLimitProperties(
         publicRoom = publicRoom == null ? DEFAULT_PUBLIC_ROOM : publicRoom;
         publicInvite = publicInvite == null ? DEFAULT_PUBLIC_INVITE : publicInvite;
         inviteRedemption = inviteRedemption == null ? DEFAULT_INVITE_REDEMPTION : inviteRedemption;
+        deviceBindingStart =
+                deviceBindingStart == null ? DEFAULT_DEVICE_BINDING_START : deviceBindingStart;
+        deviceBindingApprove =
+                deviceBindingApprove == null ? DEFAULT_DEVICE_BINDING_APPROVE : deviceBindingApprove;
+        deviceBindingToken =
+                deviceBindingToken == null ? DEFAULT_DEVICE_BINDING_TOKEN : deviceBindingToken;
     }
 
     public boolean isEnabled() {

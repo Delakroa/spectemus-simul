@@ -103,6 +103,29 @@ class RateLimitConfiguration implements WebMvcConfigurer {
                     "invite-redemption",
                     config.inviteRedemption(),
                     "/api/v2/invite-redemptions");
+            if (publicAccess.isDeviceBindingEnabled()) {
+                register(
+                        registry,
+                        limiter,
+                        meters,
+                        "device-binding-start",
+                        config.deviceBindingStart(),
+                        "/api/v2/auth/device-bindings");
+                register(
+                        registry,
+                        limiter,
+                        meters,
+                        "device-binding-approve",
+                        config.deviceBindingApprove(),
+                        "/api/v2/auth/device-bindings/*/approve");
+                register(
+                        registry,
+                        limiter,
+                        meters,
+                        "device-binding-token",
+                        config.deviceBindingToken(),
+                        "/api/v2/auth/device-bindings/*/token");
+            }
         }
     }
 

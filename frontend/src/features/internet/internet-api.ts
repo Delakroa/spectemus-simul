@@ -177,6 +177,33 @@ export function createPublicRoomInvite(
   );
 }
 
+export async function approveDeviceBinding(
+  bindingId: string,
+  userCode: string,
+  signal?: AbortSignal,
+) {
+  const response = await fetch(
+    `${apiBaseUrl}/api/v2/auth/device-bindings/${encodeURIComponent(bindingId)}/approve`,
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ userCode }),
+      credentials: "include",
+      signal,
+    },
+  );
+  if (!response.ok) {
+    throw await createResponseError(response);
+  }
+}
+
+export function isDeviceBindingUnavailableError(error: unknown) {
+  return error instanceof ApiProblemError && error.problem.code === "DEVICE_BINDING_UNAVAILABLE";
+}
+
 export function createInviteRedemptionIdempotencyKey() {
   if (globalThis.crypto?.randomUUID) {
     return `invite-redeem-${globalThis.crypto.randomUUID()}`;

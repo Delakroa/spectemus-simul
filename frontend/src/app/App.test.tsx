@@ -73,4 +73,18 @@ describe("App", () => {
       screen.getByRole("heading", { name: "Internet-комната пока закрыта" }),
     ).toBeInTheDocument();
   });
+
+  it("открывает desktop link route за выключенным feature", () => {
+    vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "false");
+
+    render(
+      <QueryClientProvider client={createAppQueryClient()}>
+        <MemoryRouter initialEntries={["/internet/link"]}>
+          <App />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole("heading", { name: "Привязка недоступна" })).toBeInTheDocument();
+  });
 });

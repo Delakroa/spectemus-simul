@@ -64,6 +64,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  delete window.spectemusDesktop;
   globalThis.localStorage?.clear?.();
   globalThis.sessionStorage?.clear?.();
 });
@@ -202,6 +203,83 @@ describe("InternetHostPage", () => {
     expect(roomCalls).toBe(1);
     expect(inviteKeys).toHaveLength(2);
     expect(inviteKeys[1]).toBe(inviteKeys[0]);
+  });
+
+  it("в desktop предлагает browser binding без передачи credential в renderer", async () => {
+    vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
+    vi.stubEnv("VITE_INTERNET_APP_ORIGIN", "https://app.example.test");
+    const user = userEvent.setup();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const opened: string[] = [];
+    let bound = false;
+    let releasePoll!: () => void;
+    const pollGate = new Promise<void>((resolve) => {
+      releasePoll = resolve;
+    });
+    window.spectemusDesktop = {
+      getRuntimeStatus: async () => ({ detail: "ok", state: "ready" }),
+      onRuntimeStatus: () => () => undefined,
+      restartRuntime: async () => ({ detail: "ok", state: "ready" }),
+      getDeviceBindingStatus: async () =>
+        bound
+          ? {
+              bound: true,
+              profile: {
+                accountId: accountProfile.accountId,
+                displayName: accountProfile.displayName,
+              },
+              expiresAt: "2026-11-24T10:00:00Z",
+            }
+          : { bound: false },
+      startDeviceBinding: async () => ({
+        bindingId: "11111111-1111-4111-8111-111111111111",
+        userCode: "ABCD-EFGH",
+        verificationUri:
+          "https://app.example.test/internet/link#binding=11111111-1111-4111-8111-111111111111",
+        expiresAt: "2026-11-10T10:10:00Z",
+        intervalSeconds: 0,
+      }),
+      openDeviceBinding: async (uri) => {
+        opened.push(uri);
+      },
+      pollDeviceBinding: async () => {
+        await pollGate;
+        bound = true;
+        return {
+          status: "bound" as const,
+          profile: {
+            accountId: accountProfile.accountId,
+            displayName: accountProfile.displayName,
+          },
+          expiresAt: "2026-11-24T10:00:00Z",
+        };
+      },
+      cancelDeviceBinding: async () => ({ cancelled: true }),
+      clearDeviceBinding: async () => {
+        bound = false;
+        return { bound: false };
+      },
+      createPublicRoomWithDeviceBinding: async () => roomAccess,
+      createPublicInviteWithDeviceBinding: async () => invite,
+    };
+
+    renderPage();
+    expect(
+      await screen.findByText(/подтвердите аккаунт в системном браузере/i),
+    ).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Подтвердить аккаунт в браузере" }));
+    expect(await screen.findByText("ABCD-EFGH")).toBeInTheDocument();
+    expect(opened[0]).toContain("/internet/link#binding=");
+    expect(opened[0]).not.toMatch(/deviceCode|deviceCredential|@[A-Za-z]/);
+    releasePoll();
+    expect(await screen.findByText(/Desktop привязан: Хозяин/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Создать комнату" }));
+    expect(
+      await screen.findByDisplayValue(`https://app.example.test/join#invite=${inviteToken}`),
+    ).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/deviceCredential|deviceCode/);
   });
 
   it("после невосстановимого replay invite создаёт новый invite key", async () => {

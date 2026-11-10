@@ -760,6 +760,136 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/v2/auth/device-bindings:
+    post:
+      tags: [Internet access]
+      operationId: startDeviceBinding
+      summary: Начать одноразовую привязку desktop host к public account
+      description: |
+        Device-authorization start. Desktop получает `deviceCode` один раз в body
+        ответа и короткий `userCode` для подтверждения в системном браузере.
+        Credential и deviceCode не помещаются в URL, fragment или query.
+        Route доступен только при `PUBLIC_ACCESS_ENABLED=true` и
+        `PUBLIC_DEVICE_BINDING_ENABLED=true`.
+      x-implementation-status: implemented
+      responses:
+        "201":
+          description: Binding создан; deviceCode возвращается один раз
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceBindingStarted"
+        "404":
+          $ref: "#/components/responses/DeviceBindingUnavailable"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v2/auth/device-bindings/{bindingId}/approve:
+    parameters:
+      - $ref: "#/components/parameters/DeviceBindingId"
+    post:
+      tags: [Internet access]
+      operationId: approveDeviceBinding
+      summary: Подтвердить desktop binding действующим browser account
+      description: |
+        Требует `wt_account`. Сопоставляет `userCode` с pending binding без
+        раскрытия, существует ли другой binding.
+      x-implementation-status: implemented
+      security:
+        - accountSessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveDeviceBindingRequest"
+      responses:
+        "204":
+          description: Binding подтверждён и ожидает desktop exchange
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/DeviceBindingUnavailable"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v2/auth/device-bindings/{bindingId}/token:
+    parameters:
+      - $ref: "#/components/parameters/DeviceBindingId"
+    post:
+      tags: [Internet access]
+      operationId: exchangeDeviceBinding
+      summary: Обменять deviceCode на desktop account session
+      description: |
+        Polling/exchange endpoint. `deviceCode` только в POST body. Pending
+        возвращает retryable `DEVICE_AUTHORIZATION_PENDING`. Успех один раз
+        выдаёт opaque `deviceCredential`; повторный exchange недоступен.
+      x-implementation-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExchangeDeviceBindingRequest"
+      responses:
+        "200":
+          description: Desktop session выдана один раз
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceBindingSession"
+        "400":
+          $ref: "#/components/responses/DeviceAuthorizationPending"
+        "401":
+          $ref: "#/components/responses/DeviceCodeRejected"
+        "404":
+          $ref: "#/components/responses/DeviceBindingUnavailable"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v2/account/device-sessions/revoke:
+    post:
+      tags: [Internet access]
+      operationId: revokeDeviceSession
+      summary: Отозвать текущую desktop device session
+      description: |
+        Desktop передаёт `deviceCredential` только в POST body. Browser cookie
+        для этого endpoint не требуется.
+      x-implementation-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RevokeDeviceSessionRequest"
+      responses:
+        "204":
+          description: Session отозвана или уже неактивна
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+        "401":
+          $ref: "#/components/responses/DeviceCodeRejected"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /api/v2/invite-redemptions:
     post:
       tags: [Internet access]
@@ -830,6 +960,14 @@ components:
       required: true
       schema:
         $ref: "./schemas/common.schema.json#/$defs/RoomId"
+    DeviceBindingId:
+      name: bindingId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
     IdempotencyKey:
       name: Idempotency-Key
       in: header
@@ -1582,6 +1720,98 @@ components:
           minimum: 1
           maximum: 3
 
+    DeviceBindingStarted:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          bindingId,
+          userCode,
+          verificationUri,
+          expiresAt,
+          intervalSeconds,
+          deviceCode,
+        ]
+      properties:
+        bindingId:
+          type: string
+          format: uuid
+        userCode:
+          type: string
+          pattern: ^[A-Z0-9]{4}-[A-Z0-9]{4}$
+          description: Короткий код для подтверждения в браузере; не является session credential.
+        verificationUri:
+          type: string
+          format: uri
+          pattern: ^https://
+          description: Публичный HTTPS URL страницы подтверждения без credentials.
+        expiresAt:
+          type: string
+          format: date-time
+        intervalSeconds:
+          type: integer
+          minimum: 1
+          maximum: 60
+        deviceCode:
+          type: string
+          minLength: 43
+          maxLength: 43
+          pattern: ^[A-Za-z0-9_-]{43}$
+          writeOnly: true
+          description: High-entropy one-time secret для desktop poll/exchange; только в response body.
+
+    ApproveDeviceBindingRequest:
+      type: object
+      additionalProperties: false
+      required: [userCode]
+      properties:
+        userCode:
+          type: string
+          pattern: ^[A-Z0-9]{4}-[A-Z0-9]{4}$
+          writeOnly: true
+
+    ExchangeDeviceBindingRequest:
+      type: object
+      additionalProperties: false
+      required: [deviceCode]
+      properties:
+        deviceCode:
+          type: string
+          minLength: 43
+          maxLength: 43
+          pattern: ^[A-Za-z0-9_-]{43}$
+          writeOnly: true
+
+    DeviceBindingSession:
+      type: object
+      additionalProperties: false
+      required: [deviceCredential, profile, expiresAt]
+      properties:
+        deviceCredential:
+          type: string
+          minLength: 43
+          maxLength: 43
+          pattern: ^[A-Za-z0-9_-]{43}$
+          writeOnly: true
+          description: Opaque desktop session; хранится только HMAC fingerprint.
+        profile:
+          $ref: "#/components/schemas/AccountProfile"
+        expiresAt:
+          type: string
+          format: date-time
+
+    RevokeDeviceSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [deviceCredential]
+      properties:
+        deviceCredential:
+          type: string
+          minLength: 43
+          maxLength: 43
+          pattern: ^[A-Za-z0-9_-]{43}$
+          writeOnly: true
+
     RedeemPublicInviteRequest:
       type: object
       additionalProperties: false
@@ -1631,6 +1861,24 @@ components:
             $ref: "#/components/schemas/ProblemDetails"
     MembershipRequired:
       description: Public room недоступна без active membership; ответ не раскрывает её существование или owner-а
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    DeviceBindingUnavailable:
+      description: Binding недоступен без раскрытия expired/unknown/exchanged
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    DeviceAuthorizationPending:
+      description: Binding ещё не подтверждён; desktop должен повторить poll
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    DeviceCodeRejected:
+      description: deviceCode/deviceCredential недействителен без enumeration
       content:
         application/problem+json:
           schema:

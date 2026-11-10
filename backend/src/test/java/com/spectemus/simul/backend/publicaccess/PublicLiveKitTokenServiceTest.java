@@ -323,7 +323,7 @@ class PublicLiveKitTokenServiceTest {
                     null,
                     true,
                     new PublicAccessProperties.EmailProperties(
-                            "smtp.example.test", 587, "user", "password", "login@example.test", true));
+                            "smtp.example.test", 587, "user", "password", "login@example.test", true), null, null, null, null, null);
         }
     }
 

@@ -1,8 +1,16 @@
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  safeStorage,
+  shell,
+} from "electron";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { createDeviceBindingController } from "./device-binding.mjs";
 import { acquireDesktopInstanceLock } from "./instance-lock.mjs";
 import { DesktopMediaLibrary } from "./media-library.mjs";
 import {
@@ -144,6 +152,39 @@ if (isPrimaryInstance) {
       await startDesktopHost(address);
       return supervisor.status;
     });
+
+    const deviceBinding = createDeviceBindingController({
+      userDataPath: app.getPath("userData"),
+      openExternal: (url) => shell.openExternal(url),
+      safeStorageImpl: safeStorage,
+    });
+    ipcMain.handle("spectemus:device-binding-status", () =>
+      deviceBinding.status(),
+    );
+    ipcMain.handle("spectemus:device-binding-start", (_event, apiOrigin) =>
+      deviceBinding.start({ apiOrigin }),
+    );
+    ipcMain.handle("spectemus:device-binding-open", (_event, verificationUri) =>
+      deviceBinding.openVerification(verificationUri),
+    );
+    ipcMain.handle("spectemus:device-binding-poll", () =>
+      deviceBinding.pollOnce(),
+    );
+    ipcMain.handle("spectemus:device-binding-cancel", () => {
+      deviceBinding.cancel();
+      return { cancelled: true };
+    });
+    ipcMain.handle("spectemus:device-binding-clear", () =>
+      deviceBinding.clear(),
+    );
+    ipcMain.handle("spectemus:device-binding-create-room", (_event, payload) =>
+      deviceBinding.createPublicRoom(payload),
+    );
+    ipcMain.handle(
+      "spectemus:device-binding-create-invite",
+      (_event, payload) => deviceBinding.createPublicInvite(payload),
+    );
+
     mainWindow = createWindow();
     await startDesktopHost(process.env.SPECTEMUS_LAN_IP);
   });

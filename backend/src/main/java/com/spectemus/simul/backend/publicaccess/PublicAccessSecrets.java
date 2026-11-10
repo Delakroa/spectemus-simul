@@ -42,6 +42,31 @@ final class PublicAccessSecrets {
         return new String(code);
     }
 
+    /** Short browser-facing code shaped like {@code ABCD-EFGH}. Not a session credential. */
+    String deviceUserCode() {
+        char[] code = new char[9];
+        for (int index = 0; index < code.length; index++) {
+            if (index == 4) {
+                code[index] = '-';
+                continue;
+            }
+            code[index] = CODE_ALPHABET[random.nextInt(CODE_ALPHABET.length)];
+        }
+        return new String(code);
+    }
+
+    String deviceCodeFingerprint(String deviceCode) {
+        return fingerprint("device-code", deviceCode);
+    }
+
+    String userCodeFingerprint(String userCode) {
+        return fingerprint("user-code", userCode);
+    }
+
+    String deviceCredentialFingerprint(String deviceCredential) {
+        return fingerprint("device-credential", deviceCredential);
+    }
+
     String emailFingerprint(String normalizedEmail) {
         return fingerprint("email", normalizedEmail);
     }

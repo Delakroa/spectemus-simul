@@ -108,6 +108,66 @@ for (const pathItem of Object.values(openApi.paths)) {
     "Invite token must never appear in an API path or query parameter",
   );
 }
+const deviceBindingStart = openApi.paths["/api/v2/auth/device-bindings"].post;
+assert.equal(
+  deviceBindingStart["x-implementation-status"],
+  "implemented",
+  "Device binding start must be marked implemented after SPS-724",
+);
+assert.equal(
+  openApi.paths["/api/v2/auth/device-bindings/{bindingId}/approve"].post
+    .security?.[0]?.accountSessionCookie !== undefined,
+  true,
+  "Device binding approve must require the account session cookie",
+);
+assert.equal(
+  openApi.components.schemas.ExchangeDeviceBindingRequest.properties.deviceCode
+    .writeOnly,
+  true,
+  "deviceCode must stay write-only in the exchange request",
+);
+assert.equal(
+  openApi.components.schemas.DeviceBindingSession.properties.deviceCredential
+    .writeOnly,
+  true,
+  "deviceCredential must stay write-only in the session response schema",
+);
+for (const [pathKey, pathItem] of Object.entries(openApi.paths)) {
+  if (
+    !pathKey.includes("device-binding") &&
+    !pathKey.includes("device-sessions")
+  ) {
+    continue;
+  }
+  for (const operation of Object.values(pathItem)) {
+    if (
+      !operation ||
+      typeof operation !== "object" ||
+      !("parameters" in operation)
+    ) {
+      continue;
+    }
+    const parameters = operation.parameters ?? [];
+    assert.equal(
+      parameters.some(
+        (parameter) =>
+          ["deviceCode", "deviceCredential", "userCode"].includes(
+            parameter.name,
+          ) &&
+          (parameter.in === "query" || parameter.in === "path"),
+      ),
+      false,
+      `${pathKey} must not place device secrets in path or query`,
+    );
+  }
+}
+assert.equal(
+  Object.keys(openApi.paths).some(
+    (pathKey) => pathKey.startsWith("/api/v1") && pathKey.includes("device"),
+  ),
+  false,
+  "LAN /api/v1 must stay free of device-binding routes",
+);
 console.log("[ok] Internet access contract privacy invariants");
 
 const [commonSchema, problemSchema, clientEventSchema, serverEventSchema] =
