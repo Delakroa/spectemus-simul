@@ -32,6 +32,16 @@ export type RemotePlaybackController = {
 
 export type RemotePlaybackHandlers = {
   onStateChange: (state: RemotePlaybackState) => void;
+  /**
+   * Optional publication filter. When omitted, LAN defaults apply:
+   * any video; audio via isMovieAudioPublication (movie-audio / screen_share_audio / non-voice).
+   */
+  acceptPublication?: (track: RemoteTrack, publication: RemoteTrackPublication) => boolean;
+  /**
+   * When true, status stays `waiting` until a video track is attached.
+   * LAN default is false (any single track counts as receiving).
+   */
+  receivingRequiresVideo?: boolean;
 };
 
 const idleState: RemotePlaybackState = {
@@ -56,6 +66,21 @@ export function createRemotePlaybackController(
   let participantIdentity: string | null = null;
   let hasReceivedTracks = false;
   let disconnected = false;
+  let videoPlaybackError: string | null = null;
+  let audioPlaybackError: string | null = null;
+
+  const resolveStatus = (override?: RemotePlaybackStatus): RemotePlaybackStatus => {
+    if (override) {
+      return override;
+    }
+    if (videoTrack) {
+      return "receiving";
+    }
+    if (audioTrack) {
+      return handlers.receivingRequiresVideo ? "waiting" : "receiving";
+    }
+    return hasReceivedTracks ? "lost" : "waiting";
+  };
 
   const emitState = (next?: Partial<RemotePlaybackState>) => {
     if (disconnected) {
@@ -63,19 +88,29 @@ export function createRemotePlaybackController(
     }
 
     const trackCount = Number(Boolean(videoTrack)) + Number(Boolean(audioTrack));
-    const status: RemotePlaybackStatus =
-      next?.status ?? (trackCount > 0 ? "receiving" : hasReceivedTracks ? "lost" : "waiting");
+    const error =
+      next && Object.prototype.hasOwnProperty.call(next, "error")
+        ? (next.error ?? null)
+        : (videoPlaybackError ?? audioPlaybackError);
+    const status = next?.status ?? (error ? "error" : resolveStatus());
 
     handlers.onStateChange({
-      ...idleState,
       audioTrackName,
-      error: null,
+      error,
       participantIdentity,
       status,
       trackCount,
       videoTrackName,
-      ...next,
     });
+  };
+
+  const emitAfterPlaybackAttempt = () => {
+    const error = videoPlaybackError ?? audioPlaybackError;
+    if (error) {
+      emitState({ error, status: "error" });
+      return;
+    }
+    emitState({ error: null });
   };
 
   const resumeAudio = async (): Promise<void> => {
@@ -85,10 +120,13 @@ export function createRemotePlaybackController(
 
     try {
       await audioElement.play();
-      emitState();
+      audioPlaybackError = null;
+      emitAfterPlaybackAttempt();
     } catch (error) {
+      audioPlaybackError =
+        error instanceof Error ? error.message : "Не удалось воспроизвести звук.";
       emitState({
-        error: error instanceof Error ? error.message : "Не удалось воспроизвести звук.",
+        error: videoPlaybackError ?? audioPlaybackError,
         status: "error",
       });
     }
@@ -101,10 +139,12 @@ export function createRemotePlaybackController(
 
     try {
       await videoElement.play();
-      emitState();
+      videoPlaybackError = null;
+      emitAfterPlaybackAttempt();
     } catch (error) {
+      videoPlaybackError = formatVideoPlaybackError(error);
       emitState({
-        error: formatVideoPlaybackError(error),
+        error: videoPlaybackError ?? audioPlaybackError,
         status: "error",
       });
     }
@@ -149,6 +189,16 @@ export function createRemotePlaybackController(
     attachAudio();
   };
 
+  const acceptsPublication = (track: RemoteTrack, publication: RemoteTrackPublication) => {
+    if (handlers.acceptPublication) {
+      return handlers.acceptPublication(track, publication);
+    }
+    if (track.kind === "audio") {
+      return isMovieAudioPublication(publication);
+    }
+    return track.kind === "video";
+  };
+
   const handleTrackSubscribed = (
     track: RemoteTrack,
     publication: RemoteTrackPublication,
@@ -158,7 +208,7 @@ export function createRemotePlaybackController(
       return;
     }
 
-    if (track.kind === "audio" && !isMovieAudioPublication(publication)) {
+    if (!acceptsPublication(track, publication)) {
       return;
     }
 
@@ -172,6 +222,7 @@ export function createRemotePlaybackController(
 
       videoTrack = track;
       videoTrackName = publication.trackName || "video";
+      videoPlaybackError = null;
       attachVideo();
       emitState();
       return;
@@ -183,6 +234,7 @@ export function createRemotePlaybackController(
 
     audioTrack = track;
     audioTrackName = publication.trackName || "audio";
+    audioPlaybackError = null;
     attachAudio();
     emitState();
   };
@@ -195,6 +247,7 @@ export function createRemotePlaybackController(
 
       videoTrack = null;
       videoTrackName = null;
+      videoPlaybackError = null;
     }
 
     if (track === audioTrack) {
@@ -204,6 +257,7 @@ export function createRemotePlaybackController(
 
       audioTrack = null;
       audioTrackName = null;
+      audioPlaybackError = null;
     }
 
     emitState();
@@ -220,7 +274,9 @@ export function createRemotePlaybackController(
     audioTrackName = null;
     videoTrackName = null;
     participantIdentity = null;
-    emitState({ status: "lost" });
+    videoPlaybackError = null;
+    audioPlaybackError = null;
+    emitState({ status: "lost", error: null });
   };
 
   room.on("trackSubscribed", handleTrackSubscribed);
@@ -284,4 +340,19 @@ function isMovieAudioPublication(publication: RemoteTrackPublication) {
     source === "screen_share_audio" ||
     !isVoiceTrackPublication(publication)
   );
+}
+
+/** Strict Internet movie tracks: name + expected LiveKit source from file publication. */
+export function isStrictInternetMoviePublication(
+  track: Pick<RemoteTrack, "kind">,
+  publication: Pick<RemoteTrackPublication, "trackName"> & { source?: unknown },
+) {
+  const source = publication.source;
+  if (track.kind === "video") {
+    return publication.trackName === "movie-video" && source === "camera";
+  }
+  if (track.kind === "audio") {
+    return publication.trackName === "movie-audio" && source === "screen_share_audio";
+  }
+  return false;
 }

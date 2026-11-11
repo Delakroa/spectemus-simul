@@ -3,6 +3,7 @@ import type { Room as LiveKitRoom } from "livekit-client";
 
 import {
   createRemotePlaybackController,
+  isStrictInternetMoviePublication,
   type RemotePlaybackController,
   type RemotePlaybackElements,
   type RemotePlaybackState,
@@ -47,11 +48,14 @@ export function useInternetGuestRemotePlayback(options: {
     }
 
     const controller = createRemotePlaybackController(room, {
+      acceptPublication: (track, publication) =>
+        isStrictInternetMoviePublication(track, publication),
       onStateChange: (next) => {
         if (!cancelled) {
           setState(next);
         }
       },
+      receivingRequiresVideo: true,
     });
     controllerRef.current = controller;
     controller.setElements(elementsRef.current);
@@ -111,6 +115,7 @@ export function formatInternetRemotePlaybackStatus(status: RemotePlaybackState["
 export function formatInternetRemotePlaybackHint(
   status: RemotePlaybackState["status"],
   error: string | null,
+  tracks?: { audioTrackName: string | null; videoTrackName: string | null },
 ) {
   if (status === "error" && isInternetRemotePlaybackUserActionRequired(error)) {
     return "Браузер ожидает подтверждения. Нажмите «Запустить просмотр».";
@@ -120,6 +125,13 @@ export function formatInternetRemotePlaybackHint(
   }
   if (status === "lost") {
     return "Хозяин остановил публикацию или отключился.";
+  }
+  if (
+    (status === "waiting" || status === "idle") &&
+    tracks?.audioTrackName &&
+    !tracks.videoTrackName
+  ) {
+    return "Звук уже есть, ждём видео.";
   }
   if (status === "waiting" || status === "idle") {
     return "Хозяин ещё не опубликовал фильм.";

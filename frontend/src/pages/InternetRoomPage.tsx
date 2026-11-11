@@ -318,7 +318,10 @@ function InternetGuestPlaybackPanel({
   }, [setElements]);
 
   const statusLabel = formatInternetRemotePlaybackStatus(playback.status);
-  const hint = formatInternetRemotePlaybackHint(playback.status, playback.error);
+  const hint = formatInternetRemotePlaybackHint(playback.status, playback.error, {
+    audioTrackName: playback.audioTrackName,
+    videoTrackName: playback.videoTrackName,
+  });
   const needsUserStart = isInternetRemotePlaybackUserActionRequired(playback.error);
 
   return (

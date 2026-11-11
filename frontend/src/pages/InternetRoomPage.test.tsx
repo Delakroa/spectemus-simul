@@ -309,13 +309,13 @@ describe("InternetRoomPage", () => {
     mockLiveKitRoom.emit(
       "trackSubscribed",
       videoTrack,
-      { track: videoTrack, trackName: "movie-video" },
+      { track: videoTrack, trackName: "movie-video", source: "camera" },
       participant,
     );
     mockLiveKitRoom.emit(
       "trackSubscribed",
       audioTrack,
-      { track: audioTrack, trackName: "movie-audio" },
+      { track: audioTrack, trackName: "movie-audio", source: "screen_share_audio" },
       participant,
     );
 
@@ -331,13 +331,13 @@ describe("InternetRoomPage", () => {
     mockLiveKitRoom.emit(
       "trackUnsubscribed",
       videoTrack,
-      { track: videoTrack, trackName: "movie-video" },
+      { track: videoTrack, trackName: "movie-video", source: "camera" },
       participant,
     );
     mockLiveKitRoom.emit(
       "trackSubscribed",
       videoTrack,
-      { track: videoTrack, trackName: "movie-video" },
+      { track: videoTrack, trackName: "movie-video", source: "camera" },
       participant,
     );
     expect(await screen.findByRole("button", { name: "Запустить просмотр" })).toBeInTheDocument();
@@ -370,13 +370,47 @@ describe("InternetRoomPage", () => {
     vi.spyOn(video as HTMLVideoElement, "play").mockResolvedValue(undefined);
 
     await waitFor(() => expect(mockLiveKitRoom.on).toHaveBeenCalled());
-    const publication = { track: videoTrack, trackName: "movie-video" };
+    const publication = { track: videoTrack, trackName: "movie-video", source: "camera" };
     mockLiveKitRoom.emit("trackSubscribed", videoTrack, publication, participant);
     expect(await screen.findByRole("heading", { name: "Воспроизводим" })).toBeInTheDocument();
     expect(screen.getByText(/без звука/)).toBeInTheDocument();
 
     mockLiveKitRoom.emit("trackUnsubscribed", videoTrack, publication, participant);
     expect(await screen.findByRole("heading", { name: "Поток прервался" })).toBeInTheDocument();
+  });
+
+  it("browser guest при одном movie-audio ждёт видео и не скрывает заглушку", async () => {
+    vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(okJson(roomAccess))
+      .mockResolvedValueOnce(okJson(publicToken));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const audioTrack = {
+      attach: vi.fn(),
+      detach: vi.fn(),
+      kind: "audio",
+      name: "movie-audio-track",
+    };
+    const participant = { identity: "host-participant", trackPublications: new Map() };
+
+    renderRoom();
+    expect(await screen.findByRole("heading", { name: "Ждём фильм" })).toBeInTheDocument();
+    const audio = document.querySelector("audio");
+    vi.spyOn(audio as HTMLAudioElement, "play").mockResolvedValue(undefined);
+
+    await waitFor(() => expect(mockLiveKitRoom.on).toHaveBeenCalled());
+    mockLiveKitRoom.emit(
+      "trackSubscribed",
+      audioTrack,
+      { track: audioTrack, trackName: "movie-audio", source: "screen_share_audio" },
+      participant,
+    );
+
+    expect(await screen.findByText(/Звук уже есть, ждём видео/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ждём фильм" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Воспроизводим" })).not.toBeInTheDocument();
   });
 
   it("browser guest не видит управление файлом даже при desktop API в window", async () => {

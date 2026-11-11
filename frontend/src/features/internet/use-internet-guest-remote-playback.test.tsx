@@ -24,6 +24,14 @@ function createPublication(
   };
 }
 
+function movieVideoPublication(track: ReturnType<typeof createTrack>) {
+  return createPublication(track, "movie-video", "camera");
+}
+
+function movieAudioPublication(track: ReturnType<typeof createTrack>) {
+  return createPublication(track, "movie-audio", "screen_share_audio");
+}
+
 function createParticipant(publications: Array<ReturnType<typeof createPublication>> = []) {
   return {
     identity: "host-participant",
@@ -75,8 +83,8 @@ describe("useInternetGuestRemotePlayback", () => {
     const videoTrack = createTrack("video", "movie-video-track");
     const audioTrack = createTrack("audio", "movie-audio-track");
     const participant = createParticipant([
-      createPublication(videoTrack, "movie-video"),
-      createPublication(audioTrack, "movie-audio"),
+      movieVideoPublication(videoTrack),
+      movieAudioPublication(audioTrack),
     ]);
     const room = createRoom(participant);
     const videoElement = document.createElement("video");
@@ -123,12 +131,7 @@ describe("useInternetGuestRemotePlayback", () => {
     });
 
     act(() => {
-      room.emit(
-        "trackSubscribed",
-        videoTrack,
-        createPublication(videoTrack, "movie-video"),
-        participant,
-      );
+      room.emit("trackSubscribed", videoTrack, movieVideoPublication(videoTrack), participant);
     });
     await waitFor(() => expect(result.current.status).toBe("receiving"));
     expect(result.current.videoTrackName).toBe("movie-video");
@@ -136,18 +139,13 @@ describe("useInternetGuestRemotePlayback", () => {
     expect(result.current.trackCount).toBe(1);
 
     act(() => {
-      room.emit(
-        "trackSubscribed",
-        audioTrack,
-        createPublication(audioTrack, "movie-audio"),
-        participant,
-      );
+      room.emit("trackSubscribed", audioTrack, movieAudioPublication(audioTrack), participant);
     });
     await waitFor(() => expect(result.current.audioTrackName).toBe("movie-audio"));
     expect(result.current.trackCount).toBe(2);
   });
 
-  it("принимает movie-audio раньше movie-video", async () => {
+  it("при одном movie-audio раньше видео остаётся в ожидании, а не receiving", async () => {
     const videoTrack = createTrack("video", "movie-video-track");
     const audioTrack = createTrack("audio", "movie-audio-track");
     const participant = createParticipant();
@@ -168,26 +166,59 @@ describe("useInternetGuestRemotePlayback", () => {
     });
 
     act(() => {
-      room.emit(
-        "trackSubscribed",
-        audioTrack,
-        createPublication(audioTrack, "movie-audio"),
-        participant,
-      );
+      room.emit("trackSubscribed", audioTrack, movieAudioPublication(audioTrack), participant);
     });
     await waitFor(() => expect(result.current.audioTrackName).toBe("movie-audio"));
+    expect(result.current.status).toBe("waiting");
     expect(result.current.videoTrackName).toBeNull();
+
+    act(() => {
+      room.emit("trackSubscribed", videoTrack, movieVideoPublication(videoTrack), participant);
+    });
+    await waitFor(() => expect(result.current.status).toBe("receiving"));
+    expect(result.current.videoTrackName).toBe("movie-video");
+    expect(result.current.trackCount).toBe(2);
+  });
+
+  it("отклоняет постороннее видео и movie-audio с источником microphone", async () => {
+    const foreignVideo = createTrack("video", "camera-track");
+    const spoofedMic = createTrack("audio", "spoofed-audio");
+    const participant = createParticipant();
+    const room = createRoom(participant);
+    const videoElement = document.createElement("video");
+    const audioElement = document.createElement("audio");
+    vi.spyOn(videoElement, "play").mockResolvedValue(undefined);
+    vi.spyOn(audioElement, "play").mockResolvedValue(undefined);
+
+    const { result } = renderHook(() =>
+      useInternetGuestRemotePlayback({
+        enabled: true,
+        room: room as never,
+      }),
+    );
+    act(() => {
+      result.current.setElements({ audioElement, videoElement });
+    });
 
     act(() => {
       room.emit(
         "trackSubscribed",
-        videoTrack,
-        createPublication(videoTrack, "movie-video"),
+        foreignVideo,
+        createPublication(foreignVideo, "camera", "camera"),
+        participant,
+      );
+      room.emit(
+        "trackSubscribed",
+        spoofedMic,
+        createPublication(spoofedMic, "movie-audio", "microphone"),
         participant,
       );
     });
-    await waitFor(() => expect(result.current.videoTrackName).toBe("movie-video"));
-    expect(result.current.trackCount).toBe(2);
+
+    expect(foreignVideo.attach).not.toHaveBeenCalled();
+    expect(spoofedMic.attach).not.toHaveBeenCalled();
+    expect(result.current.status).toBe("waiting");
+    expect(result.current.trackCount).toBe(0);
   });
 
   it("игнорирует микрофон и не смешивает его с фильмом", async () => {
@@ -220,6 +251,43 @@ describe("useInternetGuestRemotePlayback", () => {
     expect(result.current.status).toBe("waiting");
   });
 
+  it("не сбрасывает ошибку autoplay видео, когда аудио позже успешно стартовало", async () => {
+    const videoTrack = createTrack("video", "movie-video-track");
+    const audioTrack = createTrack("audio", "movie-audio-track");
+    const participant = createParticipant();
+    const room = createRoom(participant);
+    const videoElement = document.createElement("video");
+    const audioElement = document.createElement("audio");
+    vi.spyOn(videoElement, "play").mockRejectedValue(
+      Object.assign(new Error("Autoplay blocked"), { name: "NotAllowedError" }),
+    );
+    vi.spyOn(audioElement, "play").mockResolvedValue(undefined);
+
+    const { result } = renderHook(() =>
+      useInternetGuestRemotePlayback({
+        enabled: true,
+        room: room as never,
+      }),
+    );
+    act(() => {
+      result.current.setElements({ audioElement, videoElement });
+    });
+
+    act(() => {
+      room.emit("trackSubscribed", videoTrack, movieVideoPublication(videoTrack), participant);
+    });
+    await waitFor(() => expect(result.current.status).toBe("error"));
+    expect(result.current.error).toMatch(/явного действия/);
+
+    act(() => {
+      room.emit("trackSubscribed", audioTrack, movieAudioPublication(audioTrack), participant);
+    });
+    await waitFor(() => expect(result.current.audioTrackName).toBe("movie-audio"));
+    expect(result.current.status).toBe("error");
+    expect(result.current.error).toMatch(/явного действия/);
+    expect(result.current.videoTrackName).toBe("movie-video");
+  });
+
   it("переходит в lost после остановки публикации хозяином", async () => {
     const videoTrack = createTrack("video", "movie-video-track");
     const participant = createParticipant();
@@ -237,7 +305,7 @@ describe("useInternetGuestRemotePlayback", () => {
       result.current.setElements({ audioElement: null, videoElement });
     });
 
-    const publication = createPublication(videoTrack, "movie-video");
+    const publication = movieVideoPublication(videoTrack);
     act(() => {
       room.emit("trackSubscribed", videoTrack, publication, participant);
     });
@@ -272,12 +340,7 @@ describe("useInternetGuestRemotePlayback", () => {
     });
 
     act(() => {
-      room.emit(
-        "trackSubscribed",
-        videoTrack,
-        createPublication(videoTrack, "movie-video"),
-        participant,
-      );
+      room.emit("trackSubscribed", videoTrack, movieVideoPublication(videoTrack), participant);
     });
     await waitFor(() => expect(result.current.status).toBe("error"));
     expect(result.current.error).toMatch(/явного действия|Autoplay|NotAllowed/i);
@@ -290,7 +353,7 @@ describe("useInternetGuestRemotePlayback", () => {
 
   it("на disable и unmount снимает listeners и detach-ит дорожки", async () => {
     const videoTrack = createTrack("video", "movie-video-track");
-    const participant = createParticipant([createPublication(videoTrack, "movie-video")]);
+    const participant = createParticipant([movieVideoPublication(videoTrack)]);
     const room = createRoom(participant);
     const videoElement = document.createElement("video");
     vi.spyOn(videoElement, "play").mockResolvedValue(undefined);

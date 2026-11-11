@@ -204,4 +204,86 @@ describe("createRemotePlaybackController", () => {
 
     controller.disconnect();
   });
+
+  it("при receivingRequiresVideo одно аудио оставляет waiting", async () => {
+    const audioTrack = createTrack("audio", "movie-audio-track");
+    const audioPublication = createPublication(audioTrack, "movie-audio", "screen_share_audio");
+    const participant = createParticipant();
+    const room = createRoom(participant);
+    const onStateChange = vi.fn();
+    const audioElement = document.createElement("audio");
+    vi.spyOn(audioElement, "play").mockResolvedValue(undefined);
+
+    const controller = createRemotePlaybackController(room as never, {
+      onStateChange,
+      receivingRequiresVideo: true,
+    });
+    controller.setElements({ audioElement, videoElement: null });
+
+    room.emit("trackSubscribed", audioTrack, audioPublication, participant);
+    await vi.waitFor(() =>
+      expect(onStateChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          audioTrackName: "movie-audio",
+          status: "waiting",
+          trackCount: 1,
+        }),
+      ),
+    );
+
+    controller.disconnect();
+  });
+
+  it("не очищает ошибку autoplay видео, когда аудио play() успешен", async () => {
+    const videoTrack = createTrack("video", "movie-video-track");
+    const audioTrack = createTrack("audio", "movie-audio-track");
+    const videoPublication = createPublication(videoTrack, "movie-video", "camera");
+    const audioPublication = createPublication(audioTrack, "movie-audio", "screen_share_audio");
+    const participant = createParticipant();
+    const room = createRoom(participant);
+    const onStateChange = vi.fn();
+    const videoElement = document.createElement("video");
+    const audioElement = document.createElement("audio");
+    vi.spyOn(videoElement, "play").mockRejectedValue(
+      Object.assign(new Error("Autoplay blocked"), { name: "NotAllowedError" }),
+    );
+    vi.spyOn(audioElement, "play").mockResolvedValue(undefined);
+
+    const controller = createRemotePlaybackController(room as never, {
+      acceptPublication: (track, publication) =>
+        (track.kind === "video" &&
+          publication.trackName === "movie-video" &&
+          publication.source === "camera") ||
+        (track.kind === "audio" &&
+          publication.trackName === "movie-audio" &&
+          publication.source === "screen_share_audio"),
+      onStateChange,
+      receivingRequiresVideo: true,
+    });
+    controller.setElements({ audioElement, videoElement });
+
+    room.emit("trackSubscribed", videoTrack, videoPublication, participant);
+    await vi.waitFor(() =>
+      expect(onStateChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          error: "Браузер ждёт явного действия для запуска видео.",
+          status: "error",
+        }),
+      ),
+    );
+
+    room.emit("trackSubscribed", audioTrack, audioPublication, participant);
+    await vi.waitFor(() =>
+      expect(onStateChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          audioTrackName: "movie-audio",
+          error: "Браузер ждёт явного действия для запуска видео.",
+          status: "error",
+          videoTrackName: "movie-video",
+        }),
+      ),
+    );
+
+    controller.disconnect();
+  });
 });
