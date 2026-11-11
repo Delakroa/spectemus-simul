@@ -17,13 +17,25 @@ import {
   stopFilePublication,
   type FilePublication,
 } from "../rooms/file-publication";
+import { createHostSeekController, type HostSeekController } from "../rooms/host-seek-controller";
+import {
+  createHostPlaybackStatePublisher,
+  type HostPlaybackStatePublisher,
+  type PlaybackEvent,
+} from "../rooms/playback-state";
 
 export type InternetHostMediaStatus =
   "idle" | "checking" | "normalizing" | "ready" | "publishing" | "live" | "error";
 
+export type InternetHostPlaybackStatus = "idle" | "playing" | "paused" | "ended";
+
 export type InternetHostMediaState = {
   displayName: string | null;
   error: string | null;
+  playbackCurrentTime: number;
+  playbackDuration: number | null;
+  playbackError: string | null;
+  playbackStatus: InternetHostPlaybackStatus;
   preparationProgress: number | null;
   status: InternetHostMediaStatus;
   trackCount: number;
@@ -32,6 +44,10 @@ export type InternetHostMediaState = {
 const INITIAL_STATE: InternetHostMediaState = {
   displayName: null,
   error: null,
+  playbackCurrentTime: 0,
+  playbackDuration: null,
+  playbackError: null,
+  playbackStatus: "idle",
   preparationProgress: null,
   status: "idle",
   trackCount: 0,
@@ -76,6 +92,10 @@ export function useInternetHostMediaPublish(options: {
   const desktopMediaIdRef = useRef<string | null>(null);
   const fileResultRef = useRef<FileDiagnosticsResult | null>(null);
   const publicationRef = useRef<FilePublication | null>(null);
+  const playbackPublisherRef = useRef<HostPlaybackStatePublisher | null>(null);
+  const seekControllerRef = useRef<HostSeekController | null>(null);
+  const playbackTrackingCleanupRef = useRef<(() => void) | null>(null);
+  const playbackRevisionRef = useRef(0);
   const prepareRequestIdRef = useRef(0);
   const publishRequestIdRef = useRef(0);
   const statusRef = useRef<InternetHostMediaStatus>(state.status);
@@ -90,8 +110,103 @@ export function useInternetHostMediaPublish(options: {
     void Promise.resolve(window.spectemusDesktop?.releaseMedia?.(id)).catch(() => {});
   }, []);
 
+  const tearDownPlaybackSync = useCallback((event: PlaybackEvent = "stop") => {
+    playbackTrackingCleanupRef.current?.();
+    playbackTrackingCleanupRef.current = null;
+    seekControllerRef.current?.dispose();
+    seekControllerRef.current = null;
+    const publisher = playbackPublisherRef.current;
+    playbackPublisherRef.current = null;
+    publisher?.disconnect(event);
+  }, []);
+
+  const startPlaybackSync = useCallback(
+    (liveRoom: LiveKitRoom, publication: FilePublication, fileName: string) => {
+      tearDownPlaybackSync("stop");
+      const videoElement = publication.videoElement;
+      playbackPublisherRef.current = createHostPlaybackStatePublisher(
+        liveRoom,
+        videoElement,
+        fileName,
+        {
+          initialRevision: playbackRevisionRef.current,
+          onRevisionChange: (revision) => {
+            playbackRevisionRef.current = revision;
+          },
+        },
+      );
+      seekControllerRef.current = createHostSeekController(videoElement);
+
+      const syncPlaybackUi = () => {
+        setState((current) => ({
+          ...current,
+          playbackCurrentTime: Number.isFinite(videoElement.currentTime)
+            ? Math.max(0, videoElement.currentTime)
+            : 0,
+          playbackDuration: Number.isFinite(videoElement.duration) ? videoElement.duration : null,
+          playbackStatus: videoElement.ended ? "ended" : videoElement.paused ? "paused" : "playing",
+        }));
+      };
+
+      const handlePlay = () => {
+        setState((current) => ({
+          ...current,
+          playbackError: null,
+          playbackStatus: "playing",
+        }));
+      };
+      const handlePause = () => {
+        setState((current) => ({
+          ...current,
+          playbackStatus: videoElement.ended ? "ended" : "paused",
+        }));
+      };
+      const handleEnded = () => {
+        const duration = Number.isFinite(videoElement.duration) ? videoElement.duration : null;
+        setState((current) => ({
+          ...current,
+          playbackCurrentTime: duration ?? current.playbackCurrentTime,
+          playbackDuration: duration ?? current.playbackDuration,
+          playbackStatus: "ended",
+        }));
+      };
+      const handleTimeUpdate = () => {
+        setState((current) => ({
+          ...current,
+          playbackCurrentTime: Number.isFinite(videoElement.currentTime)
+            ? Math.max(0, videoElement.currentTime)
+            : current.playbackCurrentTime,
+        }));
+      };
+      const handleDurationChange = () => {
+        setState((current) => ({
+          ...current,
+          playbackDuration: Number.isFinite(videoElement.duration)
+            ? videoElement.duration
+            : current.playbackDuration,
+        }));
+      };
+
+      videoElement.addEventListener("play", handlePlay);
+      videoElement.addEventListener("pause", handlePause);
+      videoElement.addEventListener("ended", handleEnded);
+      videoElement.addEventListener("timeupdate", handleTimeUpdate);
+      videoElement.addEventListener("durationchange", handleDurationChange);
+      playbackTrackingCleanupRef.current = () => {
+        videoElement.removeEventListener("play", handlePlay);
+        videoElement.removeEventListener("pause", handlePause);
+        videoElement.removeEventListener("ended", handleEnded);
+        videoElement.removeEventListener("timeupdate", handleTimeUpdate);
+        videoElement.removeEventListener("durationchange", handleDurationChange);
+      };
+      syncPlaybackUi();
+    },
+    [tearDownPlaybackSync],
+  );
+
   const stopPublication = useCallback(() => {
     publishRequestIdRef.current += 1;
+    tearDownPlaybackSync("stop");
     const publication = publicationRef.current;
     publicationRef.current = null;
     if (publication) {
@@ -100,14 +215,20 @@ export function useInternetHostMediaPublish(options: {
     setState((current) => ({
       ...current,
       error: null,
+      playbackCurrentTime: 0,
+      playbackDuration: null,
+      playbackError: null,
+      playbackStatus: "idle",
       status: fileResultRef.current ? "ready" : "idle",
       trackCount: 0,
     }));
-  }, []);
+  }, [tearDownPlaybackSync]);
 
   const clearAll = useCallback(() => {
     prepareRequestIdRef.current += 1;
     publishRequestIdRef.current += 1;
+    tearDownPlaybackSync("stop");
+    playbackRevisionRef.current = 0;
     const publication = publicationRef.current;
     publicationRef.current = null;
     if (publication) {
@@ -118,7 +239,50 @@ export function useInternetHostMediaPublish(options: {
     desktopMediaIdRef.current = null;
     releaseDesktopMedia(mediaId);
     setState(INITIAL_STATE);
-  }, [releaseDesktopMedia]);
+  }, [releaseDesktopMedia, tearDownPlaybackSync]);
+
+  const play = useCallback(async () => {
+    const publication = publicationRef.current;
+    if (!publication || statusRef.current !== "live") {
+      return;
+    }
+    try {
+      await publication.videoElement.play();
+      // stop / republish могли сменить публикацию, пока play() ещё висел.
+      if (publicationRef.current !== publication) {
+        return;
+      }
+      setState((current) => ({
+        ...current,
+        playbackError: null,
+      }));
+    } catch (error: unknown) {
+      if (publicationRef.current !== publication) {
+        return;
+      }
+      if (isBenignPlayInterruption(error)) {
+        setState((current) => ({
+          ...current,
+          playbackError: null,
+        }));
+        return;
+      }
+      setState((current) => ({
+        ...current,
+        playbackError:
+          error instanceof Error ? error.message : "Не удалось начать воспроизведение.",
+        playbackStatus: "paused",
+      }));
+    }
+  }, []);
+
+  const pause = useCallback(() => {
+    publicationRef.current?.videoElement.pause();
+  }, []);
+
+  const seek = useCallback((seconds: number, onComplete?: () => void) => {
+    seekControllerRef.current?.seek(seconds, onComplete);
+  }, []);
 
   useEffect(() => {
     if (!enabled) {
@@ -185,11 +349,10 @@ export function useInternetHostMediaPublish(options: {
         return;
       }
       setState({
+        ...INITIAL_STATE,
         displayName: null,
         error: prepareErrorMessage(caught),
-        preparationProgress: null,
         status: "error",
-        trackCount: 0,
       });
       return;
     }
@@ -209,6 +372,7 @@ export function useInternetHostMediaPublish(options: {
     prepareRequestIdRef.current = requestId;
     publishRequestIdRef.current += 1;
 
+    tearDownPlaybackSync("stop");
     const previousPublication = publicationRef.current;
     publicationRef.current = null;
     if (previousPublication) {
@@ -223,11 +387,9 @@ export function useInternetHostMediaPublish(options: {
     fileResultRef.current = null;
 
     setState({
+      ...INITIAL_STATE,
       displayName: selection.displayName,
-      error: null,
-      preparationProgress: null,
       status: "checking",
-      trackCount: 0,
     });
 
     try {
@@ -255,11 +417,9 @@ export function useInternetHostMediaPublish(options: {
       desktopMediaIdRef.current = prepared.mediaId;
       fileResultRef.current = prepared.result;
       setState({
+        ...INITIAL_STATE,
         displayName: prepared.result.displayName,
-        error: null,
-        preparationProgress: null,
         status: "ready",
-        trackCount: 0,
       });
     } catch (caught: unknown) {
       if (prepareRequestIdRef.current !== requestId) {
@@ -270,14 +430,13 @@ export function useInternetHostMediaPublish(options: {
       desktopMediaIdRef.current = null;
       releaseDesktopMedia(mediaId);
       setState({
+        ...INITIAL_STATE,
         displayName: selection.displayName,
         error: prepareErrorMessage(caught),
-        preparationProgress: null,
         status: "error",
-        trackCount: 0,
       });
     }
-  }, [enabled, releaseDesktopMedia]);
+  }, [enabled, releaseDesktopMedia, tearDownPlaybackSync]);
 
   const publish = useCallback(async () => {
     if (!enabled) {
@@ -306,6 +465,7 @@ export function useInternetHostMediaPublish(options: {
 
     const requestId = publishRequestIdRef.current + 1;
     publishRequestIdRef.current = requestId;
+    tearDownPlaybackSync("stop");
     const previous = publicationRef.current;
     publicationRef.current = null;
     if (previous) {
@@ -315,6 +475,10 @@ export function useInternetHostMediaPublish(options: {
     setState((current) => ({
       ...current,
       error: null,
+      playbackCurrentTime: 0,
+      playbackDuration: null,
+      playbackError: null,
+      playbackStatus: "idle",
       status: "publishing",
       trackCount: 0,
     }));
@@ -326,6 +490,7 @@ export function useInternetHostMediaPublish(options: {
         return;
       }
       publicationRef.current = publication;
+      startPlaybackSync(liveRoom, publication, file.displayName);
       setState((current) => ({
         ...current,
         error: null,
@@ -337,26 +502,41 @@ export function useInternetHostMediaPublish(options: {
         return;
       }
       publicationRef.current = null;
+      tearDownPlaybackSync("stop");
       setState((current) => ({
         ...current,
         error:
           caught instanceof FilePublicationFailure
             ? caught.message
             : "Не удалось опубликовать файл в public LiveKit.",
+        playbackCurrentTime: 0,
+        playbackDuration: null,
+        playbackError: null,
+        playbackStatus: "idle",
         status: "error",
         trackCount: 0,
       }));
     }
-  }, [enabled, liveKitStatus]);
+  }, [enabled, liveKitStatus, startPlaybackSync, tearDownPlaybackSync]);
 
   return {
     ...state,
     canUseDesktopMedia: Boolean(desktopMediaApi()),
     clearAll,
+    pause,
+    play,
     publish,
+    seek,
     selectAndPrepare,
     stop: stopPublication,
   };
+}
+
+function isBenignPlayInterruption(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  return error.name === "AbortError" || /interrupted|abort/i.test(error.message);
 }
 
 async function prepareDesktopSelection(

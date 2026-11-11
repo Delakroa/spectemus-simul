@@ -11,6 +11,11 @@ import {
   type PublicLiveKitTokenResponse,
 } from "../features/internet/internet-api";
 import {
+  formatInternetPlaybackClock,
+  formatInternetPlaybackSyncStatus,
+  useInternetGuestPlaybackSync,
+} from "../features/internet/use-internet-guest-playback-sync";
+import {
   formatInternetRemotePlaybackHint,
   formatInternetRemotePlaybackStatus,
   isInternetRemotePlaybackUserActionRequired,
@@ -88,6 +93,11 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
   });
   const guestPlayback = useInternetGuestRemotePlayback({
     enabled: isGuest && media.status === "connected",
+    room: liveKitRoom,
+  });
+  const guestPlaybackSync = useInternetGuestPlaybackSync({
+    enabled: isGuest && media.status === "connected",
+    expectedHostIdentity: guestPlayback.participantIdentity,
     room: liveKitRoom,
   });
 
@@ -241,7 +251,7 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
             <p role="status">Подключаемся к public LiveKit…</p>
           ) : null}
           {media.status === "connected" && isGuest ? (
-            <InternetGuestPlaybackPanel playback={guestPlayback} />
+            <InternetGuestPlaybackPanel playback={guestPlayback} playbackSync={guestPlaybackSync} />
           ) : null}
           {media.status === "connected" && isHost ? (
             <InternetHostMediaPanel
@@ -300,8 +310,10 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
 
 function InternetGuestPlaybackPanel({
   playback,
+  playbackSync,
 }: {
   playback: ReturnType<typeof useInternetGuestRemotePlayback>;
+  playbackSync: ReturnType<typeof useInternetGuestPlaybackSync>;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -323,6 +335,9 @@ function InternetGuestPlaybackPanel({
     videoTrackName: playback.videoTrackName,
   });
   const needsUserStart = isInternetRemotePlaybackUserActionRequired(playback.error);
+  const syncLabel = formatInternetPlaybackSyncStatus(playbackSync.status);
+  const syncClock = formatInternetPlaybackClock(playbackSync.currentTime, playbackSync.duration);
+  const hasSync = playbackSync.revision > 0 && playbackSync.status !== "idle";
 
   return (
     <div className="internet-invite__form" aria-label="Просмотр фильма">
@@ -354,6 +369,17 @@ function InternetGuestPlaybackPanel({
         {playback.audioTrackName ? ` · ${playback.audioTrackName}` : ""}
         {playback.status === "receiving" && !playback.audioTrackName ? " · без звука" : ""}
       </p>
+      {hasSync ? (
+        <p className="internet-invite__meta" aria-label="Синхронизация фильма" role="status">
+          {syncLabel} · {syncClock}
+          {playbackSync.fileName ? ` · ${playbackSync.fileName}` : ""}
+        </p>
+      ) : null}
+      {playbackSync.error ? (
+        <div className="internet-invite__error" role="alert">
+          <p>{playbackSync.error}</p>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -365,6 +391,8 @@ function InternetHostMediaPanel({
   hostMedia: ReturnType<typeof useInternetHostMediaPublish>;
   liveKitConnected: boolean;
 }) {
+  const [seekDraft, setSeekDraft] = useState<number | null>(null);
+
   if (!hostMedia.canUseDesktopMedia) {
     return (
       <p role="status">
@@ -372,6 +400,12 @@ function InternetHostMediaPanel({
       </p>
     );
   }
+
+  const seekValue =
+    hostMedia.playbackStatus === "ended"
+      ? hostMedia.playbackCurrentTime
+      : (seekDraft ?? hostMedia.playbackCurrentTime);
+  const seekMax = hostMedia.playbackDuration ?? 0;
 
   return (
     <div className="internet-invite__form" aria-label="Публикация фильма">
@@ -401,6 +435,70 @@ function InternetHostMediaPanel({
       {hostMedia.status === "error" && hostMedia.error ? (
         <div className="internet-invite__error" role="alert">
           <p>{hostMedia.error}</p>
+        </div>
+      ) : null}
+
+      {hostMedia.status === "live" ? (
+        <div className="internet-invite__meta" aria-label="Управление фильмом">
+          {hostMedia.playbackStatus === "playing" ? (
+            <button className="button" type="button" onClick={() => hostMedia.pause()}>
+              Пауза
+            </button>
+          ) : (
+            <button
+              className="button"
+              type="button"
+              disabled={hostMedia.playbackStatus === "ended"}
+              onClick={() => void hostMedia.play()}
+            >
+              Воспроизвести
+            </button>
+          )}
+          <span role="status">
+            {formatInternetPlaybackClock(seekValue, hostMedia.playbackDuration)}
+          </span>
+          <label>
+            Перемотка
+            <input
+              aria-label="Перемотка фильма"
+              max={seekMax}
+              min={0}
+              step={0.1}
+              type="range"
+              value={seekValue}
+              onChange={(event) => setSeekDraft(Number(event.currentTarget.value))}
+              onMouseUp={(event) => {
+                const seconds = Number(event.currentTarget.value);
+                hostMedia.seek(seconds, () => setSeekDraft(null));
+              }}
+              onTouchEnd={(event) => {
+                const seconds = Number(event.currentTarget.value);
+                hostMedia.seek(seconds, () => setSeekDraft(null));
+              }}
+              onKeyUp={(event) => {
+                if (
+                  ![
+                    "ArrowDown",
+                    "ArrowLeft",
+                    "ArrowRight",
+                    "ArrowUp",
+                    "End",
+                    "Home",
+                    "PageDown",
+                    "PageUp",
+                  ].includes(event.key)
+                ) {
+                  return;
+                }
+                hostMedia.seek(Number(event.currentTarget.value), () => setSeekDraft(null));
+              }}
+            />
+          </label>
+          {hostMedia.playbackError ? (
+            <div className="internet-invite__error" role="alert">
+              <p>{hostMedia.playbackError}</p>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

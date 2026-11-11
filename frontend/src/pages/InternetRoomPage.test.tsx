@@ -36,6 +36,7 @@ vi.mock("../features/rooms/file-diagnostics", async () => {
   };
 });
 
+import { PLAYBACK_STATE_TOPIC, encodePlaybackStateMessage } from "../features/rooms/playback-state";
 import { InternetRoomPage } from "./InternetRoomPage";
 
 const publicRoomId = "22222222-2222-4222-8222-222222222222";
@@ -118,7 +119,10 @@ function createMockLiveKitRoom(
         handler(...args);
       }
     },
-    localParticipant: { publishTrack: vi.fn() },
+    localParticipant: {
+      publishData: vi.fn().mockResolvedValue(undefined),
+      publishTrack: vi.fn(),
+    },
     off: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
       handlers.get(event)?.delete(handler);
     }),
@@ -263,10 +267,14 @@ describe("InternetRoomPage", () => {
     expect(publishFileToLiveKit).toHaveBeenCalled();
     expect(screen.getByText(/movie-video/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Выбрать файл" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Воспроизвести" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Перемотка фильма")).toBeInTheDocument();
+    expect(mockLiveKitRoom.localParticipant.publishData).toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: "Остановить публикацию" }));
     expect(stopFilePublication).toHaveBeenCalled();
     expect(await screen.findByRole("button", { name: "Выбрать файл" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Воспроизвести" })).not.toBeInTheDocument();
   });
 
   it("browser guest воспроизводит movie tracks и показывает кнопку при блокировке autoplay", async () => {
@@ -411,6 +419,78 @@ describe("InternetRoomPage", () => {
     expect(await screen.findByText(/Звук уже есть, ждём видео/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Ждём фильм" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Воспроизводим" })).not.toBeInTheDocument();
+  });
+
+  it("browser guest показывает sync статус хозяина и игнорирует spoof от другого участника", async () => {
+    vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(okJson(roomAccess))
+      .mockResolvedValueOnce(okJson(publicToken));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const videoTrack = {
+      attach: vi.fn(),
+      detach: vi.fn(),
+      kind: "video",
+      name: "movie-video-track",
+    };
+    const participant = { identity: "host-participant", trackPublications: new Map() };
+
+    renderRoom();
+    expect(await screen.findByRole("heading", { name: "Ждём фильм" })).toBeInTheDocument();
+    const video = document.querySelector("video");
+    vi.spyOn(video as HTMLVideoElement, "play").mockResolvedValue(undefined);
+
+    await waitFor(() => expect(mockLiveKitRoom.on).toHaveBeenCalled());
+    mockLiveKitRoom.emit(
+      "trackSubscribed",
+      videoTrack,
+      { track: videoTrack, trackName: "movie-video", source: "camera" },
+      participant,
+    );
+    expect(await screen.findByRole("heading", { name: "Воспроизводим" })).toBeInTheDocument();
+
+    mockLiveKitRoom.emit(
+      "dataReceived",
+      encodePlaybackStateMessage({
+        schemaVersion: 1,
+        revision: 4,
+        event: "pause",
+        status: "paused",
+        currentTime: 125,
+        duration: 3600,
+        sentAt: "2026-11-10T12:00:00.000Z",
+        fileName: "film.mp4",
+        publisherSessionId: "11111111-1111-4111-8111-111111111111",
+      }),
+      { identity: "guest-spoof" },
+      undefined,
+      PLAYBACK_STATE_TOPIC,
+    );
+    expect(screen.queryByLabelText("Синхронизация фильма")).not.toBeInTheDocument();
+
+    mockLiveKitRoom.emit(
+      "dataReceived",
+      encodePlaybackStateMessage({
+        schemaVersion: 1,
+        revision: 4,
+        event: "pause",
+        status: "paused",
+        currentTime: 125,
+        duration: 3600,
+        sentAt: "2026-11-10T12:00:00.000Z",
+        fileName: "film.mp4",
+        publisherSessionId: "11111111-1111-4111-8111-111111111111",
+      }),
+      { identity: "host-participant" },
+      undefined,
+      PLAYBACK_STATE_TOPIC,
+    );
+
+    expect(await screen.findByLabelText("Синхронизация фильма")).toHaveTextContent(/Пауза/);
+    expect(screen.getByLabelText("Синхронизация фильма")).toHaveTextContent(/2:05/);
+    expect(screen.getByLabelText("Синхронизация фильма")).toHaveTextContent(/film\.mp4/);
   });
 
   it("browser guest не видит управление файлом даже при desktop API в window", async () => {

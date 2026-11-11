@@ -56,7 +56,12 @@ const fileResult = {
 };
 
 function mockRoom() {
-  return { localParticipant: { publishTrack: vi.fn() } };
+  return {
+    localParticipant: {
+      publishData: vi.fn().mockResolvedValue(undefined),
+      publishTrack: vi.fn(),
+    },
+  };
 }
 
 function installDesktop(overrides: Partial<NonNullable<typeof window.spectemusDesktop>> = {}) {
@@ -339,6 +344,167 @@ describe("useInternetHostMediaPublish", () => {
     expect(desktop.releaseMedia).toHaveBeenCalledWith("media-normalized");
     expect(result.current.status).toBe("idle");
     expect(result.current.displayName).toBeNull();
+  });
+
+  it("live: play/pause/seek управляют исходным videoElement и публикуют playback-state", async () => {
+    installDesktop();
+    const room = mockRoom();
+    const videoElement = document.createElement("video");
+    Object.defineProperty(videoElement, "duration", { configurable: true, value: 120 });
+    Object.defineProperty(videoElement, "paused", {
+      configurable: true,
+      value: true,
+      writable: true,
+    });
+    Object.defineProperty(videoElement, "ended", { configurable: true, value: false });
+    Object.defineProperty(videoElement, "readyState", { configurable: true, value: 4 });
+    const play = vi.spyOn(videoElement, "play").mockImplementation(async () => {
+      Object.defineProperty(videoElement, "paused", { configurable: true, value: false });
+      videoElement.dispatchEvent(new Event("play"));
+    });
+    const pause = vi.spyOn(videoElement, "pause").mockImplementation(() => {
+      Object.defineProperty(videoElement, "paused", { configurable: true, value: true });
+      videoElement.dispatchEvent(new Event("pause"));
+    });
+    publishFileToLiveKit.mockResolvedValue({
+      audioTrack: {},
+      stream: { getTracks: () => [] },
+      tracks: [{}, {}],
+      videoElement,
+      videoTrack: {},
+    });
+
+    const { result } = renderHook(() =>
+      useInternetHostMediaPublish({
+        enabled: true,
+        liveKitStatus: "connected",
+        room: room as never,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.selectAndPrepare();
+    });
+    await act(async () => {
+      await result.current.publish();
+    });
+    await waitFor(() => expect(result.current.status).toBe("live"));
+    expect(room.localParticipant.publishData).toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.play();
+    });
+    expect(play).toHaveBeenCalled();
+    await waitFor(() => expect(result.current.playbackStatus).toBe("playing"));
+
+    act(() => {
+      result.current.pause();
+    });
+    expect(pause).toHaveBeenCalled();
+    await waitFor(() => expect(result.current.playbackStatus).toBe("paused"));
+
+    act(() => {
+      result.current.seek(42);
+    });
+    expect(videoElement.currentTime).toBe(42);
+
+    act(() => {
+      result.current.stop();
+    });
+    expect(result.current.playbackStatus).toBe("idle");
+    const lastPayload = room.localParticipant.publishData.mock.calls.at(-1)?.[0] as Uint8Array;
+    const lastText = new TextDecoder().decode(lastPayload);
+    expect(lastText).toMatch(/"event":"stop"/);
+  });
+
+  it("игнорирует отложенный reject play() после stop и новой публикации", async () => {
+    installDesktop();
+    const room = mockRoom();
+    let rejectFirstPlay: (error: Error) => void = () => undefined;
+    const firstVideo = document.createElement("video");
+    Object.defineProperty(firstVideo, "duration", { configurable: true, value: 60 });
+    Object.defineProperty(firstVideo, "paused", { configurable: true, value: true });
+    Object.defineProperty(firstVideo, "ended", { configurable: true, value: false });
+    Object.defineProperty(firstVideo, "readyState", { configurable: true, value: 4 });
+    vi.spyOn(firstVideo, "play").mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectFirstPlay = reject;
+        }),
+    );
+
+    const secondVideo = document.createElement("video");
+    Object.defineProperty(secondVideo, "duration", { configurable: true, value: 90 });
+    Object.defineProperty(secondVideo, "paused", { configurable: true, value: true });
+    Object.defineProperty(secondVideo, "ended", { configurable: true, value: false });
+    Object.defineProperty(secondVideo, "readyState", { configurable: true, value: 4 });
+    vi.spyOn(secondVideo, "play").mockResolvedValue(undefined);
+
+    publishFileToLiveKit
+      .mockResolvedValueOnce({
+        audioTrack: {},
+        stream: { getTracks: () => [] },
+        tracks: [{}, {}],
+        videoElement: firstVideo,
+        videoTrack: {},
+      })
+      .mockResolvedValueOnce({
+        audioTrack: {},
+        stream: { getTracks: () => [] },
+        tracks: [{}, {}],
+        videoElement: secondVideo,
+        videoTrack: {},
+      });
+
+    const { result } = renderHook(() =>
+      useInternetHostMediaPublish({
+        enabled: true,
+        liveKitStatus: "connected",
+        room: room as never,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.selectAndPrepare();
+    });
+    await act(async () => {
+      await result.current.publish();
+    });
+    await waitFor(() => expect(result.current.status).toBe("live"));
+
+    let playPromise: Promise<void> = Promise.resolve();
+    act(() => {
+      playPromise = result.current.play();
+    });
+
+    act(() => {
+      result.current.stop();
+    });
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+
+    await act(async () => {
+      await result.current.publish();
+    });
+    await waitFor(() => expect(result.current.status).toBe("live"));
+
+    await act(async () => {
+      await result.current.play();
+    });
+    Object.defineProperty(secondVideo, "paused", { configurable: true, value: false });
+    act(() => {
+      secondVideo.dispatchEvent(new Event("play"));
+    });
+    await waitFor(() => expect(result.current.playbackStatus).toBe("playing"));
+    expect(result.current.playbackError).toBeNull();
+
+    await act(async () => {
+      rejectFirstPlay(new Error("stale play failed"));
+      await playPromise;
+    });
+
+    expect(result.current.status).toBe("live");
+    expect(result.current.playbackError).toBeNull();
+    expect(result.current.playbackStatus).toBe("playing");
   });
 
   it("при disconnect после live освобождает media id", async () => {
