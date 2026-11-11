@@ -41,7 +41,8 @@ WSS/TURN/VM, privacy-safe telemetry и включение Internet mode — сл
 ## Проверки
 
 - host hook: play/pause/seek на source videoElement, publishData topic,
-  stop шлёт `stop` и чистит playback state
+  stop шлёт `stop` и чистит playback state; отложенный reject `play()` после
+  stop и новой публикации не портит UI нового фильма
 - guest sync hook: без identity не слушает; late join heartbeat; reject
   non-host; stale revision; reconnect; смена identity / cleanup
 - page: host controls после publish; guest sync UI; spoof ignored

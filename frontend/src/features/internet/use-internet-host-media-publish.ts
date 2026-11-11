@@ -248,11 +248,18 @@ export function useInternetHostMediaPublish(options: {
     }
     try {
       await publication.videoElement.play();
+      // stop / republish могли сменить публикацию, пока play() ещё висел.
+      if (publicationRef.current !== publication) {
+        return;
+      }
       setState((current) => ({
         ...current,
         playbackError: null,
       }));
     } catch (error: unknown) {
+      if (publicationRef.current !== publication) {
+        return;
+      }
       if (isBenignPlayInterruption(error)) {
         setState((current) => ({
           ...current,
