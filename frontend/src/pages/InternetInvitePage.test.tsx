@@ -7,7 +7,15 @@ vi.mock("../features/rooms/livekit-connection", () => ({
   connectLiveKitRoom: vi.fn(
     async (_token: unknown, handlers: { onStatusChange: (status: string) => void }) => {
       handlers.onStatusChange("connected");
-      return { disconnect: vi.fn(), room: {} };
+      return {
+        disconnect: vi.fn(),
+        room: {
+          localParticipant: { publishTrack: vi.fn() },
+          off: vi.fn(),
+          on: vi.fn(),
+          remoteParticipants: new Map(),
+        },
+      };
     },
   ),
 }));
@@ -170,7 +178,7 @@ describe("InternetInvitePage", () => {
       );
     });
     expect(screen.getByTestId("location")).toHaveAttribute("data-hash", "");
-    expect(await screen.findByRole("heading", { name: "Подключено" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Ждём фильм" })).toBeInTheDocument();
     expect(document.body.textContent).not.toContain(token);
     expect(JSON.stringify({ ...globalThis.localStorage })).not.toContain(token);
     expect(JSON.stringify({ ...globalThis.sessionStorage })).not.toContain(token);
