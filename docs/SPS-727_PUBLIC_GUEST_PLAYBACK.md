@@ -25,7 +25,8 @@ play/pause/seek, WSS/TURN и ручной межсетевой прогон — 
    detach tracks и снятие listeners.
 5. Если браузер блокирует autoplay видео или звука, гость видит кнопку
    «Запустить просмотр». Успешный play одной дорожки не сбрасывает ошибку
-   другой.
+   другой. Отложенный reject/resolve `play()` после unsubscribe или
+   disconnect игнорируется и не перетирает `lost`.
 6. Host UI публикации (SPS-726) не меняется; guest не получает publish UI.
 
 ## Безопасность и границы режимов
@@ -44,7 +45,8 @@ Playback sync, microphone, WSS/TURN/VM, telemetry и включение Internet
 - frontend hook/controller: waiting, early tracks, video-only,
   audio-before-video остаётся waiting, strict reject foreign video /
   movie-audio+microphone, lost после unsubscribe, autoplay video error
-  сохраняется при успешном audio, resume, cleanup на disable/unmount
+  сохраняется при успешном audio, отложенный reject play() после
+  unsubscribe не перетирает lost, resume, cleanup на disable/unmount
 - frontend page: guest waiting/receiving/lost, audio-only ждёт видео,
   кнопка autoplay, без host publish UI
 - `pnpm check`

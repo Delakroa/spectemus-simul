@@ -286,4 +286,102 @@ describe("createRemotePlaybackController", () => {
 
     controller.disconnect();
   });
+
+  it("игнорирует отложенный reject play() после unsubscribe video", async () => {
+    let rejectPlay: (error: Error) => void = () => undefined;
+    const videoTrack = createTrack("video", "movie-video-track");
+    const videoPublication = createPublication(videoTrack, "movie-video");
+    const participant = createParticipant();
+    const room = createRoom(participant);
+    const onStateChange = vi.fn();
+    const videoElement = document.createElement("video");
+    vi.spyOn(videoElement, "play").mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectPlay = reject;
+        }),
+    );
+
+    const controller = createRemotePlaybackController(room as never, { onStateChange });
+    controller.setElements({ audioElement: null, videoElement });
+    room.emit("trackSubscribed", videoTrack, videoPublication, participant);
+    await vi.waitFor(() => expect(videoElement.play).toHaveBeenCalled());
+
+    room.emit("trackUnsubscribed", videoTrack, videoPublication, participant);
+    await vi.waitFor(() =>
+      expect(onStateChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          error: null,
+          status: "lost",
+          trackCount: 0,
+          videoTrackName: null,
+        }),
+      ),
+    );
+
+    const callsAfterLost = onStateChange.mock.calls.length;
+    rejectPlay(Object.assign(new Error("Autoplay blocked"), { name: "NotAllowedError" }));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onStateChange).toHaveBeenCalledTimes(callsAfterLost);
+    expect(onStateChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        error: null,
+        status: "lost",
+        videoTrackName: null,
+      }),
+    );
+
+    controller.disconnect();
+  });
+
+  it("игнорирует отложенный reject play() после unsubscribe audio", async () => {
+    let rejectPlay: (error: Error) => void = () => undefined;
+    const audioTrack = createTrack("audio", "movie-audio-track");
+    const audioPublication = createPublication(audioTrack, "movie-audio");
+    const participant = createParticipant();
+    const room = createRoom(participant);
+    const onStateChange = vi.fn();
+    const audioElement = document.createElement("audio");
+    vi.spyOn(audioElement, "play").mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectPlay = reject;
+        }),
+    );
+
+    const controller = createRemotePlaybackController(room as never, { onStateChange });
+    controller.setElements({ audioElement, videoElement: null });
+    room.emit("trackSubscribed", audioTrack, audioPublication, participant);
+    await vi.waitFor(() => expect(audioElement.play).toHaveBeenCalled());
+
+    room.emit("trackUnsubscribed", audioTrack, audioPublication, participant);
+    await vi.waitFor(() =>
+      expect(onStateChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          audioTrackName: null,
+          error: null,
+          status: "lost",
+          trackCount: 0,
+        }),
+      ),
+    );
+
+    const callsAfterLost = onStateChange.mock.calls.length;
+    rejectPlay(new Error("Autoplay blocked"));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onStateChange).toHaveBeenCalledTimes(callsAfterLost);
+    expect(onStateChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        audioTrackName: null,
+        error: null,
+        status: "lost",
+      }),
+    );
+
+    controller.disconnect();
+  });
 });

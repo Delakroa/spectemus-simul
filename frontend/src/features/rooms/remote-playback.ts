@@ -114,15 +114,24 @@ export function createRemotePlaybackController(
   };
 
   const resumeAudio = async (): Promise<void> => {
-    if (!audioTrack || !audioElement) {
+    const expectedTrack = audioTrack;
+    const expectedElement = audioElement;
+    if (!expectedTrack || !expectedElement) {
       return;
     }
 
     try {
-      await audioElement.play();
+      await expectedElement.play();
+      // Unsubscribe / setElements / disconnect могли сменить дорожку, пока play() висел.
+      if (disconnected || audioTrack !== expectedTrack || audioElement !== expectedElement) {
+        return;
+      }
       audioPlaybackError = null;
       emitAfterPlaybackAttempt();
     } catch (error) {
+      if (disconnected || audioTrack !== expectedTrack || audioElement !== expectedElement) {
+        return;
+      }
       audioPlaybackError =
         error instanceof Error ? error.message : "Не удалось воспроизвести звук.";
       emitState({
@@ -133,15 +142,24 @@ export function createRemotePlaybackController(
   };
 
   const resumeVideo = async (): Promise<void> => {
-    if (!videoTrack || !videoElement) {
+    const expectedTrack = videoTrack;
+    const expectedElement = videoElement;
+    if (!expectedTrack || !expectedElement) {
       return;
     }
 
     try {
-      await videoElement.play();
+      await expectedElement.play();
+      // Unsubscribe / setElements / disconnect могли сменить дорожку, пока play() висел.
+      if (disconnected || videoTrack !== expectedTrack || videoElement !== expectedElement) {
+        return;
+      }
       videoPlaybackError = null;
       emitAfterPlaybackAttempt();
     } catch (error) {
+      if (disconnected || videoTrack !== expectedTrack || videoElement !== expectedElement) {
+        return;
+      }
       videoPlaybackError = formatVideoPlaybackError(error);
       emitState({
         error: videoPlaybackError ?? audioPlaybackError,
