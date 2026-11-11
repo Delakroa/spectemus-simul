@@ -261,6 +261,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [SPS-725_PUBLIC_LIVEKIT_CLIENT_CONNECTION.md](SPS-725_PUBLIC_LIVEKIT_CLIENT_CONNECTION.md) — browser cookie и desktop Bearer mint public LiveKit token, client connect без publish фильма.
 - [SPS-726_PUBLIC_MEDIA_PUBLISH.md](SPS-726_PUBLIC_MEDIA_PUBLISH.md) — desktop HOST публикует локальный фильм в public LiveKit; guest remote playback вне тикета.
 - [SPS-727_PUBLIC_GUEST_PLAYBACK.md](SPS-727_PUBLIC_GUEST_PLAYBACK.md) — guest воспроизводит movie-video/movie-audio в Internet-комнате без sync.
+- [SPS-728_INTERNET_PLAYBACK_SYNC.md](SPS-728_INTERNET_PLAYBACK_SYNC.md) — Internet host play/pause/seek исходного видео и display-only sync для гостя.
 - [WT-652_INTERNET_MODE_ARCHITECTURE.md](WT-652_INTERNET_MODE_ARCHITECTURE.md) — отдельный public Internet mode: account/invite, TLS/TURN, privacy, cost gates и последовательность запуска.
 - [WT-653_PUBLIC_ACCESS_CONTRACTS.md](WT-653_PUBLIC_ACCESS_CONTRACTS.md) — контракт изолированного `/api/v2` для account, membership и hash-only invite; LAN API не меняется.
 - [WT-657_DESKTOP_INSTALL_SMOKE.md](WT-657_DESKTOP_INSTALL_SMOKE.md) — CI монтирует DMG и устанавливает NSIS, затем проверяет runtime-компоненты готового приложения.
