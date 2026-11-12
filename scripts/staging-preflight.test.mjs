@@ -140,6 +140,10 @@ test("public overlay is opt-in and public gateway blocks LAN and operator routes
     `${root}infra/staging/public-caddy-app-route.fragment.yaml`,
     "utf8",
   );
+  const publicServerDirectives = gateway.slice(
+    gateway.indexOf("server {"),
+    gateway.indexOf("location = /gateway-health"),
+  );
   const frontendDockerfile = readFileSync(`${root}frontend/Dockerfile`, "utf8");
   assert.doesNotMatch(base, /PUBLIC_ACCESS_ENABLED: "true"/);
   assert.match(overlay, /PUBLIC_ACCESS_ENABLED: "true"/);
@@ -163,6 +167,8 @@ test("public overlay is opt-in and public gateway blocks LAN and operator routes
   assert.match(gateway, /location \^~ \/actuator\/ \{ return 404; \}/);
   assert.match(gateway, /location \^~ \/api\/v2\/ \{/);
   assert.match(gateway, /listen 80 proxy_protocol;/);
+  assert.match(publicServerDirectives, /access_log off;/);
+  assert.match(publicServerDirectives, /error_log \/dev\/null;/);
   assert.match(gateway, /X-Forwarded-For \$proxy_protocol_addr;/);
   assert.match(overlay, /127\.0\.0\.1:8081\/gateway-health/);
   assert.match(caddyRoute, /proxy_protocol: v2/);
