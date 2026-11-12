@@ -2229,6 +2229,54 @@ a {
   color: var(--muted);
 }
 
+.internet-connection-diagnostics {
+  margin: 0 0 18px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.internet-connection-diagnostics summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.internet-connection-diagnostics p {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.internet-connection-diagnostics dl {
+  display: grid;
+  gap: 8px;
+}
+
+.internet-connection-diagnostics dl > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.internet-connection-diagnostics dt {
+  color: var(--muted);
+}
+
+.internet-connection-diagnostics dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.internet-connection-diagnostics pre {
+  overflow-x: auto;
+  margin-bottom: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--surface-subtle);
+  white-space: pre-wrap;
+}
+
 .internet-host__ready,
 .internet-host__result {
   display: grid;

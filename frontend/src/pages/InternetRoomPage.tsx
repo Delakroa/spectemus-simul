@@ -11,6 +11,14 @@ import {
   type PublicLiveKitTokenResponse,
 } from "../features/internet/internet-api";
 import {
+  connectionQualityLabel,
+  connectionStatusLabel,
+  formatConnectionDiagnostics,
+  initialConnectionDiagnostics,
+  withConnectionQuality,
+  withConnectionStatus,
+} from "../features/internet/connection-diagnostics";
+import {
   formatInternetPlaybackClock,
   formatInternetPlaybackSyncStatus,
   useInternetGuestPlaybackSync,
@@ -79,6 +87,7 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
   const [mediaRetry, setMediaRetry] = useState(0);
   const [membership, setMembership] = useState<MembershipState>({ status: "loading" });
   const [media, setMedia] = useState<MediaState>({ status: "idle" });
+  const [connectionDiagnostics, setConnectionDiagnostics] = useState(initialConnectionDiagnostics);
   const [liveKitRoom, setLiveKitRoom] = useState<LiveKitRoom | null>(null);
 
   const isHost = membership.status === "ready" && membership.mediaRole === "HOST";
@@ -163,6 +172,7 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
           return;
         }
         setMedia({ status: "connecting" });
+        setConnectionDiagnostics((current) => withConnectionStatus(current, "connecting"));
         setLiveKitRoom(null);
         const token = await fetchPublicLiveKitToken(publicRoomId, controller.signal);
         if (cancelled || controller.signal.aborted) {
@@ -177,10 +187,15 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
           roleLabel: token.role === "HOST" ? "хозяин" : "гость",
         });
         const connection = await connectLiveKitRoom(token, {
-          onError: (message) => {
+          onError: () => {
             if (!cancelled) {
               setLiveKitRoom(null);
-              setMedia({ status: "error", message, canRetry: true });
+              setConnectionDiagnostics((current) => withConnectionStatus(current, "error"));
+              setMedia({
+                status: "error",
+                message: "Не удалось подключиться к просмотру. Попробуйте ещё раз.",
+                canRetry: true,
+              });
             }
           },
           onStatusChange: (status) => {
@@ -190,7 +205,13 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
             if (status === "disconnected") {
               setLiveKitRoom(null);
             }
+            setConnectionDiagnostics((current) => withConnectionStatus(current, status));
             setMedia({ status });
+          },
+          onQualityChange: (quality) => {
+            if (!cancelled) {
+              setConnectionDiagnostics((current) => withConnectionQuality(current, quality));
+            }
           },
         });
         if (cancelled) {
@@ -204,6 +225,7 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
           return;
         }
         setLiveKitRoom(null);
+        setConnectionDiagnostics((current) => withConnectionStatus(current, "error"));
         setMedia({
           status: "error",
           message: liveKitErrorMessage(caught),
@@ -247,6 +269,7 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
       {membership.status === "ready" ? (
         <>
           <p className="internet-invite__meta">Роль: {membership.roleLabel}</p>
+          <InternetConnectionDiagnostics diagnostics={connectionDiagnostics} />
           {media.status === "connecting" || media.status === "idle" ? (
             <p role="status">Подключаемся к public LiveKit…</p>
           ) : null}
@@ -305,6 +328,52 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
         </button>
       ) : null}
     </InternetRoomShell>
+  );
+}
+
+function InternetConnectionDiagnostics({
+  diagnostics,
+}: {
+  diagnostics: typeof initialConnectionDiagnostics;
+}) {
+  const [copyFailed, setCopyFailed] = useState(false);
+  const report = formatConnectionDiagnostics(diagnostics);
+
+  async function copyReport() {
+    try {
+      await navigator.clipboard.writeText(report);
+      setCopyFailed(false);
+    } catch {
+      setCopyFailed(true);
+    }
+  }
+
+  return (
+    <details className="internet-connection-diagnostics">
+      <summary>Диагностика соединения · {connectionStatusLabel(diagnostics.status)}</summary>
+      <p>Отчёт содержит только состояние соединения. Он никуда не отправляется автоматически.</p>
+      <dl>
+        <div>
+          <dt>Соединение</dt>
+          <dd>{connectionStatusLabel(diagnostics.status)}</dd>
+        </div>
+        <div>
+          <dt>Качество связи</dt>
+          <dd>{connectionQualityLabel(diagnostics.quality)}</dd>
+        </div>
+        <div>
+          <dt>Попыток автовосстановления</dt>
+          <dd>{diagnostics.reconnectCount}</dd>
+        </div>
+      </dl>
+      <button className="button" onClick={() => void copyReport()} type="button">
+        Скопировать диагностику
+      </button>
+      {copyFailed ? (
+        <p role="alert">Не удалось скопировать автоматически. Выделите текст ниже.</p>
+      ) : null}
+      <pre>{report}</pre>
+    </details>
   );
 }
 
