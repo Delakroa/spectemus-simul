@@ -62,7 +62,7 @@ export function parseEnvironment(source) {
   return values;
 }
 
-export function validateConfiguration(values) {
+export function validateConfiguration(values, { publicMode = false } = {}) {
   const problems = [];
   const domains = requiredDomains.map((key) => {
     const value = values[key]?.trim().toLowerCase();
@@ -96,7 +96,86 @@ export function validateConfiguration(values) {
     }
   }
 
+  if (publicMode) {
+    problems.push(...validatePublicConfiguration(values));
+  }
+
   return { domains, problems };
+}
+
+export function validatePublicConfiguration(values) {
+  const problems = [];
+  const requiredPublicSecrets = {
+    PUBLIC_ACCESS_JDBC_USERNAME: 1,
+    PUBLIC_ACCESS_JDBC_PASSWORD: 24,
+    PUBLIC_ACCESS_IDENTITY_PEPPER: 32,
+    PUBLIC_ACCESS_EMAIL_USERNAME: 1,
+    PUBLIC_ACCESS_EMAIL_PASSWORD: 24,
+    PUBLIC_LIVEKIT_API_KEY: 8,
+    PUBLIC_LIVEKIT_API_SECRET: 32,
+  };
+
+  for (const [key, minimumLength] of Object.entries(requiredPublicSecrets)) {
+    const value = values[key]?.trim();
+    if (!value || value.length < minimumLength || isPlaceholder(value)) {
+      problems.push(`${key} не задан или выглядит как sample-значение.`);
+    }
+  }
+
+  const jdbcUrl = values.PUBLIC_ACCESS_JDBC_URL?.trim();
+  try {
+    if (!jdbcUrl?.startsWith("jdbc:postgresql://")) {
+      throw new Error("not PostgreSQL");
+    }
+    const url = new URL(jdbcUrl.slice(5));
+    if (
+      !url.hostname ||
+      ["localhost", "127.0.0.1", "::1", "[::1]"].includes(
+        url.hostname.toLowerCase(),
+      ) ||
+      !url.pathname ||
+      url.pathname === "/" ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      url.hostname.endsWith(".example.com") ||
+      url.hostname.endsWith(".test") ||
+      isPlaceholder(jdbcUrl)
+    ) {
+      throw new Error("invalid JDBC URL");
+    }
+  } catch {
+    problems.push(
+      "PUBLIC_ACCESS_JDBC_URL должен быть jdbc:postgresql://host/database без учётных данных в URL и без loopback.",
+    );
+  }
+
+  const smtpHost = values.PUBLIC_ACCESS_EMAIL_HOST?.trim();
+  if (
+    !smtpHost ||
+    isPlaceholder(smtpHost) ||
+    !isPublicHostname(smtpHost.toLowerCase())
+  ) {
+    problems.push("PUBLIC_ACCESS_EMAIL_HOST должен быть именем SMTP-сервера.");
+  }
+  const smtpPort = Number(values.PUBLIC_ACCESS_EMAIL_PORT ?? "587");
+  if (!Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65535) {
+    problems.push("PUBLIC_ACCESS_EMAIL_PORT должен быть портом 1–65535.");
+  }
+  const sender = values.PUBLIC_ACCESS_EMAIL_FROM?.trim();
+  if (
+    !sender ||
+    isPlaceholder(sender) ||
+    !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(sender) ||
+    !isPublicHostname(sender.split("@").at(-1).toLowerCase())
+  ) {
+    problems.push(
+      "PUBLIC_ACCESS_EMAIL_FROM должен быть адресом на публичном домене.",
+    );
+  }
+
+  return problems;
 }
 
 export async function verifyDns(domains, expectedAddress, resolver = resolve4) {
@@ -186,7 +265,9 @@ async function main(args) {
   const options = parseArguments(args);
   const source = await readFile(options.envFile, "utf8");
   const values = parseEnvironment(source);
-  const result = validateConfiguration(values);
+  const result = validateConfiguration(values, {
+    publicMode: options.publicMode,
+  });
 
   if (options.verifyDns && result.problems.length === 0) {
     result.problems.push(
@@ -204,6 +285,11 @@ async function main(args) {
 
   console.log("[ok] protected staging env contains no sample values");
   console.log("[ok] app, rtc and turn use three distinct public domains");
+  if (options.publicMode) {
+    console.log(
+      "[ok] public access, PostgreSQL, SMTP and public LiveKit settings have no sample values",
+    );
+  }
   if (options.verifyDns) {
     console.log(`[ok] all staging A-records point to ${options.publicIpv4}`);
   } else {
@@ -221,6 +307,7 @@ export function parseArguments(args) {
   let envFile;
   let publicIpv4;
   let verifyDns = false;
+  let publicMode = false;
 
   for (let index = 0; index < normalizedArgs.length; index += 1) {
     const argument = normalizedArgs[index];
@@ -230,6 +317,8 @@ export function parseArguments(args) {
       publicIpv4 = normalizedArgs[++index];
     } else if (argument === "--verify-dns") {
       verifyDns = true;
+    } else if (argument === "--public") {
+      publicMode = true;
     } else {
       throw new Error(`Неизвестный аргумент ${argument}.`);
     }
@@ -244,7 +333,7 @@ export function parseArguments(args) {
     throw new Error("Для --verify-dns укажите публичный IPv4 выбранной VM.");
   }
 
-  return { envFile, publicIpv4, verifyDns };
+  return { envFile, publicIpv4, verifyDns, publicMode };
 }
 
 const scriptPath = fileURLToPath(import.meta.url);
