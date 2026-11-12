@@ -623,6 +623,65 @@ test("sends only an allowlisted Internet connection event through device Bearer"
   await rm(userDataPath, { recursive: true, force: true });
 });
 
+test("changed packaged origin cannot reuse an old device credential", async () => {
+  const userDataPath = await mkdtemp(
+    join(tmpdir(), "spectemus-binding-origin-"),
+  );
+  const requests = [];
+  const oldOrigin = "https://old.spectemus.org";
+  const safeStorageImpl = {
+    isEncryptionAvailable: () => true,
+    encryptString: (value) => Buffer.from(value, "utf8"),
+    decryptString: (buffer) => buffer.toString("utf8"),
+  };
+  try {
+    await writeFile(
+      join(userDataPath, "device-binding.bin"),
+      safeStorageImpl.encryptString(
+        JSON.stringify({
+          deviceCredential: "c".repeat(43),
+          apiOrigin: oldOrigin,
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          profile: {
+            accountId: "11111111-1111-4111-8111-111111111111",
+            displayName: "Host",
+          },
+        }),
+      ),
+    );
+    const controller = createDeviceBindingController({
+      apiOrigin: "https://new.spectemus.org",
+      userDataPath,
+      safeStorageImpl,
+      openExternal: async () => {},
+      fetchImpl: async (url) => {
+        requests.push(String(url));
+        return jsonResponse(204);
+      },
+    });
+    assert.deepEqual(await controller.status(), {
+      bound: false,
+      requiresRevoke: true,
+    });
+    await assert.rejects(() => controller.start(), {
+      code: "DEVICE_ORIGIN_CHANGED",
+    });
+    await assert.rejects(
+      () => controller.createPublicRoom({ expiresInMinutes: 180 }),
+      {
+        code: "ACCOUNT_REQUIRED",
+      },
+    );
+    assert.deepEqual(requests, []);
+    assert.deepEqual(await controller.clear(), { bound: false });
+    assert.deepEqual(requests, [
+      `${oldOrigin}/api/v2/account/device-sessions/revoke`,
+    ]);
+  } finally {
+    await rm(userDataPath, { recursive: true, force: true });
+  }
+});
+
 function jsonResponse(status, body) {
   return {
     ok: status >= 200 && status < 300,

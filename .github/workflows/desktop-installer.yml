@@ -8,6 +8,11 @@ on:
         required: true
         default: false
         type: boolean
+      public_origin:
+        description: "Опционально: HTTPS origin закрытого Internet-стенда; пусто = обычный LAN installer"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -17,6 +22,9 @@ jobs:
     name: macOS DMG (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
+    env:
+      SPECTEMUS_PUBLIC_BUILD_ENABLED: ${{ inputs.public_origin != '' }}
+      SPECTEMUS_PUBLIC_API_ORIGIN: ${{ inputs.public_origin }}
     strategy:
       fail-fast: false
       matrix:
@@ -32,6 +40,8 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      - name: Проверить режим Internet installer до сборки sidecars
+        run: node scripts/desktop-prepare.mjs --validate-only
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -111,6 +121,9 @@ jobs:
     name: Windows NSIS
     runs-on: windows-latest
     timeout-minutes: 35
+    env:
+      SPECTEMUS_PUBLIC_BUILD_ENABLED: ${{ inputs.public_origin != '' }}
+      SPECTEMUS_PUBLIC_API_ORIGIN: ${{ inputs.public_origin }}
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -118,6 +131,8 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      - name: Проверить режим Internet installer до сборки sidecars
+        run: node scripts/desktop-prepare.mjs --validate-only
       - uses: actions/setup-java@v5
         with:
           distribution: temurin

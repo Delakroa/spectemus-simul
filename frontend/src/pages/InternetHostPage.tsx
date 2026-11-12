@@ -39,7 +39,7 @@ type HostStep =
 
 type HostError = {
   message: string;
-  retryAction: "bootstrap" | "email" | "code" | "bind" | "create" | "clear" | null;
+  retryAction: "bootstrap" | "email" | "code" | "bind" | "create" | "clear" | "revoke" | null;
   canRequestNewCode?: boolean;
 };
 
@@ -136,6 +136,14 @@ function DesktopInternetHostEntry({
       if (status.bound) {
         setDisplayName(status.profile.displayName);
         setStep("ready");
+        return;
+      }
+      if (status.requiresRevoke) {
+        setStep("error");
+        setError({
+          message: "Адрес Internet-сервера изменился. Сначала отвяжите прежний аккаунт.",
+          retryAction: "revoke",
+        });
         return;
       }
       setStep("bind");
@@ -433,6 +441,16 @@ function DesktopInternetHostEntry({
               type="button"
             >
               Повторить отзыв
+            </button>
+          ) : null}
+          {error.retryAction === "revoke" ? (
+            <button
+              className="button"
+              disabled={pending}
+              onClick={() => void clearBinding()}
+              type="button"
+            >
+              Отвязать прежний аккаунт
             </button>
           ) : null}
         </div>

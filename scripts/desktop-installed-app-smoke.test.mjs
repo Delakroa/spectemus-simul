@@ -11,6 +11,11 @@ const script = join(
   "scripts",
   "desktop-installed-app-smoke.mjs",
 );
+const defaultBuildEnvironment = {
+  ...process.env,
+  SPECTEMUS_PUBLIC_BUILD_ENABLED: "false",
+  SPECTEMUS_PUBLIC_API_ORIGIN: "",
+};
 
 test("install smoke принимает macOS app с каждым bundled компонентом", async () => {
   const appPath = await mkdtemp(join(tmpdir(), "spectemus-installed-mac-"));
@@ -20,7 +25,7 @@ test("install smoke принимает macOS app с каждым bundled ком�
     const result = spawnSync(
       process.execPath,
       [script, "--platform", "mac", "--app", appPath],
-      { encoding: "utf8" },
+      { encoding: "utf8", env: defaultBuildEnvironment },
     );
 
     assert.equal(result.status, 0, result.stderr);
@@ -50,11 +55,34 @@ test("install smoke ловит присутствующий, но незапус
     const result = spawnSync(
       process.execPath,
       [script, "--platform", "mac", "--app", appPath],
-      { encoding: "utf8" },
+      { encoding: "utf8", env: defaultBuildEnvironment },
     );
 
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /FFmpeg normalizer не запускается/);
+  } finally {
+    await rm(appPath, { recursive: true, force: true });
+  }
+});
+
+test("install smoke отклоняет Internet config, не совпадающий с режимом installer", async () => {
+  const appPath = await mkdtemp(join(tmpdir(), "spectemus-installed-origin-"));
+  try {
+    await createMacApp(appPath);
+    const result = spawnSync(
+      process.execPath,
+      [script, "--platform", "mac", "--app", appPath],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          SPECTEMUS_PUBLIC_BUILD_ENABLED: "true",
+          SPECTEMUS_PUBLIC_API_ORIGIN: "https://app.spectemus.org",
+        },
+      },
+    );
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /неверный Internet build config/);
   } finally {
     await rm(appPath, { recursive: true, force: true });
   }
@@ -65,6 +93,7 @@ test("install smoke сообщает об отсутствующем Windows sid
   try {
     await createFile(appPath, "Spectemus Simul.exe");
     await createFile(appPath, "resources/frontend/index.html");
+    await createBuildConfig(appPath, "resources/public-build-config.json");
     await createFile(
       appPath,
       "resources/sidecars/backend/spectemus-simul-backend.jar",
@@ -74,7 +103,7 @@ test("install smoke сообщает об отсутствующем Windows sid
     const result = spawnSync(
       process.execPath,
       [script, "--platform", "win", "--app", appPath],
-      { encoding: "utf8" },
+      { encoding: "utf8", env: defaultBuildEnvironment },
     );
 
     assert.notEqual(result.status, 0);
@@ -108,6 +137,7 @@ async function createMacApp(appPath) {
   await Promise.all([
     createFile(appPath, "Contents/MacOS/Spectemus Simul"),
     createFile(appPath, "Contents/Resources/frontend/index.html"),
+    createBuildConfig(appPath, "Contents/Resources/public-build-config.json"),
     createFile(
       appPath,
       "Contents/Resources/sidecars/backend/spectemus-simul-backend.jar",
@@ -121,6 +151,19 @@ async function createMacApp(appPath) {
     createExecutable(appPath, "Contents/Resources/sidecars/media/bin/ffmpeg"),
     createExecutable(appPath, "Contents/Resources/sidecars/media/bin/ffprobe"),
   ]);
+}
+
+async function createBuildConfig(root, relativePath) {
+  const filePath = join(root, relativePath);
+  await mkdir(dirname(filePath), { recursive: true });
+  await writeFile(
+    filePath,
+    JSON.stringify({
+      schemaVersion: 1,
+      internetModeEnabled: false,
+      publicApiOrigin: null,
+    }),
+  );
 }
 
 async function createFile(root, relativePath) {

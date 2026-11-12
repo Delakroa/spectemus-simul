@@ -34,6 +34,10 @@
     ],
     "extraResources": [
       {
+        "from": ".sidecars/public-build-config.json",
+        "to": "public-build-config.json"
+      },
+      {
         "from": "../frontend/dist",
         "to": "frontend"
       },

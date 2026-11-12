@@ -1,6 +1,11 @@
 import { spawnSync } from "node:child_process";
 import { access, constants, stat } from "node:fs/promises";
 import { resolve } from "node:path";
+import {
+  loadPublicBuildConfig,
+  PUBLIC_BUILD_CONFIG_NAME,
+} from "../desktop/src/main/public-build-config.mjs";
+import { resolveDesktopBuildSettings } from "./desktop-prepare.mjs";
 import { createIsolatedWindowsProbeEnvironment } from "./desktop-installed-app-environment.mjs";
 
 const { platform, appPath } = readArguments(process.argv.slice(2));
@@ -14,6 +19,7 @@ const ffprobe = platform === "mac" ? "ffprobe" : "ffprobe.exe";
 const required = [
   [executable, "desktop executable"],
   [`${resources}/frontend/index.html`, "React UI"],
+  [`${resources}/${PUBLIC_BUILD_CONFIG_NAME}`, "desktop public build config"],
   [
     `${resources}/sidecars/backend/spectemus-simul-backend.jar`,
     "Spring Boot jar",
@@ -73,6 +79,17 @@ const executables = [
 
 for (const [relativePath, label] of required) {
   await assertFile(resolve(appPath, relativePath), label);
+}
+
+const expectedBuild = resolveDesktopBuildSettings(process.env).config;
+const actualBuild = await loadPublicBuildConfig({
+  packaged: true,
+  resourcesPath: resolve(appPath, resources),
+});
+if (JSON.stringify(actualBuild) !== JSON.stringify(expectedBuild)) {
+  throw new Error(
+    "Установленный desktop содержит неверный Internet build config",
+  );
 }
 
 for (const [relativePath, args, label] of executables) {

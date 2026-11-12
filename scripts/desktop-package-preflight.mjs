@@ -1,5 +1,11 @@
-import { access, constants } from "node:fs/promises";
+import { access, constants, readFile, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
+
+import {
+  loadPublicBuildConfig,
+  PUBLIC_BUILD_CONFIG_NAME,
+} from "../desktop/src/main/public-build-config.mjs";
+import { resolveDesktopBuildSettings } from "./desktop-prepare.mjs";
 
 const platform = readPlatform(process.argv.slice(2));
 const root = process.cwd();
@@ -9,6 +15,10 @@ const ffmpeg = platform === "win" ? "ffmpeg.exe" : "ffmpeg";
 const ffprobe = platform === "win" ? "ffprobe.exe" : "ffprobe";
 const required = [
   [resolve(root, "frontend", "dist", "index.html"), "собранный React UI"],
+  [
+    resolve(root, "desktop", ".sidecars", PUBLIC_BUILD_CONFIG_NAME),
+    "desktop public build config",
+  ],
   [
     resolve(root, "backend", "build", "libs", "spectemus-simul-backend.jar"),
     "Spring Boot jar",
@@ -101,6 +111,33 @@ if (platform === "win") {
 
 for (const [filePath, label, executableFile] of required) {
   await assertAvailable(filePath, label, executableFile);
+}
+
+const expectedBuild = resolveDesktopBuildSettings(process.env).config;
+const actualBuild = await loadPublicBuildConfig({
+  packaged: true,
+  resourcesPath: resolve(root, "desktop", ".sidecars"),
+});
+if (JSON.stringify(actualBuild) !== JSON.stringify(expectedBuild)) {
+  throw new Error(
+    "Desktop public build config не совпадает с выбранным режимом сборки",
+  );
+}
+if (actualBuild.internetModeEnabled) {
+  const assetsPath = resolve(root, "frontend", "dist", "assets");
+  const assets = (await readdir(assetsPath)).filter((name) =>
+    name.endsWith(".js"),
+  );
+  const includesOrigin = await Promise.all(
+    assets.map(async (name) =>
+      (await readFile(resolve(assetsPath, name), "utf8")).includes(
+        actualBuild.publicApiOrigin,
+      ),
+    ),
+  );
+  if (!includesOrigin.some(Boolean)) {
+    throw new Error("Internet frontend не содержит доверенный public origin");
+  }
 }
 
 console.log(`[ok] ${platform} packaging input готов.`);
