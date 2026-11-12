@@ -39,6 +39,18 @@ assert.equal(
 );
 const publicLiveKitToken =
   openApi.paths["/api/v2/public-rooms/{publicRoomId}/livekit-token"].post;
+const publicConnectionTelemetry =
+  openApi.paths["/api/v2/public-rooms/{publicRoomId}/connection-telemetry"]
+    .post;
+assert.deepEqual(
+  publicConnectionTelemetry.security,
+  [{ accountSessionCookie: [] }, { deviceSessionBearer: [] }],
+  "Internet telemetry must require an account cookie or device Bearer",
+);
+assert.equal(
+  publicConnectionTelemetry["x-implementation-status"],
+  "implemented",
+);
 assert.equal(
   publicLiveKitToken["x-implementation-status"],
   "implemented",
@@ -195,6 +207,26 @@ ajv.addSchema(problemSchema);
 const validateProblem = ajv.compile(problemSchema);
 const validateClientEvent = ajv.compile(clientEventSchema);
 const validateServerEvent = ajv.compile(serverEventSchema);
+const validatePublicConnectionTelemetry = ajv.compile(
+  openApi.components.schemas.PublicConnectionTelemetryRequest,
+);
+assertValid(
+  validatePublicConnectionTelemetry,
+  { type: "RECONNECTING" },
+  "Internet connection telemetry event",
+);
+for (const invalid of [
+  {},
+  { type: "UNKNOWN" },
+  { type: "CONNECTED", roomId: "should-not-be-here" },
+  { type: "CONNECTED", detail: "free text" },
+]) {
+  assert.equal(
+    validatePublicConnectionTelemetry(invalid),
+    false,
+    "Internet telemetry contract must reject identifiers and free text",
+  );
+}
 
 const [
   problemExample,

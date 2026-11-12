@@ -93,6 +93,10 @@ public class SecurityConfig {
                                         HttpMethod.POST,
                                         "/api/v2/public-rooms/*/livekit-token")
                                 .permitAll()
+                                .requestMatchers(
+                                        HttpMethod.POST,
+                                        "/api/v2/public-rooms/*/connection-telemetry")
+                                .permitAll()
                                 .requestMatchers(HttpMethod.POST, "/api/v2/invite-redemptions")
                                 .permitAll();
                         if (publicAccess.isDeviceBindingEnabled()) {

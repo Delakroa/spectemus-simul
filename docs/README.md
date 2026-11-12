@@ -264,6 +264,7 @@ P7 repo-side готов; реальные evidence/QoS отчёты заполн
 - [SPS-728_INTERNET_PLAYBACK_SYNC.md](SPS-728_INTERNET_PLAYBACK_SYNC.md) — Internet host play/pause/seek исходного видео и display-only sync для гостя.
 - [SPS-729_PUBLIC_STAGING_TRANSPORT.md](SPS-729_PUBLIC_STAGING_TRANSPORT.md) — отдельный opt-in staging для Internet runtime с fail-closed настройками и закрытым LAN API.
 - [SPS-730_INTERNET_CONNECTION_DIAGNOSTICS.md](SPS-730_INTERNET_CONNECTION_DIAGNOSTICS.md) — понятное состояние интернет-соединения и безопасный отчёт без токенов, ссылок и названия фильма.
+- [SPS-731_PUBLIC_CONNECTION_TELEMETRY_FOUNDATION.md](SPS-731_PUBLIC_CONNECTION_TELEMETRY_FOUNDATION.md) — закрытая по умолчанию серверная основа агрегированных событий соединения для Internet-комнат.
 - [WT-652_INTERNET_MODE_ARCHITECTURE.md](WT-652_INTERNET_MODE_ARCHITECTURE.md) — отдельный public Internet mode: account/invite, TLS/TURN, privacy, cost gates и последовательность запуска.
 - [WT-653_PUBLIC_ACCESS_CONTRACTS.md](WT-653_PUBLIC_ACCESS_CONTRACTS.md) — контракт изолированного `/api/v2` для account, membership и hash-only invite; LAN API не меняется.
 - [WT-657_DESKTOP_INSTALL_SMOKE.md](WT-657_DESKTOP_INSTALL_SMOKE.md) — CI монтирует DMG и устанавливает NSIS, затем проверяет runtime-компоненты готового приложения.
