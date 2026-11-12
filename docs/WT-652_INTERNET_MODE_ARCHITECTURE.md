@@ -1,5 +1,12 @@
 # WT-652 — Internet mode architecture
 
+> **Историческое решение, приостановлено SPS-736.** Ниже описан центральный
+> Internet-контур с публичной VM, account и LiveKit. Он остаётся в git для
+> аудита уже выполненной работы, но не является текущим планом продукта.
+> Актуальная цель — комната на компьютере host-а; см.
+> [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) и
+> [SPS-736_HOST_OWNED_INTERNET_ROADMAP.md](SPS-736_HOST_OWNED_INTERNET_ROADMAP.md).
+
 ## Статус
 
 Завершено как архитектурное решение и план безопасного запуска. В этой задаче

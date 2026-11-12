@@ -9,7 +9,10 @@
 ## Документы о продукте
 
 - [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) — единый порядок развития: LAN
-  quality, закрытый Internet mode и release gates.
+  quality, host-owned Internet mode и release gates.
+- [SPS-736_HOST_OWNED_INTERNET_ROADMAP.md](SPS-736_HOST_OWNED_INTERNET_ROADMAP.md) —
+  архитектурный разворот: компьютер host-а ведёт комнату, центральный
+  Internet-контур отложен, следующий шаг — сетевой proof.
 - [WT-662_README_PRODUCT_GUIDE.md](WT-662_README_PRODUCT_GUIDE.md) — граница
   между публичным руководством пользователя и внутренней историей проекта.
 - [WT-664_PRODUCT_ROADMAP_README.md](WT-664_PRODUCT_ROADMAP_README.md) —
