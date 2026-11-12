@@ -6,6 +6,14 @@ const DEVICE_SECRET_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const VERIFICATION_PATH = "/internet/link";
 const PUBLIC_ROOM_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const PUBLIC_CONNECTION_EVENTS = new Set([
+  "CONNECTED",
+  "RECONNECTING",
+  "RECONNECTED",
+  "DISCONNECTED",
+  "QUALITY_POOR",
+  "QUALITY_LOST",
+]);
 
 export function assertPublicHttpsOrigin(rawOrigin) {
   if (typeof rawOrigin !== "string" || !rawOrigin.trim()) {
@@ -398,6 +406,35 @@ export function createDeviceBindingController({
     };
   }
 
+  async function submitPublicConnectionEvent(payload) {
+    if (
+      !payload ||
+      typeof payload !== "object" ||
+      Object.keys(payload).sort().join(",") !== "publicRoomId,type" ||
+      typeof payload.publicRoomId !== "string" ||
+      !PUBLIC_ROOM_ID_PATTERN.test(payload.publicRoomId) ||
+      !PUBLIC_CONNECTION_EVENTS.has(payload.type)
+    ) {
+      throw new Error("Invalid public connection event");
+    }
+    const response = await authorizedFetch(
+      `/api/v2/public-rooms/${encodeURIComponent(payload.publicRoomId)}/connection-telemetry`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: payload.type }),
+        signal: AbortSignal.timeout(5_000),
+      },
+    );
+    if (!response.ok) {
+      throw await toProblem(response);
+    }
+    if (response.status !== 202) {
+      throw new Error("Unexpected Internet telemetry response");
+    }
+    return { accepted: true };
+  }
+
   return {
     status,
     start,
@@ -409,6 +446,7 @@ export function createDeviceBindingController({
     createPublicRoom,
     createPublicInvite,
     mintPublicLiveKitToken,
+    submitPublicConnectionEvent,
     _storagePath: storagePath,
   };
 }

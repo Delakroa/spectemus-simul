@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { ApiProblemError, createResponseError } from "../rooms/room-api";
+import { publicConnectionEventTypes, type PublicConnectionEventType } from "./connection-telemetry";
 
 const dateTimeSchema = z.iso.datetime();
 const displayNameSchema = z.string().min(1).max(64);
@@ -164,6 +165,31 @@ export function mintPublicLiveKitToken(publicRoomId: string, signal?: AbortSigna
     publicLiveKitTokenResponseSchema,
     { method: "POST", signal },
   );
+}
+
+/** Best-effort Internet-only telemetry. Never accepts arbitrary event fields. */
+export async function submitPublicConnectionEvent(
+  publicRoomId: string,
+  type: PublicConnectionEventType,
+): Promise<void> {
+  const roomId = z.uuid().parse(publicRoomId);
+  const eventType = z.enum(publicConnectionEventTypes).parse(type);
+  const response = await fetch(
+    `${apiBaseUrl}/api/v2/public-rooms/${encodeURIComponent(roomId)}/connection-telemetry`,
+    {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ type: eventType }),
+      credentials: "include",
+      signal: AbortSignal.timeout(5_000),
+    },
+  );
+  if (!response.ok) {
+    throw await createResponseError(response);
+  }
+  if (response.status !== 202) {
+    throw new Error("Unexpected Internet telemetry response");
+  }
 }
 
 export function createPublicRoom(

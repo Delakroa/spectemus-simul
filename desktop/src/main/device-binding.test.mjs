@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -542,6 +542,84 @@ test("treats expired stored credential as unbound", async () => {
   assert.equal((await controller.status()).bound, true);
   nowMs = Date.parse("2026-11-10T12:00:00Z");
   assert.equal((await controller.status()).bound, false);
+  await rm(userDataPath, { recursive: true, force: true });
+});
+
+test("sends only an allowlisted Internet connection event through device Bearer", async () => {
+  const userDataPath = await mkdtemp(join(tmpdir(), "spectemus-binding-"));
+  const publicRoomId = "33333333-3333-4333-8333-333333333333";
+  const deviceCredential = "c".repeat(43);
+  const calls = [];
+  const safeStorageImpl = {
+    isEncryptionAvailable: () => true,
+    encryptString: (value) => Buffer.from(`enc:${value}`, "utf8"),
+    decryptString: (buffer) => Buffer.from(buffer).toString("utf8").slice(4),
+  };
+  await writeFile(
+    join(userDataPath, "device-binding.bin"),
+    safeStorageImpl.encryptString(
+      JSON.stringify({
+        apiOrigin: "https://app.example.test",
+        deviceCredential,
+        expiresAt: "2026-11-24T10:00:00Z",
+      }),
+    ),
+  );
+  const controller = createDeviceBindingController({
+    apiOrigin: "https://app.example.test",
+    userDataPath,
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      return { ok: true, status: 202 };
+    },
+    openExternal: async () => undefined,
+    safeStorageImpl,
+    now: () => Date.parse("2026-11-12T10:00:00Z"),
+  });
+
+  await assert.rejects(() =>
+    controller.submitPublicConnectionEvent({
+      publicRoomId,
+      type: "ARBITRARY",
+    }),
+  );
+  await assert.rejects(() =>
+    controller.submitPublicConnectionEvent({
+      publicRoomId,
+      type: "RECONNECTING",
+      apiOrigin: "https://evil.example.test",
+    }),
+  );
+  assert.equal(calls.length, 0);
+
+  assert.deepEqual(
+    await controller.submitPublicConnectionEvent({
+      publicRoomId,
+      type: "RECONNECTING",
+    }),
+    { accepted: true },
+  );
+  assert.equal(calls.length, 1);
+  assert.equal(
+    calls[0].url,
+    `https://app.example.test/api/v2/public-rooms/${publicRoomId}/connection-telemetry`,
+  );
+  assert.equal(
+    calls[0].init.headers.get("Authorization"),
+    `Bearer ${deviceCredential}`,
+  );
+  assert.equal(calls[0].init.body, JSON.stringify({ type: "RECONNECTING" }));
+  assert.equal(calls[0].init.body.includes(deviceCredential), false);
+  assert.equal(calls[0].url.includes(deviceCredential), false);
+
+  await controller.clear({ revokeRemote: false });
+  await assert.rejects(() =>
+    controller.submitPublicConnectionEvent({
+      publicRoomId,
+      type: "RECONNECTED",
+    }),
+  );
+  assert.equal(calls.length, 1);
   await rm(userDataPath, { recursive: true, force: true });
 });
 

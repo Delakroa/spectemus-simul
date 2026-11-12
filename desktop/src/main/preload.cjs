@@ -30,6 +30,8 @@ contextBridge.exposeInMainWorld("spectemusDesktop", {
   // strips custom fields from thrown Errors / rejected reasons.
   mintPublicLiveKitToken: (publicRoomId) =>
     ipcRenderer.invoke("spectemus:mint-public-livekit-token", publicRoomId),
+  submitPublicConnectionEvent: (payload) =>
+    ipcRenderer.invoke("spectemus:public-connection-telemetry", payload),
   onRuntimeStatus: (listener) => {
     const wrapped = (_event, status) => listener(status);
     ipcRenderer.on("spectemus:runtime-status", wrapped);

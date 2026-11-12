@@ -2248,6 +2248,22 @@ a {
   line-height: 1.5;
 }
 
+.internet-connection-diagnostics__consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.internet-connection-diagnostics__consent input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--accent);
+}
+
 .internet-connection-diagnostics dl {
   display: grid;
   gap: 8px;
