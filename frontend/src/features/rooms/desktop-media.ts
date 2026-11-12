@@ -1,3 +1,5 @@
+import type { PublicConnectionEventType } from "../internet/connection-telemetry";
+
 export type DesktopRuntimeStatus = {
   detail: string;
   state: string;
@@ -102,6 +104,10 @@ export type SpectemusDesktopApi = {
   mintPublicLiveKitToken?: (
     publicRoomId: string,
   ) => Promise<DesktopIpcResult<DesktopPublicLiveKitToken>>;
+  submitPublicConnectionEvent?: (payload: {
+    publicRoomId: string;
+    type: PublicConnectionEventType;
+  }) => Promise<{ accepted: true }>;
   normalizeMedia?: (id: string) => Promise<DesktopMediaSelection>;
   onMediaNormalizationProgress?: (
     listener: (progress: DesktopMediaNormalizationProgress) => void,

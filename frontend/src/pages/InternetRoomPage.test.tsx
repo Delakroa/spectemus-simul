@@ -271,6 +271,96 @@ describe("InternetRoomPage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Выделите текст ниже");
   });
 
+  it("отправляет только opt-in события браузерного гостя и не дублирует reconnect", async () => {
+    vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
+    const user = userEvent.setup();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(okJson(roomAccess))
+      .mockResolvedValueOnce(okJson(publicToken))
+      .mockResolvedValue({ ok: true, status: 202 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderRoom();
+    expect(await screen.findByRole("heading", { name: "Ждём фильм" })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await user.click(screen.getByText("Диагностика соединения · Подключено"));
+    await user.click(
+      screen.getByRole("checkbox", {
+        name: "Отправлять агрегированные события соединения для улучшения качества",
+      }),
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    const handlers = connectLiveKitRoom.mock.calls[0]?.[1] as {
+      onStatusChange: (status: string) => void;
+      onQualityChange: (quality: string) => void;
+    };
+    act(() => {
+      handlers.onStatusChange("reconnecting");
+      handlers.onStatusChange("reconnecting");
+      handlers.onQualityChange("poor");
+      handlers.onStatusChange("connected");
+      handlers.onQualityChange("poor");
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6));
+    expect(fetchMock.mock.calls.slice(2).map(([, init]) => JSON.parse(init.body).type)).toEqual([
+      "CONNECTED",
+      "RECONNECTING",
+      "RECONNECTED",
+      "QUALITY_POOR",
+    ]);
+    for (const [url, init] of fetchMock.mock.calls.slice(2)) {
+      expect(url).toBe(`/api/v2/public-rooms/${publicRoomId}/connection-telemetry`);
+      expect(init.body).not.toContain(publicToken.token);
+      expect(init.body).not.toContain(publicRoomId);
+      expect(init.body).not.toContain(publicToken.liveKitUrl);
+    }
+
+    await user.click(
+      screen.getByRole("checkbox", {
+        name: "Отправлять агрегированные события соединения для улучшения качества",
+      }),
+    );
+    act(() => handlers.onStatusChange("disconnected"));
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+  });
+
+  it("desktop host sends telemetry through IPC only and ignores its failure", async () => {
+    vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
+    const user = userEvent.setup();
+    const submitPublicConnectionEvent = vi.fn().mockRejectedValue(new Error("network down"));
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    window.spectemusDesktop = {
+      getRuntimeStatus: async () => ({ detail: "ok", state: "ready" }),
+      onRuntimeStatus: () => () => undefined,
+      restartRuntime: async () => ({ detail: "ok", state: "ready" }),
+      mintPublicLiveKitToken: vi.fn().mockResolvedValue({
+        ok: true,
+        data: { ...publicToken, role: "HOST" },
+      }),
+      submitPublicConnectionEvent,
+    };
+
+    renderRoom();
+    expect(await screen.findByRole("heading", { name: "Подключено" })).toBeInTheDocument();
+    await user.click(screen.getByText("Диагностика соединения · Подключено"));
+    await user.click(
+      screen.getByRole("checkbox", {
+        name: "Отправлять агрегированные события соединения для улучшения качества",
+      }),
+    );
+    await waitFor(() =>
+      expect(submitPublicConnectionEvent).toHaveBeenCalledWith({
+        publicRoomId,
+        type: "CONNECTED",
+      }),
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "Подключено" })).toBeInTheDocument();
+    expect(screen.queryByText("network down")).not.toBeInTheDocument();
+  });
+
   it("не показывает сырой текст ошибки LiveKit с адресом и токеном", async () => {
     vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
     vi.stubGlobal(
@@ -324,6 +414,12 @@ describe("InternetRoomPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Подключено" })).toBeInTheDocument();
     expect(screen.getByText(/Роль: хозяин/)).toBeInTheDocument();
+    await user.click(screen.getByText("Диагностика соединения · Подключено"));
+    expect(
+      screen.getByRole("checkbox", {
+        name: "Отправлять агрегированные события соединения для улучшения качества",
+      }),
+    ).toBeDisabled();
     expect(mintPublicLiveKitToken).toHaveBeenCalledWith(publicRoomId);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(screen.queryByText(/когда хозяин начнёт передачу/)).not.toBeInTheDocument();

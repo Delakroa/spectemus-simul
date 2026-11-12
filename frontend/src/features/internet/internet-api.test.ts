@@ -15,6 +15,7 @@ import {
   publicRoomAccessSchema,
   redeemPublicInvite,
   requestEmailChallenge,
+  submitPublicConnectionEvent,
   toApiProblemError,
   unwrapDesktopIpcResult,
   verifyEmailChallenge,
@@ -46,6 +47,27 @@ afterEach(() => {
 });
 
 describe("internet-api", () => {
+  it("sends only an enum event to authenticated v2 telemetry without reading a receipt", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 202 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await submitPublicConnectionEvent(roomAccess.room.publicRoomId, "RECONNECTING");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/v2/public-rooms/${roomAccess.room.publicRoomId}/connection-telemetry`,
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify({ type: "RECONNECTING" }),
+      }),
+    );
+    expect(fetchMock.mock.calls[0]?.[1].body).not.toContain("roomId");
+    expect(fetchMock.mock.calls[0]?.[1].body).not.toContain("token");
+    await expect(
+      submitPublicConnectionEvent(roomAccess.room.publicRoomId, "ARBITRARY" as never),
+    ).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
   it("читает account с credentials include", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

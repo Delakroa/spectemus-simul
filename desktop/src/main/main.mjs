@@ -194,6 +194,9 @@ if (isPrimaryInstance) {
           deviceBinding.mintPublicLiveKitToken(publicRoomId),
         ),
     );
+    ipcMain.handle("spectemus:public-connection-telemetry", (_event, payload) =>
+      deviceBinding.submitPublicConnectionEvent(payload),
+    );
 
     mainWindow = createWindow();
     await startDesktopHost(process.env.SPECTEMUS_LAN_IP);

@@ -6,10 +6,15 @@ import {
   getPublicRoom,
   isAccountRequiredError,
   mintPublicLiveKitToken,
+  submitPublicConnectionEvent,
   toApiProblemError,
   unwrapDesktopIpcResult,
   type PublicLiveKitTokenResponse,
 } from "../features/internet/internet-api";
+import {
+  createConnectionTelemetryTracker,
+  type PublicConnectionEventType,
+} from "../features/internet/connection-telemetry";
 import {
   connectionQualityLabel,
   connectionStatusLabel,
@@ -56,6 +61,21 @@ function desktopMintApi() {
   return desktop?.mintPublicLiveKitToken ? desktop : null;
 }
 
+async function sendPublicConnectionEvent(
+  publicRoomId: string,
+  type: PublicConnectionEventType,
+): Promise<void> {
+  const desktop = desktopMintApi();
+  if (desktop) {
+    if (!desktop.submitPublicConnectionEvent) {
+      return;
+    }
+    await desktop.submitPublicConnectionEvent({ publicRoomId, type });
+    return;
+  }
+  await submitPublicConnectionEvent(publicRoomId, type);
+}
+
 export function InternetRoomPage() {
   const { publicRoomId = "" } = useParams();
   const enabled = isInternetRoomChoiceEnabled();
@@ -83,12 +103,21 @@ export function InternetRoomPage() {
 function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
   const abortRef = useRef<AbortController | null>(null);
   const connectionRef = useRef<LiveKitConnection | null>(null);
+  const telemetryRef = useRef<ReturnType<typeof createConnectionTelemetryTracker> | null>(null);
   const [membershipRetry, setMembershipRetry] = useState(0);
   const [mediaRetry, setMediaRetry] = useState(0);
   const [membership, setMembership] = useState<MembershipState>({ status: "loading" });
   const [media, setMedia] = useState<MediaState>({ status: "idle" });
   const [connectionDiagnostics, setConnectionDiagnostics] = useState(initialConnectionDiagnostics);
+  const [telemetryEnabled, setTelemetryEnabled] = useState(false);
   const [liveKitRoom, setLiveKitRoom] = useState<LiveKitRoom | null>(null);
+
+  if (telemetryRef.current === null) {
+    telemetryRef.current = createConnectionTelemetryTracker((event) => {
+      // Telemetry is opt-in and best-effort; it must never interrupt the movie.
+      void sendPublicConnectionEvent(publicRoomId, event).catch(() => {});
+    });
+  }
 
   const isHost = membership.status === "ready" && membership.mediaRole === "HOST";
   const isGuest = membership.status === "ready" && membership.mediaRole === "GUEST";
@@ -172,6 +201,7 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
           return;
         }
         setMedia({ status: "connecting" });
+        telemetryRef.current?.onStatus("connecting");
         setConnectionDiagnostics((current) => withConnectionStatus(current, "connecting"));
         setLiveKitRoom(null);
         const token = await fetchPublicLiveKitToken(publicRoomId, controller.signal);
@@ -189,6 +219,7 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
         const connection = await connectLiveKitRoom(token, {
           onError: () => {
             if (!cancelled) {
+              telemetryRef.current?.onStatus("error");
               setLiveKitRoom(null);
               setConnectionDiagnostics((current) => withConnectionStatus(current, "error"));
               setMedia({
@@ -205,11 +236,13 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
             if (status === "disconnected") {
               setLiveKitRoom(null);
             }
+            telemetryRef.current?.onStatus(status);
             setConnectionDiagnostics((current) => withConnectionStatus(current, status));
             setMedia({ status });
           },
           onQualityChange: (quality) => {
             if (!cancelled) {
+              telemetryRef.current?.onQuality(quality);
               setConnectionDiagnostics((current) => withConnectionQuality(current, quality));
             }
           },
@@ -225,6 +258,7 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
           return;
         }
         setLiveKitRoom(null);
+        telemetryRef.current?.onStatus("error");
         setConnectionDiagnostics((current) => withConnectionStatus(current, "error"));
         setMedia({
           status: "error",
@@ -269,7 +303,17 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
       {membership.status === "ready" ? (
         <>
           <p className="internet-invite__meta">Роль: {membership.roleLabel}</p>
-          <InternetConnectionDiagnostics diagnostics={connectionDiagnostics} />
+          <InternetConnectionDiagnostics
+            diagnostics={connectionDiagnostics}
+            telemetryEnabled={telemetryEnabled}
+            telemetryAvailable={
+              !desktopMintApi() || Boolean(desktopMintApi()?.submitPublicConnectionEvent)
+            }
+            onTelemetryEnabledChange={(enabled) => {
+              telemetryRef.current?.setEnabled(enabled);
+              setTelemetryEnabled(enabled);
+            }}
+          />
           {media.status === "connecting" || media.status === "idle" ? (
             <p role="status">Подключаемся к public LiveKit…</p>
           ) : null}
@@ -333,8 +377,14 @@ function InternetRoomSessionView({ publicRoomId }: { publicRoomId: string }) {
 
 function InternetConnectionDiagnostics({
   diagnostics,
+  telemetryEnabled,
+  telemetryAvailable,
+  onTelemetryEnabledChange,
 }: {
   diagnostics: typeof initialConnectionDiagnostics;
+  telemetryEnabled: boolean;
+  telemetryAvailable: boolean;
+  onTelemetryEnabledChange: (enabled: boolean) => void;
 }) {
   const [copyFailed, setCopyFailed] = useState(false);
   const report = formatConnectionDiagnostics(diagnostics);
@@ -352,6 +402,23 @@ function InternetConnectionDiagnostics({
     <details className="internet-connection-diagnostics">
       <summary>Диагностика соединения · {connectionStatusLabel(diagnostics.status)}</summary>
       <p>Отчёт содержит только состояние соединения. Он никуда не отправляется автоматически.</p>
+      <label className="internet-connection-diagnostics__consent">
+        <input
+          checked={telemetryEnabled}
+          disabled={!telemetryAvailable}
+          onChange={(event) => onTelemetryEnabledChange(event.target.checked)}
+          type="checkbox"
+        />
+        Отправлять агрегированные события соединения для улучшения качества
+      </label>
+      <p>
+        По умолчанию выключено. Сервер проверяет ваш доступ по ID комнаты и сессии, но в счётчик
+        записывает только тип события. Ссылка-приглашение, LiveKit-токен и название фильма в теле
+        события не передаются. После отключения новые события не отправляются.
+      </p>
+      {!telemetryAvailable ? (
+        <p>Эта версия приложения ещё не поддерживает отправку диагностики.</p>
+      ) : null}
       <dl>
         <div>
           <dt>Соединение</dt>
