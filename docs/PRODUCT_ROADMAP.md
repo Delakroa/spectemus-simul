@@ -62,17 +62,19 @@ SPS-726 даёт desktop HOST публикацию локального филь
 через переиспользованный LAN media pipeline. SPS-727 подключает guest
 remote playback `movie-video` / `movie-audio`. SPS-728 добавляет Internet
 playback sync: host управляет исходным видео, гость видит состояние без
-перемотки WebRTC-потока.
+перемотки WebRTC-потока. SPS-729 добавляет только repo-side opt-in staging
+для public runtime: отдельные настройки PostgreSQL/SMTP/LiveKit, HTTPS/WSS
+origin и закрытый LAN API. Реальный TURN и межсетевой просмотр ещё не проверены.
 
 ## Порядок задач
 
-| Фаза | Состояние                                     | Результат                                                                                                                                                                               | Незавершённый gate                                                                                             |
-| ---- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| 0    | Код готов: WT-682, WT-684–WT-689, SPS-711–715 | Локальная подготовка и исправления desktop/LAN. Физически форматы и платформы ещё не подтверждены                                                                                       | Mac ↔ Windows matrix перенесена в финальный release-candidate gate                                             |
-| 1    | Код готов, feature выключена: WT-654          | Изолированный `/api/v2`: account, email challenge, membership, отзыв invite и audit                                                                                                     | PostgreSQL, SMTP и sender domain; revoked invite не даёт access                                                |
-| 2    | Код готов, feature выключена: SPS-716/720–728 | Явный выбор LAN/Internet. Public account, room/invite, guest/host entry, desktop binding, LiveKit connect, HOST publish, guest remote movie playback и playback sync изолированы от LAN | WSS/TURN и диагностика. Публичный доступ выключен. Уже выданный JWT живёт до TTL на self-hosted LK             |
-| 3    | Запланировано: private alpha                  | Ограниченная invite-only проверка «host дома → гость в другом городе»                                                                                                                   | Сессии из разных сетей, включая сложную сеть; измерены QoS, TURN usage, стоимость и support load               |
-| 4    | Запланировано: closed beta → release          | Понятная установка, операционный контур и честный UX для малых private rooms                                                                                                            | Успешность сессий, privacy/deletion policy, incident/revoke runbook, физическая matrix и проверенная экономика |
+| Фаза | Состояние                                     | Результат                                                                                                                         | Незавершённый gate                                                                                                     |
+| ---- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 0    | Код готов: WT-682, WT-684–WT-689, SPS-711–715 | Локальная подготовка и исправления desktop/LAN. Физически форматы и платформы ещё не подтверждены                                 | Mac ↔ Windows matrix перенесена в финальный release-candidate gate                                                     |
+| 1    | Код готов, feature выключена: WT-654          | Изолированный `/api/v2`: account, email challenge, membership, отзыв invite и audit                                               | PostgreSQL, SMTP и sender domain; revoked invite не даёт access                                                        |
+| 2    | Код готов, feature выключена: SPS-716/720–729 | Явный выбор LAN/Internet. Public account, room/invite, media, playback sync и opt-in staging application layer изолированы от LAN | Реальные VM/DNS/TLS/WSS/TURN и диагностика. Публичный доступ по умолчанию выключен; JWT живёт до TTL на self-hosted LK |
+| 3    | Запланировано: private alpha                  | Ограниченная invite-only проверка «host дома → гость в другом городе»                                                             | Сессии из разных сетей, включая сложную сеть; измерены QoS, TURN usage, стоимость и support load                       |
+| 4    | Запланировано: closed beta → release          | Понятная установка, операционный контур и честный UX для малых private rooms                                                      | Успешность сессий, privacy/deletion policy, incident/revoke runbook, физическая matrix и проверенная экономика         |
 
 ## Что делаем следующим
 
@@ -84,8 +86,10 @@ account через device-authorization exchange без credential в URL, SPS-7
 подключает Internet-комнату к public LiveKit, SPS-726 публикует локальный
 фильм desktop HOST в public LiveKit, SPS-727 даёт guest remote playback
 movie tracks, SPS-728 синхронизирует play/pause/seek через playback-state
-без перемотки гостевого WebRTC. Internet mode остаётся закрытым. Следующий
-срез — WSS/TURN, диагностика и privacy-safe telemetry. Ни один из этих
+без перемотки гостевого WebRTC. SPS-729 готовит отдельный opt-in staging
+application layer, но не создаёт внешние ресурсы и не доказывает работу TURN.
+Internet mode по умолчанию остаётся закрытым. Следующий срез — диагностика
+соединения и privacy-safe telemetry перед реальным межсетевым прогоном. Ни один из этих
 тикетов не делает LAN-комнату публичной.
 
 Публичный доступ и заявление о готовности Internet mode невозможны, пока не

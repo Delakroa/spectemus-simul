@@ -1,0 +1,15 @@
+# Replace the legacy app route with this one for opt-in Internet staging.
+# Caddy layer4 sends the real client address to the PROXY-v2-only Nginx gateway.
+# Preserve the official generator's rtc/turn routes and their order.
+- match:
+    - tls:
+        sni:
+          - "<APP_DOMAIN>"
+  handle:
+    - handler: tls
+      connection_policies:
+        - alpn: ["http/1.1"]
+    - handler: proxy
+      proxy_protocol: v2
+      upstreams:
+        - dial: ["localhost:8088"]
