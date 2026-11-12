@@ -100,6 +100,13 @@ class RateLimitConfiguration implements WebMvcConfigurer {
                     registry,
                     limiter,
                     meters,
+                    "internet-telemetry",
+                    config.telemetry(),
+                    "/api/v2/public-rooms/*/connection-telemetry");
+            register(
+                    registry,
+                    limiter,
+                    meters,
                     "invite-redemption",
                     config.inviteRedemption(),
                     "/api/v2/invite-redemptions");

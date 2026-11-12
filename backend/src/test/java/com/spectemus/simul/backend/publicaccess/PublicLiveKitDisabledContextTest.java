@@ -32,7 +32,12 @@ class PublicLiveKitDisabledContextTest {
         assertThat(context.getBeansOfType(PublicLiveKitTokenService.class)).isEmpty();
         assertThat(context.getBeansOfType(PublicLiveKitTokenController.class)).isEmpty();
         assertThat(context.getBeansOfType(PublicLiveKitRoomAdminClient.class)).isEmpty();
+        assertThat(context.getBeansOfType(PublicConnectionTelemetryController.class)).isEmpty();
+        assertThat(context.getBeansOfType(PublicConnectionTelemetryService.class)).isEmpty();
         mockMvc.perform(post("/api/v2/public-rooms/{publicRoomId}/livekit-token",
+                        "9de974f2-d79c-4bbf-b5ff-6fc83d608164"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v2/public-rooms/{publicRoomId}/connection-telemetry",
                         "9de974f2-d79c-4bbf-b5ff-6fc83d608164"))
                 .andExpect(status().isForbidden());
     }

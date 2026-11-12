@@ -55,7 +55,8 @@ class RateLimitConfigurationPublicLiveKitTest {
         assertThat(pathCaptor.getAllValues())
                 .contains(
                         "/api/v1/rooms/*/livekit-token",
-                        "/api/v2/public-rooms/*/livekit-token");
+                        "/api/v2/public-rooms/*/livekit-token",
+                        "/api/v2/public-rooms/*/connection-telemetry");
     }
 
     private static <T> ObjectProvider<T> provider(T value) {

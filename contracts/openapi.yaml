@@ -665,6 +665,49 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/v2/public-rooms/{publicRoomId}/connection-telemetry:
+    parameters:
+      - $ref: "#/components/parameters/PublicRoomId"
+    post:
+      tags: [Telemetry]
+      operationId: recordPublicConnectionEvent
+      summary: Учесть агрегированное событие соединения Internet-комнаты
+      description: |
+        Доступно только действующему участнику открытой Internet-комнаты при
+        включённых public access и public LiveKit. Принимает одно событие из
+        фиксированного списка. Событие увеличивает только aggregate counter с
+        low-cardinality тегом event; room ID, account, IP, URL, JWT и свободный
+        текст не попадают в метрики или application log. Browser использует
+        cookie, desktop — device Bearer; cookie имеет приоритет.
+      x-implementation-status: implemented
+      security:
+        - accountSessionCookie: []
+        - deviceSessionBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicConnectionTelemetryRequest"
+      responses:
+        "202":
+          description: Агрегированный счётчик обновлён; receipt не создаётся
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/MembershipRequired"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /api/v2/public-rooms/{publicRoomId}/invites:
     parameters:
       - $ref: "#/components/parameters/PublicRoomId"
@@ -1580,6 +1623,21 @@ components:
         expiresAt:
           type: string
           format: date-time
+
+    PublicConnectionTelemetryRequest:
+      type: object
+      additionalProperties: false
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum:
+            - CONNECTED
+            - RECONNECTING
+            - RECONNECTED
+            - DISCONNECTED
+            - QUALITY_POOR
+            - QUALITY_LOST
 
     EmailChallengeRequest:
       type: object
