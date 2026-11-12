@@ -223,7 +223,7 @@ export function isPublicIpv4(value) {
   );
 }
 
-function isPublicHostname(value) {
+export function isPublicHostname(value) {
   return (
     value.length <= 253 &&
     !value.endsWith(".") &&
