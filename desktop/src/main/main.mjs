@@ -11,6 +11,10 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createDeviceBindingController } from "./device-binding.mjs";
+import {
+  createPublicBuildConfig,
+  loadPublicBuildConfig,
+} from "./public-build-config.mjs";
 import { runAsIpcResult } from "./ipc-result.mjs";
 import { acquireDesktopInstanceLock } from "./instance-lock.mjs";
 import { DesktopMediaLibrary } from "./media-library.mjs";
@@ -60,6 +64,18 @@ const isPrimaryInstance = acquireDesktopInstanceLock(app, focusMainWindow);
 
 if (isPrimaryInstance) {
   app.whenReady().then(async () => {
+    let publicBuildConfig;
+    try {
+      publicBuildConfig = await loadPublicBuildConfig({
+        packaged: app.isPackaged,
+        resourcesPath: process.resourcesPath,
+        environment: process.env,
+      });
+    } catch {
+      // An invalid packaged config must never fall back to a process env origin.
+      console.error("[public] конфигурация Internet build недействительна");
+      publicBuildConfig = createPublicBuildConfig();
+    }
     normalizedMediaDirectory = join(
       app.getPath("temp"),
       "spectemus-simul",
@@ -155,7 +171,7 @@ if (isPrimaryInstance) {
     });
 
     const deviceBinding = createDeviceBindingController({
-      resolveApiOrigin: () => process.env.SPECTEMUS_PUBLIC_API_ORIGIN,
+      resolveApiOrigin: () => publicBuildConfig.publicApiOrigin,
       userDataPath: app.getPath("userData"),
       openExternal: (url) => shell.openExternal(url),
       safeStorageImpl: safeStorage,

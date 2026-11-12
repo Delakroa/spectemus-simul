@@ -157,7 +157,11 @@ Overlay передаёт backend отдельные `PUBLIC_ACCESS_*`/`PUBLIC_LI
 заголовок `Host` не используются как fallback. Для desktop host на тестовом
 компьютере отдельно требуется
 `SPECTEMUS_PUBLIC_API_ORIGIN=https://app.<domain>` — это временная операторская
-настройка, не готовый UX установки для конечного пользователя.
+настройка для dev-запуска. Для установленного desktop host теперь укажите тот
+же HTTPS-адрес как `public_origin` при запуске workflow `Desktop installer`:
+он будет встроен в frontend и Electron main одной opt-in сборкой. Пустой
+`public_origin` сохраняет обычный LAN installer. Это не заменяет настройку
+реальных DNS/TLS/WSS/TURN и не открывает Internet mode на сервере автоматически.
 
 Публичный gateway принимает app-трафик только с PROXY v2 от Caddy и берёт
 адрес гостя из этого протокола, а не из подделываемого клиентом

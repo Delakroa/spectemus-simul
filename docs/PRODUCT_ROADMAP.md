@@ -72,7 +72,7 @@ origin и закрытый LAN API. Реальный TURN и межсетево�
 | ---- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | 0    | Код готов: WT-682, WT-684–WT-689, SPS-711–715 | Локальная подготовка и исправления desktop/LAN. Физически форматы и платформы ещё не подтверждены                                 | Mac ↔ Windows matrix перенесена в финальный release-candidate gate                                                     |
 | 1    | Код готов, feature выключена: WT-654          | Изолированный `/api/v2`: account, email challenge, membership, отзыв invite и audit                                               | PostgreSQL, SMTP и sender domain; revoked invite не даёт access                                                        |
-| 2    | Код готов, feature выключена: SPS-716/720–729 | Явный выбор LAN/Internet. Public account, room/invite, media, playback sync и opt-in staging application layer изолированы от LAN | Реальные VM/DNS/TLS/WSS/TURN и диагностика. Публичный доступ по умолчанию выключен; JWT живёт до TTL на self-hosted LK |
+| 2    | Код готов, feature выключена: SPS-716/720–734 | Явный выбор LAN/Internet. Public account, room/invite, media, playback sync и opt-in staging application layer изолированы от LAN | Реальные VM/DNS/TLS/WSS/TURN и диагностика. Публичный доступ по умолчанию выключен; JWT живёт до TTL на self-hosted LK |
 | 3    | Запланировано: private alpha                  | Ограниченная invite-only проверка «host дома → гость в другом городе»                                                             | Сессии из разных сетей, включая сложную сеть; измерены QoS, TURN usage, стоимость и support load                       |
 | 4    | Запланировано: closed beta → release          | Понятная установка, операционный контур и честный UX для малых private rooms                                                      | Успешность сессий, privacy/deletion policy, incident/revoke runbook, физическая matrix и проверенная экономика         |
 
@@ -95,7 +95,9 @@ enum-события и агрегированные счётчики. SPS-732 п
 к этому контракту только после согласия пользователя в Internet-комнате;
 отправка по умолчанию выключена. SPS-733 отключает журналы запросов на
 публичном gateway и фиксирует проверку логов остальных сервисов как условие
-открытия стенда. Internet mode также остаётся закрытым. Следующий gate —
+открытия стенда. SPS-734 готовит отдельный opt-in desktop installer с единым
+публичным HTTPS origin для интерфейса и Electron main; обычный LAN installer
+остаётся закрытым для Internet mode. Следующий gate —
 реальные VM/DNS/TLS/WSS/TURN, проверка логов на VM и межсетевой прогон. Ни
 один из этих тикетов не делает LAN-комнату публичной.
 

@@ -93,6 +93,14 @@ export function createDeviceBindingController({
     return assertPublicHttpsOrigin(configured);
   }
 
+  function isCurrentOrigin(stored) {
+    try {
+      return stored?.apiOrigin === requireOrigin();
+    } catch {
+      return false;
+    }
+  }
+
   function requireSafeStorage() {
     if (!safeStorageImpl?.isEncryptionAvailable?.()) {
       throw new Error("safeStorage is unavailable");
@@ -138,6 +146,9 @@ export function createDeviceBindingController({
       await clearStoredSession();
       return { bound: false };
     }
+    if (!isCurrentOrigin(stored)) {
+      return { bound: false, requiresRevoke: true };
+    }
     return {
       bound: true,
       profile: {
@@ -150,6 +161,14 @@ export function createDeviceBindingController({
 
   async function start({ signal } = {}) {
     const origin = requireOrigin();
+    const stored = await readStoredSession();
+    if (stored?.deviceCredential && !isCurrentOrigin(stored)) {
+      const error = new Error(
+        "Revoke the previous device session before changing origin",
+      );
+      error.code = "DEVICE_ORIGIN_CHANGED";
+      throw error;
+    }
     cancel();
     const response = await fetchImpl(`${origin}/api/v2/auth/device-bindings`, {
       method: "POST",
@@ -306,6 +325,11 @@ export function createDeviceBindingController({
     if (!stored?.deviceCredential || !stored?.apiOrigin) {
       // Plain problem object; mint IPC wraps it in a resolved {ok:false} envelope.
       throw accountRequiredProblem("Desktop account is not bound");
+    }
+    if (!isCurrentOrigin(stored)) {
+      throw accountRequiredProblem(
+        "Desktop account belongs to another public origin",
+      );
     }
     if (
       typeof stored.expiresAt === "string" &&

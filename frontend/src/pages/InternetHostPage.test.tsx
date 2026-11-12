@@ -284,6 +284,41 @@ describe("InternetHostPage", () => {
     expect(document.body.textContent).not.toMatch(/deviceCredential|deviceCode/);
   });
 
+  it("после смены public origin требует отозвать прежнюю device-сессию", async () => {
+    vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
+    vi.stubEnv("VITE_INTERNET_APP_ORIGIN", "https://app.example.test");
+    const user = userEvent.setup();
+    let requiresRevoke = true;
+    const start = vi.fn();
+    const clear = vi.fn(async () => {
+      requiresRevoke = false;
+      return { bound: false as const };
+    });
+    window.spectemusDesktop = {
+      getRuntimeStatus: async () => ({ detail: "ok", state: "ready" }),
+      onRuntimeStatus: () => () => undefined,
+      restartRuntime: async () => ({ detail: "ok", state: "ready" }),
+      getDeviceBindingStatus: async () =>
+        requiresRevoke ? { bound: false, requiresRevoke: true } : { bound: false },
+      startDeviceBinding: start,
+      openDeviceBinding: async () => {},
+      pollDeviceBinding: async () => ({ status: "pending", intervalSeconds: 5 }),
+      cancelDeviceBinding: async () => ({ cancelled: true }),
+      clearDeviceBinding: clear,
+      createPublicRoomWithDeviceBinding: async () => roomAccess,
+      createPublicInviteWithDeviceBinding: async () => invite,
+    };
+
+    renderPage();
+    expect(await screen.findByText(/Адрес Internet-сервера изменился/)).toBeInTheDocument();
+    expect(start).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Отвязать прежний аккаунт" }));
+    expect(clear).toHaveBeenCalledOnce();
+    expect(
+      await screen.findByRole("button", { name: "Подтвердить аккаунт в браузере" }),
+    ).toBeInTheDocument();
+  });
+
   it("после невосстановимого replay invite создаёт новый invite key", async () => {
     vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
     vi.stubEnv("VITE_INTERNET_APP_ORIGIN", "https://app.example.test");

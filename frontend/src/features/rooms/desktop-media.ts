@@ -19,7 +19,7 @@ export type DesktopMediaNormalizationProgress = {
 };
 
 export type DesktopDeviceBindingStatus =
-  | { bound: false }
+  | { bound: false; requiresRevoke?: boolean }
   | {
       bound: true;
       expiresAt?: string;
