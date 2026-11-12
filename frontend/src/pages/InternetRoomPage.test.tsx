@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -222,6 +222,74 @@ describe("InternetRoomPage", () => {
     );
     expect(connectLiveKitRoom.mock.calls[0]?.[0]).not.toHaveProperty("deviceCredential");
     expect(connectLiveKitRoom.mock.calls[0]?.[0]).not.toHaveProperty("apiOrigin");
+  });
+
+  it("показывает безопасную диагностику переподключения и качества", async () => {
+    vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
+    const user = userEvent.setup();
+    const clipboardWriteText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      clipboard: { writeText: clipboardWriteText },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(okJson(roomAccess)).mockResolvedValueOnce(okJson(publicToken)),
+    );
+
+    renderRoom();
+    expect(await screen.findByRole("heading", { name: "Ждём фильм" })).toBeInTheDocument();
+    const handlers = connectLiveKitRoom.mock.calls[0]?.[1] as {
+      onQualityChange: (quality: string) => void;
+      onStatusChange: (status: string) => void;
+    };
+    await user.click(screen.getByText("Диагностика соединения · Подключено"));
+    act(() => {
+      handlers.onQualityChange("good");
+    });
+    expect(screen.getByText("Хорошее")).toBeInTheDocument();
+    act(() => {
+      handlers.onStatusChange("reconnecting");
+      handlers.onStatusChange("reconnecting");
+      handlers.onQualityChange("excellent");
+    });
+
+    expect(screen.getByText("Диагностика соединения · Восстанавливается")).toBeInTheDocument();
+    expect(screen.getByText("Попыток автовосстановления")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(screen.getByText("Пока неизвестно")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Скопировать диагностику" }));
+    expect(clipboardWriteText).toHaveBeenCalledWith(
+      "Spectemus Simul — Internet-комната\nСоединение: Восстанавливается\nКачество связи: Пока неизвестно\nПопыток автовосстановления: 1",
+    );
+    expect(clipboardWriteText.mock.calls[0]?.[0]).not.toContain(publicToken.token);
+    expect(clipboardWriteText.mock.calls[0]?.[0]).not.toContain(publicRoomId);
+    expect(clipboardWriteText.mock.calls[0]?.[0]).not.toContain(publicToken.liveKitUrl);
+
+    clipboardWriteText.mockRejectedValueOnce(new Error("Clipboard denied"));
+    await user.click(screen.getByRole("button", { name: "Скопировать диагностику" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Выделите текст ниже");
+  });
+
+  it("не показывает сырой текст ошибки LiveKit с адресом и токеном", async () => {
+    vi.stubEnv("VITE_INTERNET_ROOM_RUNTIME_ENABLED", "true");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(okJson(roomAccess)).mockResolvedValueOnce(okJson(publicToken)),
+    );
+    connectLiveKitRoom.mockImplementation(
+      async (_token: unknown, handlers: { onError: (message: string) => void }) => {
+        handlers.onError(`wss://rtc.example.test?token=${publicToken.token}`);
+        throw new Error(`wss://rtc.example.test?token=${publicToken.token}`);
+      },
+    );
+
+    renderRoom();
+    expect(
+      await screen.findByText("Не удалось подключиться к public LiveKit. Попробуйте ещё раз."),
+    ).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain(publicToken.token);
+    expect(document.body.textContent).not.toContain(publicToken.liveKitUrl);
   });
 
   it("desktop owner mintит token через IPC envelope и публикует локальный фильм", async () => {
