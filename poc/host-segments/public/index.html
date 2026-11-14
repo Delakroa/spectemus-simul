@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Spectemus · Segment PoC</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">SPECTEMUS SIMUL · SPS-737</p>
+      <h1>Передача фильма без live-перекодирования</h1>
+      <p class="warning">
+        Изолированный локальный прототип. Не Internet-комната, не новый
+        установщик. Один host и один guest, без STUN/TURN.
+      </p>
+      <h2 id="role">Роль</h2>
+      <p id="status" role="status">Откройте обе ссылки и подключите окна.</p>
+      <div class="actions">
+        <button id="connect">Подключиться</button
+        ><button id="stop">Остановить</button>
+      </div>
+      <video id="video" playsinline></video>
+      <div class="actions" id="host-controls">
+        <button id="play" disabled>Играть</button
+        ><button id="pause" disabled>Пауза</button>
+      </div>
+      <button id="enable" hidden>Разрешить воспроизведение</button>
+      <p>
+        Громкость регулируется средствами системы. Перемотка и восстановление
+        соединения — вне этого PoC.
+      </p>
+      <h2>Диагностика без адресов и ключей</h2>
+      <pre id="metrics">{}</pre>
+    </main>
+    <script type="module" src="/app.mjs"></script>
+  </body>
+</html>

@@ -13,6 +13,9 @@
 - [SPS-736_HOST_OWNED_INTERNET_ROADMAP.md](SPS-736_HOST_OWNED_INTERNET_ROADMAP.md) —
   архитектурный разворот: компьютер host-а ведёт комнату, центральный
   Internet-контур отложен, следующий шаг — сетевой proof.
+- [SPS-737_HOST_SEGMENT_TRANSPORT_POC.md](SPS-737_HOST_SEGMENT_TRANSPORT_POC.md) —
+  изолированный local proof fMP4 → DataChannel → MSE без live encoder;
+  межсетевой gate остаётся открытым.
 - [WT-662_README_PRODUCT_GUIDE.md](WT-662_README_PRODUCT_GUIDE.md) — граница
   между публичным руководством пользователя и внутренней историей проекта.
 - [WT-664_PRODUCT_ROADMAP_README.md](WT-664_PRODUCT_ROADMAP_README.md) —
